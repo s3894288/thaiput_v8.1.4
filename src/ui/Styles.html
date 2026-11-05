@@ -257,7 +257,10 @@ body:has(.actionbar:not([hidden])) .fab-zalo.above-tabs { bottom: calc(166px + e
 
 /* Trang chủ */
 .hero { padding-block: 14px 4px; display: flex; flex-direction: column; gap: 12px; }
-.hero .th-word { font-family: var(--font-thai); color: var(--gold-ink); font-size: 1.05rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: var(--yellow); padding: 6px 14px; border-radius: 999px; }
+/* Ảnh banner thương hiệu (5O): nền ảnh trắng khớp nền trang, bo góc như khối lớn */
+.hero-img { display: block; width: 100%; height: auto; border-radius: var(--radius-xl); }
+/* Viên chữ Thái: nền trắng, chữ đen, viền vàng thương hiệu (đổi 05/11 theo yêu cầu anh Chris) */
+.hero .th-word { font-family: var(--font-thai); color: var(--ink); font-size: 1.05rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: var(--surface); border: 1.5px solid var(--yellow); padding: 6px 14px; border-radius: 999px; }
 .hero h1 { font-size: 2.15rem; line-height: 1.12; }
 .hero p { font-size: 1.02rem; max-width: 46ch; color: var(--ink-2); }
 .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

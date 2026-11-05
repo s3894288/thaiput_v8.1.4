@@ -1,5 +1,5 @@
 /**
- * THAIPUT v8.1.5 · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)
+ * THAIPUT v8.1.6 · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)
  * Gộp từ 38 file trong src/: Config.gs, Schema.gs, Time.gs, Admin.gs, AdminApi.gs, AdminOps.gs, Api.gs, Archive.gs, Assign.gs, Auth.gs, Availability.gs, Backup.gs, Booking.gs, CalendarQueue.gs, CalendarSync.gs, Compensation.gs, Content.gs, Db.gs, EmailTemplates.gs, Jobs.gs, LoadTest.gs, Log.gs, MailTransport.gs, Maintenance.gs, Marketing.gs, Metrics.gs, Notifications.gs, Notify.gs, Packages.gs, Phone.gs, Registration.gs, Release.gs, Report.gs, Reset.gs, Sessions.gs, Setup.gs, SystemMove.gs, TutorLock.gs
  * Không sửa file này: sửa src/ rồi chạy node test/build_dist.js. Hướng dẫn cập nhật: HUONG_DAN_PHAT_HANH.md.
  * Gửi email cố định từ 8.1.4 (MailTransport.gs, GmailApp): KHÔNG cần file MailFix, KHÔNG tìm và thay. Có file MailFix.gs cũ thì xoá.
@@ -21,7 +21,7 @@
  */
 
 var APP = {
-  VERSION: '8.1.5',
+  VERSION: '8.1.6',
   NAME: 'thaiput',
   TIMEZONE: 'Asia/Ho_Chi_Minh'
 };
@@ -6207,7 +6207,7 @@ function withLock_(fn, waitMs) {
 /**
  * EmailTemplates.gs · Mẫu email song ngữ chỉnh trên tab EMAIL_TEMPLATES (chunk 5C)
  *
- * Mỗi email: nửa trên tiếng Việt, nửa dưới tiếng Anh, cùng khung giao diện cũ (emailWrap_).
+ * Mỗi email: nửa trên tiếng Việt, nửa dưới tiếng Anh, cùng khung emailWrap_ (thiết kế 5O đen trắng, gạch vàng thương hiệu).
  * Tiêu đề: tiếng Việt trước rồi tiếng Anh; email cho tutor để tiếng Anh trước (dễ đọc trong hộp thư của tutor).
  * Ô trống trong tab = dùng mẫu gốc dưới đây. Ô chỉ có dấu - = cố ý để trống (ví dụ bỏ tiêu đề tiếng Anh).
  * Cột active = FALSE thì không gửi mẫu đó.
@@ -6436,12 +6436,12 @@ function renderBody_(text, vars, lang) {
   }).join('');
 }
 
-/** Khung email song ngữ: giữ giao diện cũ. Mặc định tiếng Việt trên, tiếng Anh dưới; enFirst (email cho tutor) thì đảo lại. */
+/** Khung email song ngữ (khung 5O trong emailWrap_). Mặc định tiếng Việt trên, tiếng Anh dưới; enFirst (email cho tutor) thì đảo lại. */
 function emailWrapBi_(titleVi, htmlVi, titleEn, htmlEn, enFirst) {
   var first = enFirst && htmlEn ? [titleEn, htmlEn, titleVi, htmlVi, 'Tiếng Việt'] : [titleVi, htmlVi, titleEn, htmlEn, 'English'];
-  var second = first[3] ? '<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #d6d3cc">' +
+  var second = first[3] ? '<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #d6d6d1">' +
     '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">' + first[4] + '</div>' +
-    '<h2 style="margin:0 0 14px;font-size:19px;color:#14532d">' + esc_(first[2]) + '</h2>' + first[3] + '</div>' : '';
+    '<h2 style="margin:0 0 14px;font-size:19px;color:#141414">' + esc_(first[2]) + '</h2>' + first[3] + '</div>' : '';
   return emailWrap_(first[0], first[1] + second, 'bi');
 }
 
@@ -7871,17 +7871,18 @@ function emailWrap_(title, inner, lang) {
   var zalo = cfg_('ADMIN_ZALO_URL');
   var contact = [];
   if (zalo) contact.push('<a href="' + esc_(zalo) + '" style="color:#0068ff;text-decoration:none;font-weight:600">' + (lang === 'bi' ? 'Nhắn Zalo admin · Message admin on Zalo' : en ? 'Message admin on Zalo' : 'Nhắn Zalo admin') + '</a>');
-  return '<div style="background:#f5f3ef;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#1f2937">' +
-    '<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e7e2d9">' +
-    '<div style="background:#14532d;color:#fff;padding:18px 22px;font-size:18px;font-weight:700;letter-spacing:.3px">' + esc_(cfg_('SCHOOL_NAME')) + '</div>' +
+  // Thiết kế 5O (05/11): đen trắng, gạch vàng thương hiệu #ffc933 dưới đầu trang; ứng dụng thư không hỗ trợ CSS thì vẫn là bản phẳng đọc được.
+  return '<div style="background:#f6f6f3;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#1f2937">' +
+    '<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #ececea">' +
+    '<div style="background:#141414;color:#fff;padding:18px 22px;font-size:18px;font-weight:700;letter-spacing:.3px;border-bottom:3px solid #ffc933">' + esc_(cfg_('SCHOOL_NAME')) + '</div>' +
     '<div style="padding:22px">' +
-    '<h2 style="margin:0 0 14px;font-size:19px;color:#14532d">' + esc_(title) + '</h2>' + inner + '</div>' +
-    '<div style="padding:14px 22px;background:#faf8f4;font-size:13px;color:#6b7280;border-top:1px solid #eee">' +
+    '<h2 style="margin:0 0 14px;font-size:19px;color:#141414">' + esc_(title) + '</h2>' + inner + '</div>' +
+    '<div style="padding:14px 22px;background:#f6f6f3;font-size:13px;color:#63635d;border-top:1px solid #ececea">' +
     (contact.length ? contact.join(' &nbsp;·&nbsp; ') + '<br>' : '') +
-    '<a href="' + esc_(cfg_('SCHOOL_SITE_URL')) + '" style="color:#6b7280">' + esc_(cfg_('SCHOOL_SITE_URL')) + '</a></div></div></div>';
+    '<a href="' + esc_(cfg_('SCHOOL_SITE_URL')) + '" style="color:#63635d">' + esc_(cfg_('SCHOOL_SITE_URL')) + '</a></div></div></div>';
 }
 function btn_(href, label) {
-  return '<p style="margin:18px 0"><a href="' + esc_(href) + '" style="background:#14532d;color:#fff;padding:11px 18px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block">' + esc_(label) + '</a></p>';
+  return '<p style="margin:18px 0"><a href="' + esc_(href) + '" style="background:#141414;color:#fff;padding:11px 20px;border-radius:999px;text-decoration:none;font-weight:700;display:inline-block">' + esc_(label) + '</a></p>';
 }
 function lessonLineVi_(b, extra) {
   return '<li style="margin:6px 0"><b>' + esc_(fmtDayVi_(b.date)) + '</b> · ' + esc_(slotLabel_(b.slot)) + (extra ? ' · ' + extra : '') + '</li>';
