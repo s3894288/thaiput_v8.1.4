@@ -23,7 +23,6 @@
   --brand-ink: #ffffff;
   --brand-soft: #fff1bf;
   --yellow: #ffc933;
-  --yellow-ink: #141414;
   --gold: #8f6b00;
   --gold-soft: #fff1bf;
   --gold-ink: #6e5300;
@@ -97,7 +96,7 @@ body:has(.actionbar:not([hidden])) #app { padding-bottom: 228px; }
 .ic { stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
 /* Thanh đầu trang: logo, nút VI | EN, nút phụ */
-.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 8; background: var(--bg);
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 8; background: var(--bg); box-shadow: 0 1px 0 var(--line);
   display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 14px; margin-inline: -16px; padding-inline: 16px; }
 .brand { appearance: none; background: none; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--ink); letter-spacing: -.01em; }
 .brand .mark { width: 36px; height: 36px; border-radius: 12px; background: var(--yellow); color: var(--mark-ink); display: grid; place-items: center; font: 600 1.1rem/1 var(--font-thai); }
@@ -107,7 +106,7 @@ body:has(.actionbar:not([hidden])) #app { padding-bottom: 228px; }
 .langsw span { padding: 7px 10px; border-radius: 999px; color: var(--muted); }
 .langsw span.on { background: var(--brand); color: var(--brand-ink); }
 
-/* Bề mặt: khối trắng bo lớn đặt trên nền xám lá, không viền */
+/* Bề mặt: khối trắng bo lớn trên nền trắng, tách bằng bóng mềm (đổ bóng thay viền, 5O) */
 .card { background: var(--surface); border: 0; border-radius: var(--radius-xl); padding: 20px; box-shadow: var(--shadow); }
 .card.flush { padding: 0; overflow: hidden; }
 .panel { background: var(--surface-2); border-radius: var(--radius); padding: 14px 16px; color: var(--ink-2); }
@@ -118,7 +117,7 @@ body:has(.actionbar:not([hidden])) #app { padding-bottom: 228px; }
 .alert.warn { background: var(--warn-soft); color: var(--warn); }
 .alert.ok { background: var(--ok-soft); color: var(--ok); }
 
-/* Nút: viên thuốc. Chính: xanh rừng đậm. Phụ: nền trắng viền mảnh. */
+/* Nút: viên thuốc. Chính: đen chữ trắng. Phụ: nền trắng viền mảnh. */
 .btn { appearance: none; border: 1px solid transparent; border-radius: 999px; padding: 11px 20px; font: 600 .94rem/1.2 var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; min-height: 46px; transition: background .15s, border-color .15s, color .15s; }
 .btn-primary { background: var(--brand); color: var(--brand-ink); }
 .btn-primary:hover { background: var(--brand-2); }
@@ -196,10 +195,10 @@ input.invalid { border-color: var(--bad); background: color-mix(in srgb, var(--b
 .chip.blocked, .chip.blocked:disabled { background: var(--blush); border-color: transparent; color: var(--bad); opacity: 1; text-decoration: line-through; }
 .chip.booked { background: var(--mint); border-color: transparent; color: var(--ok); box-shadow: inset 0 -3px 0 var(--ok); }
 .chip.dirty { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--lavender-strong); }
-.chip:disabled { opacity: 1; color: #7d847e; cursor: not-allowed; }
+.chip:disabled { opacity: 1; color: var(--muted); cursor: not-allowed; }
 .chip.on:disabled { background: #4b4b48; border-color: #4b4b48; color: #ffffff; }
-.chip.booked:disabled { background: #e3f5de; color: #2f6b45; }
-.chip.pending:disabled { color: #8a530c; }
+.chip.booked:disabled { background: var(--mint); color: var(--ok); }
+.chip.pending:disabled { color: var(--warn); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: .78rem; }
 .legend .chip { min-height: 30px; padding: 6px 12px; border-radius: 999px; font: 600 .76rem/1 var(--font-body); cursor: default; }
 .legend .chip:not(.on):not(.pending):not(.blocked):not(.booked) { background: var(--surface-2); border-color: transparent; }
@@ -212,7 +211,7 @@ input.invalid { border-color: var(--bad); background: color-mix(in srgb, var(--b
 .lesson .body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .list-divider { border: 0; border-top: 1px solid var(--line); margin: 0; }
 
-/* Thanh tab (điện thoại): thanh nổi bo tròn ở đáy, mục đang chọn là viên thuốc xanh rừng */
+/* Thanh tab (điện thoại): thanh nổi bo tròn ở đáy, mục đang chọn là viên thuốc đen */
 .tabbar { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 9; background: var(--surface); border-radius: 22px; box-shadow: var(--shadow-lg); }
 .tabbar .inner { max-width: 536px; margin: 0 auto; padding: 6px; gap: 4px; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-auto-flow: column; }
 .tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 600 .72rem/1.2 var(--font-body); padding: 8px 4px 9px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; transition: background .15s, color .15s; }
@@ -290,15 +289,15 @@ body[data-page=admin] .tabbar .inner { max-width: 536px; }
 .kpi.bad b { color: var(--bad); }
 a.kpi { color: inherit; text-decoration: none; }
 button.kpi { appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-a.kpi:hover, button.kpi:hover { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+a.kpi:hover, button.kpi:hover { box-shadow: var(--shadow), inset 0 0 0 1.5px var(--line-strong); }
 .kpi:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 /* Điện thoại: 6 ô số liệu thành một hàng cuộn ngang, không chiếm nửa màn hình */
 @media (max-width: 600px) {
-  body .kpis { display: flex; overflow-x: auto; scrollbar-width: none; gap: 8px; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
+  body .kpis { display: flex; overflow-x: auto; scrollbar-width: none; gap: 8px; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; padding-block: 14px; margin-block: -14px; }
   body .kpis::-webkit-scrollbar { display: none; }
   body .kpis .kpi { flex: 0 0 38%; }
 }
-/* Bộ lọc: các viên thuốc rời, viên đang chọn tô xanh rừng */
+/* Bộ lọc: các viên thuốc rời, viên đang chọn tô đen */
 .feedbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .feedbar .grow { flex: 1 1 auto; }
 .feedbar .seg + .seg { margin-left: 4px; padding-left: 10px; border-left: 1px solid var(--line-strong); border-radius: 0; }
@@ -355,7 +354,7 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
 .day-grid, .week-grid { display: flex; flex-direction: column; gap: 12px; }
 .row .chip { padding-inline: 14px; font-family: var(--font-body); border-radius: 999px; }
 
-/* ── Máy tính: thanh tab thành khối trắng bo tròn bên trái, mục đang chọn là viên thuốc xanh rừng ── */
+/* ── Máy tính: thanh tab thành khối trắng bo tròn bên trái, mục đang chọn là viên thuốc đen ── */
 @media (min-width: 600px) and (max-width: 899px) {
   .tabbar { left: 50%; right: auto; width: min(560px, calc(100% - 24px)); transform: translateX(-50%); }
 }

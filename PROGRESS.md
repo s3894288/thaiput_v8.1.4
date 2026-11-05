@@ -1,5 +1,41 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**Trạng thái 05/11/2026 chiều: 5O PHẦN GIAO DIỆN WEB xong, bản 8.1.5** (đen trắng theo ảnh thương hiệu, chỉ `src/ui/Styles.html` + token màu; phần email của 5O chưa làm). Đồng thời khôi phục 5 file bị sót khi upload repo GitHub (`test/unit.js`, `.gitignore`, workflow CI, `.clasp.json.example`, `THIET_KE_GIAO_DIEN.md`) lấy từ zip còn trong lịch sử git — trước đó `npm test` không chạy được vì thiếu `test/unit.js`. BACKLOG còn **33 câu chờ anh** (mục A 29, mục B 4). Chi tiết: mục "Chunk 5O phần giao diện" dưới đây.
+
+## Chunk 5O phần giao diện web (05/11/2026, bản 8.1.5)
+
+### Làm gì
+
+* Giao diện mới theo ảnh thương hiệu (BL08, kế hoạch 5O): nền trắng; màu chính ĐEN TRẮNG (nút chính, mục đang chọn là viên thuốc đen chữ trắng); vàng thương hiệu `#ffc933` chỉ cho dấu nhận diện (ô logo, viên chữ Thái trang chủ, thẻ gói học); màu phụ xanh lá, tím, vàng, xanh dương dạng phấn cho trạng thái; khối bo góc, ĐỔ BÓNG THAY VIỀN. Đúng phạm vi kế hoạch: chỉ `src/ui/Styles.html` và token màu, mọi class, id, cấu trúc giữ nguyên; viền đỏ đúng ô nhập sai giữ nguyên (`input.invalid`).
+* Sửa theo soát chéo: thanh đầu trang có vạch chân mảnh (hết trắng trên trắng khi cuộn), ô số liệu giữ bóng khi trỏ chuột, bóng không bị cắt ở hàng số liệu cuộn ngang trên điện thoại, 3 mã màu tông xanh lá cũ còn sót đổi về token mới, ô `.chip:disabled` đạt tương phản 4.5:1 (lỗi có từ trước).
+* `THIET_KE_GIAO_DIEN.md` viết lại theo bản 5O (BL70, chờ anh duyệt). `VERSION` 8.1.5, `dist/` dựng lại bằng `npm run build`.
+
+### Kết quả test
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 134/134 |
+| Giao diện web | 48/48 |
+| Thử tải | 2/2 |
+| Ảnh màn hình | 4 trang (chủ, học viên, tutor, admin) × 4 cỡ (360, 390, 768, 1280): không vỡ, luật 43 đạt |
+| Soát chéo | 2 agent độc lập (kỹ thuật CSS; thiết kế theo kế hoạch và ảnh chụp): 0 HIGH, 4 MEDIUM, 9 LOW; đã sửa mọi MEDIUM sửa được trong phạm vi và các LOW có ảnh hưởng thật |
+
+### Việc của admin (STAGING, theo thứ tự luật 38)
+
+1. Dán `dist/Code.gs`, `dist/Index.html` vào project STAGING (không đổi `appsscript.json`), Lưu.
+2. Chạy menu 1 (phiên bản code đổi nên tự sao lưu DB trước, luật 49; không có cột mới).
+3. Triển khai phiên bản mới (sửa bản cũ).
+4. Mở web kiểm trên điện thoại và máy tính: nền trắng, nút đen, logo vàng; form nhập sai thấy viền đỏ đúng ô.
+
+### Giới hạn còn lại (nói thẳng)
+
+* Phần email của 5O CHƯA làm: khung `emailWrap_` (Notify.gs) vẫn tông xanh rừng cũ, lệch bản nhận diện mới; chưa gửi thử mọi mẫu email tới Gmail web, Gmail điện thoại, Outlook (BL09). Làm ở lượt sau cùng 5N.
+* Bộ ảnh chưa có ảnh chụp trạng thái ô nhập sai (`input.invalid`); code giữ nguyên bản cũ đã test.
+* Nút Zalo nổi đè nội dung khi cuộn tới đúng vị trí trên điện thoại: hành vi có từ trước 5O, không đổi ở bản này.
+* 5N (tô màu Sheets, BL13) chưa làm.
+
 **05/11/2026: chuyển sang repo GitHub cho Claude Code** (không đổi code, vẫn bản 8.1.4). Repo có đủ `src/`, `test/`, `dist/`, tài liệu; thêm `.gitignore`, `.clasp.json.example`, GitHub Actions chạy `npm test` và kiểm `dist/` khớp `src/`, lệnh `npm run build`, `npm run clasp:push`. Bỏ 2 bundle `v8/repo/` và `repo/BOOTSTRAP.md`. Hướng dẫn: `HUONG_DAN_GITHUB_CLAUDE_CODE.md`; quy trình cho Claude Code: `CLAUDE.md` mục cuối. Test lại sau khi dựng repo từ bundle: 34/34, 46/46, 134/134, 48/48, 2/2; `dist/` dựng lại trùng từng byte với bản trong project.
 
 **Trạng thái 02/11/2026: 5Q phần gửi email XONG, bản 8.1.4** (= 8.1.3 + gửi email cố định qua GmailApp trong code, **không còn MailFix**). Code giao: `dist/Code.gs`, `dist/Index.html`, `dist/appsscript.json` (không đổi quyền so với 8.1.1), `dist_google_login/` (dự án phụ, thêm `oauthScopes`). Việc của admin: `HUONG_DAN_PHAT_HANH.md` mục 3 (nâng STAGING từ 8.0.10 lên thẳng 8.1.4) và `HUONG_DAN_VAN_HANH.md` Phần M (đăng nhập Google). **5N, 5O dời sang tuần sau.** BACKLOG còn **32 câu chờ anh** (mục A 28, mục B 4), rà sau 5N, 5O. Phiên sau: mở repo GitHub bằng Claude Code, đọc `CLAUDE.md` (luật 19, 54 đổi), file này.
