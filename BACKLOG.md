@@ -1,6 +1,11 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 02/11/2026 (lần 8). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 05/11/2026 (lần 9). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 02/11 lần 8
+
+* Thêm BL70 đến BL78: quyết định cho kế hoạch v9 chi tiết (`plan/KE_HOACH_V9_CHI_TIET.md`): email bên thứ ba sớm (5R), đăng nhập, repo, Storage, PITR, nâng Claude Max, sửa `CLAUDE.md`.
+* Phát hiện `test/unit.js` không có trong repo GitHub (`npm test` đỏ ngay dòng nạp): ghi mục D.
 
 ## Thay đổi so với bản 01/11 lần 7
 
@@ -43,6 +48,15 @@
 
 | Mã | Câu hỏi | Đề xuất | Chặn |
 |---|---|---|---|
+| BL70 | Dịch vụ email bên thứ ba cho bước 0 (5R, trước v9) để có hơn 1.500 thư mỗi ngày không chờ Workspace qua 60 ngày: (a) Resend Pro 20 USD, 50.000 thư mỗi tháng, không trần ngày; (b) Postmark; (c) Amazon SES | (a) | 5R |
+| BL71 | Làm 5R khi nào: (a) ngay sau 5N, 5O, trước chunk 6 để go live đã có hạn mức rộng; (b) sau chunk 7 | (a) | 5R |
+| BL72 | Đăng nhập v9: (a) Supabase Auth (link email hạn chung, ví dụ 15 phút; Google cho admin), bỏ hạn link theo vai trò của luật 36; (b) giữ bảng link tự viết như v8 | (a) | v9 S4 |
+| BL73 | Repo v9: (a) repo GitHub riêng `thaiput_v9`, repo v8 giữ làm đặc tả và sửa lỗi tới khi đóng; (b) thư mục trong repo v8 | (a) | v9 S0 |
+| BL74 | Ảnh chuyển khoản ở v9: (a) Supabase Storage bucket riêng tư; (b) giữ Google Drive | (a) | v9 S1 |
+| BL75 | Số đo tốc độ ở v9: (a) bỏ bảng METRICS, dùng Sentry và Vercel; (b) giữ bảng để báo cáo riêng | (a) | v9 S11 |
+| BL76 | Sao lưu v9: (a) sao lưu ngày của Supabase Pro + `pg_dump` đêm lên Drive; (b) thêm PITR (thêm phí) | (a) giai đoạn đầu | v9 S11 |
+| BL77 | Nâng Claude lên Max trong các tháng xây v9 (16 tuần thay vì 20 đến 24) | Có, nếu muốn 16 tuần | v9 S0 |
+| BL78 | Dòng "không thêm máy chủ ngoài" trong `CLAUDE.md`: (a) chỉ sửa trong `CLAUDE.md` của repo v9 khi vào S0, repo v8 giữ nguyên; (b) sửa ngay | (a) | v9 S0 |
 | BL64 | Gửi email: (a) giữ GmailApp làm đường chính lâu dài (đang chạy, giống MailFix); (b) thêm chế độ Gmail API (`MAIL_TRANSPORT = GMAIL_API`, quyền hẹp `gmail.send`, phải dựng thư MIME) và chỉ đổi sau khi qua 6 bước kiểm thư tới nơi | (a) tới khi GmailApp có vấn đề; (b) làm khi cần | Tuần sau (rà) |
 | BL65 | Quyền `https://mail.google.com/` (tài liệu Google ghi GmailApp cần; lần thử 22/10 chỉ với `gmail.send` vẫn gửi được): (a) không thêm, có tự gửi lại bằng MailApp khi thiếu quyền; (b) thêm cố định (màn hình cấp quyền ghi "đọc, soạn, gửi, xoá vĩnh viễn thư") | (a) | Tuần sau (rà) |
 | BL66 | GmailApp báo thiếu quyền: (a) tự gửi lại bằng MailApp (dễ bị trả về trên tên miền trường), ghi MAIL_FALLBACK, báo admin tối đa 1 lần mỗi giờ; (b) không gửi lại, chỉ ghi MAIL_FAILED | (a), đã làm | Tuần sau (rà) |
@@ -105,6 +119,7 @@
   * GmailApp (8.1.4) trừ cùng hạn mức: menu Kiểm tra gửi email, số "trước → sau" giảm 1;
   * thư GmailApp tới hộp thư cùng tên miền trường (lý do có MailFix);
   * chuyển chủ sở hữu file sang tài khoản ở tên miền khác (chỉ khi đổi tài khoản).
+* **05/11:** `test/unit.js` (34 test hàm thuần và Db) không có trong repo GitHub; `test/harness.js` dòng 21 nạp `./unit` nên `npm test` và GitHub Actions đỏ. Lấy lại từ `TEST_BUNDLE.txt` của project claude.ai cũ rồi commit; làm trước 5R.
 
 ## Đã chốt
 
