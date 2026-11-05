@@ -18,7 +18,7 @@ Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy b
 | `HUONG_DAN_*.md` | 4 hướng dẫn cho admin: vận hành, phát hành và nâng cấp, thử tải, triển khai Workspace; thêm `HUONG_DAN_GITHUB_CLAUDE_CODE.md` (làm việc với repo này) |
 | `policy/` | Chính sách học viên, tutor (bản nháp) |
 | `docs/` | Đặc tả đã chốt: 50 quyết định, plan code, 40 kịch bản test, checklist, tên miền và Workspace |
-| `plan/` | Kế hoạch 5J đến 5Q, lộ trình, kế hoạch sau go live, luật bù buổi, trả lời 29/10 và 01/11 |
+| `plan/` | Kế hoạch 5J đến 5Q, lộ trình, kế hoạch sau go live, kế hoạch v9 chi tiết và bản 2 tối ưu giá, điều phối Claude, Codex, Gemini (Next.js + Supabase + Cloudflare + SES), luật bù buổi, trả lời 29/10 và 01/11 |
 | `archive/` | Lịch sử đã gộp (giải thích chunk, báo cáo, soát, tư vấn, spec v7, hồ sơ v6, bảng tra `MANIFEST.md`) |
 | `THIET_KE_GIAO_DIEN.md`, `CLEANUP_REPORT.md` | Thiết kế giao diện 19/10; báo cáo dọn dẹp 30/10 |
 
