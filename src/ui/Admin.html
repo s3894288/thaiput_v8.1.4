@@ -1,0 +1,624 @@
+<script>
+/**
+ * Admin.html · Giao diện admin (chunk 5E): thông báo, tutor, học viên, đặt thay, huỷ, nhật ký.
+ * Chunk 5H: thông báo gọn, mỗi thông báo một dòng (chấm màu theo mức, nội dung, giờ), gom theo ngày; bộ lọc là nút phân đoạn.
+ * Chunk 5I: song ngữ (chữ ad.* trong tab CONTENT, nút VI | EN như cổng học viên, tutor); 6 ô số liệu đều bấm được;
+ *   nhật ký mỗi dòng một dòng xem trước, bấm mở đọc đủ; đổi ngôn ngữ vẽ lại bằng dữ liệu đã có (không gọi lại máy chủ).
+ *   Mở trang lần đầu dùng luôn danh sách thông báo apiAdminHome gửi kèm (bớt một lượt gọi máy chủ).
+ */
+(function () {
+  var T = window.T;
+  var L = function (k, v) { return T.t('ad.' + k, v); };
+  var has = function (k) { var c = T.boot.content || {}; return c[k] !== undefined && c[k] !== null; };
+  var LEVEL_CLS = { CRITICAL: 'bad', WARNING: 'warn', INFO: 'info' };
+  // view: trang con đang mở trong khung (người, danh sách buổi, đặt thay), giữ dữ liệu để đổi ngôn ngữ không gọi lại máy chủ.
+  var st = { tab: 'feed', home: null, people: null, filter: { unread: true, level: '' }, search: '', feed: null, log: null, logQ: { text: '', who: '' }, view: null,
+    feedSeq: 0, feedLoading: false, logSeq: 0, logLoading: false };
+
+  /** Trang không tải được: câu báo theo ngôn ngữ đang chọn (máy chủ gửi cả hai thứ tiếng) và nút Thử lại (soát 5I B7). */
+  function drawErr(root) {
+    // Vòng 2 N3: chữ ad.* chưa có khi trang chưa tải được: dùng chữ chung a.* (có sẵn trong trang), dựng lại câu báo theo ngôn ngữ mỗi lần vẽ.
+    var e = st.err, msg = e.reason === 'NETWORK' ? T.t('a.network_error') : (e.msg ? T.m(e) : e.reason === 'SERVER_ERROR' ? T.t('a.no_response') : e.message);
+    root.innerHTML = T.topbar() + '<main class="stack-lg admin">' + alertBad(msg) + '<button class="btn btn-primary" type="button" id="retry">' + T.esc(T.t('a.retry')) + '</button></main>';
+    T.$('#retry', root).onclick = function () { T.views.admin.render(root, {}); };
+  }
+  function sameQ(a, b) { return !!a && !!b && !!a.unread === !!b.unread && String(a.level || '') === String(b.level || ''); }
+  function alertBad(msg) { return '<div class="alert bad">' + T.esc(msg) + '</div>'; }
+
+  T.views.admin = {
+    render: function (root, opts) {
+      opts = opts || {};
+      if (opts.tab) st.tab = opts.tab;
+      if (opts.filter) st.filter = { unread: !!opts.filter.unread, level: opts.filter.level || '' };
+      st.view = null;
+      root.innerHTML = T.topbar() + T.skeleton(3);
+      st.err = null;
+      T.authed('apiAdminHome').then(function (r) {
+        if (!r.ok) { st.err = r; drawErr(root); return; }
+        st.home = r.data;
+        // Chữ của trang admin (ad.*) đến cùng dữ liệu, không nằm trong trang chung của học viên, tutor.
+        var c = T.boot.content = T.boot.content || {}; Object.keys(r.data.content || {}).forEach(function (k) { c[k] = r.data.content[k]; });
+        T.adoptLang(r.data.me && r.data.me.lang);
+        st.feed = sameQ(st.filter, r.data.feedQuery) ? { q: { unread: st.filter.unread, level: st.filter.level }, data: r.data.feed } : null;
+        st.people = null; st.log = null;
+        frame(root);
+        if (opts.person) openPerson(root, opts.person);
+      }).catch(function () { });
+    },
+    /** Đổi VI | EN: vẽ lại bằng dữ liệu đã có, giữ tab, trang con, bộ lọc, chữ đang gõ, giờ đã chọn khi đặt thay. */
+    relabel: function (root) {
+      if (!st.home) { if (st.err) drawErr(root); else root.innerHTML = T.topbar() + T.skeleton(3); return; }
+      var q = T.$('#q', root), lq = T.$('#log-q', root);
+      if (q) st.search = q.value;
+      if (lq) st.logQ.text = lq.value;
+      frame(root, true);
+    }
+  };
+
+  // ── Nhãn theo ngôn ngữ ──
+  function levelLabel(lv) { return has('ad.lv.' + lv) ? L('lv.' + lv) : lv; }
+  function evLabel(ev) { return has('ad.ev.' + ev) ? L('ev.' + ev) : ev; }
+  function actLabel(a) {
+    a = String(a || '');
+    if (has('ad.act.' + a)) return L('act.' + a);
+    var m = a.match(/^(PACKAGE|MAINTENANCE)_(.+)$/);
+    if (m && has('ad.act.' + m[1] + '_')) return L('act.' + m[1] + '_', { x: m[1] === 'PACKAGE' ? pkgStatus(m[2]) : (has('ad.maint.' + m[2]) ? L('maint.' + m[2]) : m[2]) });
+    return a;
+  }
+  /** Màu nhãn trạng thái buổi, cùng hệ với cổng học viên: xác nhận xanh, huỷ đỏ, chờ tutor tím (thiết kế 20/10). */
+  // Chunk 5J: buổi quá hạn chọn kết quả tô đỏ, nhãn "Quá hạn xác nhận".
+  function statusCls(b) { return b.overdue ? ' bad' : b.awaiting ? ' gold' : b.status === 'CONFIRMED' ? ' ok' : /^CANCELLED/.test(String(b.status || '')) || b.status === 'NOT_COMPLETED' ? ' bad' : ''; }
+  function statusLabel(b) { return b.overdue ? L('st.overdue') : b.awaiting ? L('st.awaiting') : has('ad.st.' + b.status) ? L('st.' + b.status) : b.status; }
+  function pkgStatus(s) { return has('ad.pkg.' + s) ? L('pkg.' + s) : s; }
+  function userStatus(s) { return has('ad.us.' + s) ? L('us.' + s) : s; }
+  function pkgName(p) { return T.pkgName(p); }
+  function msgOf(n) { return T.lang === 'en' && n.messageEn ? n.messageEn : n.message; }
+  function pairOf(p, fallback) { return p && typeof p === 'object' ? (p[T.lang] || p.vi || fallback || '') : (fallback || ''); }
+  function actorShort(a) { a = String(a || ''); return !a || a === 'SYSTEM' ? L('system') : a === 'ADMIN' ? L('admin_sheets') : a.split('@')[0]; }
+
+  /** "dd/MM/yyyy HH:mm" (máy chủ gửi) thành nhóm ngày và giờ để gom: Hôm nay, Hôm qua, hoặc ngày. */
+  function splitTime(s) { var m = String(s || '').match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2})/); return m ? { day: m[3] + '-' + m[2] + '-' + m[1], hm: m[4] } : { day: '', hm: String(s || '') }; }
+  function dayTitle(key, todayKey) {
+    if (!key) return L('day_unknown');
+    if (key === todayKey) return L('today');
+    var p = todayKey.split('-'), y = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]) - 1)), yk = y.toISOString().slice(0, 10);
+    return key === yk ? L('yesterday') : T.day(key);
+  }
+  function todayKey() { return (st.home && st.home.today) || splitTime(st.home && st.home.now).day || new Date().toISOString().slice(0, 10); }
+  /** Gom danh sách (mới nhất trước) theo ngày: rowFn vẽ một dòng. */
+  function grouped(items, rowFn, withGroups) {
+    var today = todayKey(), last = null, out = '';
+    items.forEach(function (n) {
+      var d = splitTime(n.time).day;
+      if (withGroups && d !== last) { out += '<div class="fgroup">' + T.esc(dayTitle(d, today)) + '</div>'; last = d; }
+      out += rowFn(n);
+    });
+    return out;
+  }
+
+  // ── Khung trang: ô số liệu, thanh tab ──
+  /**
+   * Ô số liệu. Mọi ô bấm được: ô có link mở đúng tab Sheets (đăng ký chờ duyệt, tutor xin huỷ); ô khác lọc thông báo
+   * hoặc mở danh sách buổi ngay trên trang. Link Sheets chưa có (hiếm): bấm hiện câu hướng dẫn.
+   */
+  function kpi(id, n, kind, act, href) {
+    var cls = 'kpi' + (n && kind ? ' ' + kind : ''), url = href ? T.safeUrl(href) : '';
+    var inner = '<b class="mono">' + n + '</b><span>' + T.esc(L('kpi.' + id)) + (url ? '\u00a0↗' : '\u00a0›') + '</span>';
+    if (url) return '<a class="' + cls + '" href="' + T.esc(url) + '" target="_blank" rel="noopener" data-kpi-link="' + id + '">' + inner + '</a>';
+    return '<button type="button" class="' + cls + '" data-kpi="' + (act || 'nolink:' + id) + '">' + inner + '</button>';
+  }
+  function kpis(u, c, l) {
+    return kpi('critical', u.CRITICAL, 'bad', 'feed:CRITICAL') + kpi('warning', u.WARNING, 'warn', 'feed:WARNING') +
+      kpi('regs', c.pendingRegistrations, 'warn', '', l.registrations || '-') + kpi('tutor_cancels', c.pendingTutorCancels, 'warn', '', l.availability || '-') +
+      kpi('today', c.lessonsToday, '', 'lessons:today') + kpi('waiting', c.waitingResult, '', 'lessons:waiting');
+  }
+  function bindKpis(root) {
+    T.$$('[data-kpi]', root).forEach(function (b) {
+      b.onclick = function () {
+        var a = b.getAttribute('data-kpi').split(':');
+        if (a[0] === 'feed') { st.tab = 'feed'; st.view = null; st.filter = { unread: true, level: a[1] }; st.feed = null; frame(root); refreshCounts(root); window.scrollTo(0, 0); focusOn(root, '[data-kpi="' + b.getAttribute('data-kpi') + '"]'); }
+        else if (a[0] === 'lessons') openLessons(root, a[1]);
+        else T.toast(L('no_sheet_link'));
+      };
+    });
+  }
+  function frame(root, keep) {
+    var h = st.home, u = h.unread, c = h.counts, l = h.links || {};
+    root.innerHTML = T.topbar('<span class="who">' + T.esc(h.me.name) + '</span><button class="btn btn-ghost btn-sm" type="button" id="logout">' + T.esc(L('logout')) + '</button>') +
+      '<main class="stack-lg admin">' +
+      '<div class="kpis">' + kpis(u, c, l) + '</div>' +
+      '<section id="tab-body"></section></main>' +
+      '<nav class="tabbar" aria-label="' + T.esc(L('nav_aria')) + '"><div class="inner">' +
+      tabBtn('feed', L('tab_feed'), u.CRITICAL + u.WARNING) + tabBtn('tutors', L('tab_tutors')) + tabBtn('students', L('tab_students')) + tabBtn('log', L('tab_log')) + '</div></nav>';
+    T.$('#logout', root).onclick = T.logout;
+    // Vòng 2 N2: bấm tab luôn lấy dữ liệu mới (thông báo, nhật ký, người) và số trên ô; dữ liệu đã có chỉ dùng khi đổi ngôn ngữ.
+    T.$$('.tab', root).forEach(function (b) { b.onclick = function () {
+      var t = b.getAttribute('data-tab'); st.tab = t; st.view = null;
+      if (t === 'feed') st.feed = null; else if (t === 'log') st.log = null; else st.people = null;
+      frame(root); refreshCounts(root); focusOn(root, '.tab[data-tab="' + t + '"]');
+    }; });
+    bindKpis(root);
+    var body = T.$('#tab-body', root);
+    if (keep && st.view) { st.view.draw(body, root); return; }
+    st.view = null;
+    if (st.tab === 'feed') drawFeed(body, root);
+    else if (st.tab === 'tutors' || st.tab === 'students') drawPeople(body, root);
+    else drawLog(body, root);
+  }
+  /** Vòng 2 N6: sau khi vẽ lại khung, trả chỗ đứng bàn phím về đúng nút vừa bấm (nút cũ đã bị thay). */
+  function focusOn(root, sel) { try { var el = T.$(sel, root); if (el && el.focus) el.focus(); } catch (e) { } }
+  // Biểu tượng nét mảnh cho từng tab, cùng kiểu với cổng học viên, tutor (thiết kế 19/10). Chỉ trang trí: aria-hidden.
+  var TAB_ICONS = {
+    feed: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+    tutors: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.5c2.5 0 4 1.3 4.5 4"/></svg>',
+    students: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c2 2 10 2 12 0v-5"/></svg>',
+    log: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>'
+  };
+  function tabBtn(id, label, count) { return '<button class="tab' + (st.tab === id && !st.view ? ' on' : '') + '" type="button" data-tab="' + id + '"' + (st.tab === id && !st.view ? ' aria-current="page"' : '') + '>' + (TAB_ICONS[id] || '') + '<span>' + T.esc(label) + (count ? '<span class="count">' + count + '</span>' : '') + '</span></button>'; }
+  function backBtn(label) { return '<button class="btn btn-ghost btn-sm" type="button" id="back">← ' + T.esc(label || L('back')) + '</button>'; }
+  /** Quay về danh sách: tải lại số liệu (sau khi huỷ, đặt thay, đánh dấu đã đọc thì số đã đổi). */
+  function backToList(root) { T.views.admin.render(root, { tab: st.tab }); }
+
+  // ── Thông báo ──
+  function notifRow(n) {
+    var cls = LEVEL_CLS[n.level] || '', meta = evLabel(n.event) + (n.actor && n.actor !== 'SYSTEM' ? ' · ' + n.actor : '');
+    return '<button type="button" class="nrow lv-' + cls + (n.read ? ' read' : ' unread') + '" data-notif="' + T.esc(n.id) + '" title="' + T.esc(levelLabel(n.level) + ' · ' + n.time) + '">' +
+      '<span class="dot" aria-label="' + T.esc(levelLabel(n.level)) + '"></span><span class="ntext"><span class="nmsg">' + T.esc(msgOf(n)) + '</span>' +
+      '<span class="nmeta">' + T.esc(meta) + '</span></span><time>' + T.esc(splitTime(n.time).hm) + '</time></button>';
+  }
+  /** Danh sách thông báo gom theo ngày (danh sách đã xếp mới nhất trước). withGroups false: không có tiêu đề ngày. */
+  function notifList(items, withGroups) { return '<div class="card flush feed">' + grouped(items, notifRow, withGroups) + '</div>'; }
+  function seg(attr, cur, opts, aria) {
+    return '<div class="seg" role="group"' + (aria ? ' aria-label="' + T.esc(aria) + '"' : '') + '>' + opts.map(function (o) {
+      return '<button type="button" ' + attr + '="' + o[0] + '"' + (String(cur) === String(o[0]) ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>' + T.esc(o[1]) + (o[2] ? '<b>' + o[2] + '</b>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  function drawFeed(body, root) {
+    var f = st.filter, un = st.home.unread;
+    body.innerHTML = '<div class="stack"><div class="section-head"><h2>' + T.esc(L('feed_title')) + '</h2>' +
+      (st.home.sheetUrl ? '<a class="btn btn-ghost btn-sm" href="' + T.esc(st.home.sheetUrl) + '" target="_blank" rel="noopener">' + T.esc(L('open_notif_tab')) + ' ↗</a>' : '') + '</div>' +
+      '<div class="feedbar" id="feedbar">' + seg('data-fu', f.unread ? 1 : 0, [[1, L('f_unread'), un.CRITICAL + un.WARNING + un.INFO], [0, L('f_all')]], L('aria_read')) +
+      seg('data-fl', f.level, [['', L('f_all_levels')], ['CRITICAL', levelLabel('CRITICAL'), un.CRITICAL], ['WARNING', levelLabel('WARNING'), un.WARNING], ['INFO', levelLabel('INFO')]], L('aria_level')) +
+      '<span class="grow"></span><button class="btn btn-ghost btn-sm" type="button" id="feed-reload">' + T.esc(L('reload')) + '</button>' +
+      '<button class="btn btn-ghost btn-sm" type="button" id="read-all">' + T.esc(L('read_all')) + '</button></div>' +
+      '<div id="feed">' + T.skeleton(3) + '</div></div>';
+    // Kết quả về muộn vẽ vào khung đang hiện (tìm lại theo root): đổi ngôn ngữ lúc đang tải không gọi máy chủ lần hai (vòng 2 N4).
+    var show = function () {
+      var box = T.$('#feed', root), data = st.feed && st.feed.data;
+      if (!box || !data || st.tab !== 'feed' || st.view) return;
+      box.innerHTML = data.items.length ? notifList(data.items, true) +
+        (data.total > data.items.length ? '<small class="muted">' + T.esc(L('shown_of', { n: data.items.length, total: data.total })) + '</small>' : '')
+        : '<div class="panel">' + T.esc(L(st.filter.unread ? 'no_unread_notifs' : 'no_notifs')) + '</div>';
+      // Đóng chi tiết của thông báo vừa đọc: vẽ lại danh sách tại chỗ (dòng đó đã rời "Chưa đọc"), không tải lại cả trang.
+      bindNotifs(box, root, data.items, function (n) {
+        if (st.view || st.tab !== 'feed') return;
+        frame(root, false);
+        focusOn(root, n && T.$('[data-notif="' + n.id + '"]', root) ? '[data-notif="' + n.id + '"]' : '#feed .nrow, #feed-reload');
+      });
+    };
+    var load = function () {
+      var my = ++st.feedSeq;   // bấm lọc liên tiếp: chỉ nhận kết quả của lần bấm cuối
+      var q = { unread: f.unread, level: f.level };
+      st.feedLoading = true;
+      T.authed('apiAdminNotifications', { unread: q.unread, level: q.level, limit: 100 }).then(function (r) {
+        if (my !== st.feedSeq) return;
+        st.feedLoading = false;
+        if (!r.ok) { var bx = T.$('#feed', root); if (bx && st.tab === 'feed' && !st.view) bx.innerHTML = alertBad(r.message); return; }
+        st.feed = { q: q, data: r.data };
+        show();
+      }).catch(function () { st.feedLoading = false; });
+    };
+    T.$('#feed-reload', body).onclick = function () { st.feed = null; load(); refreshCounts(root); };
+    // Bấm nút lọc: đổi trạng thái nút ngay, tải lại danh sách (không vẽ lại cả trang).
+    T.$$('[data-fu]', body).forEach(function (b) { b.onclick = function () { f.unread = b.getAttribute('data-fu') === '1'; markSeg(body, 'data-fu', f.unread ? '1' : '0'); load(); }; });
+    T.$$('[data-fl]', body).forEach(function (b) { b.onclick = function () { f.level = b.getAttribute('data-fl'); markSeg(body, 'data-fl', f.level); load(); }; });
+    T.$('#read-all', body).onclick = function () {
+      var u2 = st.home.unread, total = u2.CRITICAL + u2.WARNING + u2.INFO;
+      T.sheet('<h2>' + T.esc(L('read_all_q', { n: total })) + '</h2><p class="muted">' + T.esc(L('read_all_note', { c: u2.CRITICAL, w: u2.WARNING })) + '</p>',
+        [{ label: L('read_all'), kind: 'primary', value: true }, { label: L('cancel'), value: false }]).then(function (yes) {
+        if (yes) T.authed('apiAdminMarkRead', 'ALL').then(function (r) { T.toast(r.ok ? L('read_n', { n: r.data.count }) : r.message); T.views.admin.render(root, { tab: 'feed' }); }).catch(function () { });
+      });
+    };
+    if (st.feed && sameQ(st.feed.q, f)) show(); else if (!st.feedLoading) load();
+  }
+  /** Bỏ thông báo vừa đọc khỏi danh sách "Chưa đọc" đã tải (không gọi máy chủ). */
+  function dropFromFeed(n) { if (st.feed && st.feed.q.unread) { var before = st.feed.data.items.length; st.feed.data.items = st.feed.data.items.filter(function (x) { return x.id !== n.id; }); if (st.feed.data.items.length < before) st.feed.data.total = Math.max(0, st.feed.data.total - 1); } }
+  /** Vẽ lại số trên 6 ô và số trên tab Thông báo từ dữ liệu đang có, không vẽ lại phần thân. */
+  function paintCounts(root) {
+    var h = st.home, u = h.unread, c = h.counts, l = h.links || {}, box = T.$('.kpis', root);
+    if (box) { box.innerHTML = kpis(u, c, l); bindKpis(root); }
+    var tb = T.$('.tab[data-tab="feed"] > span', root); if (tb) tb.innerHTML = T.esc(L('tab_feed')) + (u.CRITICAL + u.WARNING ? '<span class="count">' + (u.CRITICAL + u.WARNING) + '</span>' : '');
+  }
+  /** Sau khi huỷ, đặt thay: đọc lại số liệu (một lượt) rồi vẽ lại các ô, không đụng trang đang xem (soát 5I B2). */
+  function refreshCounts(root) {
+    T.authed('apiAdminHome').then(function (r) { if (!r.ok || !st.home) return; st.home.counts = r.data.counts; st.home.unread = r.data.unread; paintCounts(root); }).catch(function () { });
+  }
+  function markSeg(scope, attr, val) { T.$$('[' + attr + ']', scope).forEach(function (x) { var on = x.getAttribute(attr) === val; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
+  /** Bấm một thông báo: mở chi tiết (đánh dấu đã đọc như email). afterRead(n): gọi khi đóng chi tiết của thông báo vừa đọc. */
+  function bindNotifs(box, root, items, afterRead) {
+    T.$$('[data-notif]', box).forEach(function (el) {
+      el.onclick = function () {
+        var n = items.filter(function (x) { return x.id === el.getAttribute('data-notif'); })[0];
+        if (!n) return;
+        var ids = String(n.entityId || '').split(',').filter(Boolean), btns = [], people = {};
+        // Soát 5I B17: thông báo nhiều buổi có tối đa 3 nút; thông báo về tài khoản (USER) có nút xem từng người.
+        if (n.entity === 'BOOKING') ids.slice(0, 3).forEach(function (id, i) { btns.push({ label: L('view_booking', { id: id }), kind: i ? 'ghost' : 'primary', value: 'b:' + id }); });
+        String(n.studentId || '').split(',').filter(Boolean).slice(0, 1).forEach(function (id) { people[id] = 1; btns.push({ label: L('view_student_id', { id: id }), value: 'p:' + id }); });
+        String(n.tutorId || '').split(',').filter(Boolean).slice(0, 2).forEach(function (id) { people[id] = 1; btns.push({ label: L('view_tutor_id', { id: id }), value: 'p:' + id }); });
+        if (n.entity === 'USER') ids.filter(function (id) { return /^[ST]\d+$/.test(id) && !people[id]; }).slice(0, 3).forEach(function (id) { btns.push({ label: L('view_person', { id: id }), value: 'p:' + id }); });
+        btns.push({ label: L('close'), value: null });
+        var wasUnread = !n.read, markP = null;
+        if (wasUnread) {
+          n.read = true; el.classList.remove('unread'); el.classList.add('read');
+          if (st.home && st.home.unread && st.home.unread[n.level] > 0) st.home.unread[n.level]--;
+          markP = T.authed('apiAdminMarkRead', [n.id]).catch(function () { });
+        }
+        var link = T.safeUrl(n.link);
+        T.sheet('<span class="pill ' + (LEVEL_CLS[n.level] || '') + '">' + T.esc(levelLabel(n.level)) + '</span><h2>' + T.esc(L('notif_title')) + '</h2><p>' + T.esc(msgOf(n)) + '</p>' +
+          '<p class="muted mono">' + T.esc(n.time) + (n.actor ? ' · ' + T.esc(n.actor === 'SYSTEM' ? L('system') : n.actor) : '') + ' · ' + T.esc(evLabel(n.event)) + (has('ad.ev.' + n.event) ? ' (' + T.esc(n.event) + ')' : '') + '</p>' +
+          (link ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_row')) + ' ↗</a></p>' : ''), btns).then(function (v) {
+          if (wasUnread) {
+            // Soát 5I B6: đã đọc là bỏ khỏi danh sách Chưa đọc và cập nhật số trên ô, cả khi đi tiếp sang buổi học hay người.
+            dropFromFeed(n); paintCounts(root);
+            if (!v && afterRead) (markP || Promise.resolve()).then(function () { afterRead(n); });   // đóng: chờ ghi "đã đọc" xong (soát 5H C6)
+          }
+          if (v && v.indexOf('b:') === 0) openBooking(root, v.substring(2));
+          else if (v && v.indexOf('p:') === 0) openPerson(root, v.substring(2));
+        });
+      };
+    });
+  }
+
+  // ── Danh sách buổi (ô "Buổi hôm nay", "Chờ tutor xác nhận") ──
+  /*
+   * Trang con (danh sách buổi, một người, đặt thay) giữ đối tượng view riêng. Kết quả máy chủ về muộn chỉ vẽ khi view đó vẫn đang
+   * mở (soát 5I B1, B2); đổi ngôn ngữ lúc đang tải chỉ vẽ khung chờ, lượt đang chạy tự vẽ khi về (B8).
+   */
+  function current(v) { return st.view === v; }
+  function openLessons(root, kind) {
+    var v = { kind: 'lessons', loading: true, data: null };
+    v.draw = function (b2, r2) { if (v.data) drawLessons(b2, r2, v); else b2.innerHTML = T.skeleton(4); };
+    st.view = v;
+    markTabs(root);
+    loadLessons(root, v, kind);
+    window.scrollTo(0, 0);
+  }
+  function loadLessons(root, v, kind) {
+    v.kind2 = kind; v.loading = true;
+    var body = T.$('#tab-body', root); if (body) body.innerHTML = T.skeleton(4);
+    T.authed('apiAdminLessons', kind).then(function (r) {
+      v.loading = false;
+      if (!current(v)) return;
+      var b = T.$('#tab-body', root);
+      if (!r.ok) { b.innerHTML = '<div class="stack">' + backBtn() + alertBad(r.message) + '</div>'; T.$('#back', b).onclick = function () { st.view = null; frame(root); }; return; }
+      v.data = r.data;
+      drawLessons(b, root, v);
+    }).catch(function () { });
+  }
+  function drawLessons(body, root, v) {
+    var data = v.data, kind = v.kind2;
+    var title = L(kind === 'waiting' ? 'lessons_waiting' : 'lessons_today', { n: data.total });
+    body.innerHTML = '<div class="stack">' + backBtn() + '<div class="section-head"><h2>' + T.esc(title) + '</h2>' +
+      (T.safeUrl(data.sheetLink) ? '<a class="btn btn-ghost btn-sm" href="' + T.esc(T.safeUrl(data.sheetLink)) + '" target="_blank" rel="noopener">' + T.esc(L('open_bookings_tab')) + ' ↗</a>' : '') + '</div>' +
+      (kind === 'waiting' ? '<p class="note">' + T.esc(L('waiting_note', { hours: data.hours !== undefined && data.hours !== null && data.hours !== '' ? data.hours : '24', expire: data.expireHours || '48' })) + '</p>' : '') +
+      (data.items.length ? '<div class="card stack">' + data.items.map(function (b) { return bookingRow(b, true); }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.esc(L('none')) + '</div>') +
+      (data.total > data.items.length ? '<small class="muted">' + T.esc(L('shown_of', { n: data.items.length, total: data.total })) + '</small>' : '') + '</div>';
+    T.$('#back', body).onclick = function () { st.view = null; frame(root); };
+    bindBookingButtons(body, root, function () { refreshCounts(root); if (current(v)) loadLessons(root, v, kind); });
+  }
+  function markTabs(root) { T.$$('.tab', root).forEach(function (b) { b.classList.remove('on'); }); }
+
+  // ── Tutor và học viên ──
+  function drawPeople(body, root) {
+    var tutorsTab = st.tab === 'tutors', title = L(tutorsTab ? 'tab_tutors' : 'tab_students');
+    var render = function () {
+      var p = st.people, q = st.search.toLowerCase(), html;
+      if (tutorsTab) {
+        html = p.tutors.map(function (t) {
+          return '<button type="button" class="person" data-person="' + T.esc(t.id) + '"><span class="spread"><b>' + T.esc(t.name) + '</b>' + (t.unread ? '<span class="pill warn">' + T.esc(L('new_n', { n: t.unread })) + '</span>' : '') + '</span>' +
+            '<small class="muted">' + T.esc(L('tutor_line', { id: t.id, status: userStatus(t.status), week: t.weekLessons, confirm: t.toConfirm, open: t.openNextWeek })) + '</small></button>';
+        }).join('');
+      } else {
+        html = p.students.filter(function (s) { return !q || (s.name + ' ' + s.email + ' ' + s.id).toLowerCase().indexOf(q) !== -1; }).map(function (s) {
+          var pk = s.pkg ? pkgName(s.pkg) + ' (' + pkgStatus(s.pkg.status) + (s.pkg.end ? ', ' + L('ends', { d: T.ddmm(s.pkg.end) }) : '') + (s.pkg.left !== null && s.pkg.left !== undefined ? ', ' + L('left_n', { n: s.pkg.left }) : '') + ')' : L('no_pkg');
+          return '<button type="button" class="person" data-person="' + T.esc(s.id) + '"><span class="spread"><b>' + T.esc(s.name) + '</b>' + (s.unread ? '<span class="pill warn">' + T.esc(L('new_n', { n: s.unread })) + '</span>' : '') + '</span>' +
+            '<small class="muted">' + T.esc(L('student_line', { id: s.id, email: s.email, pkg: pk, up: s.upcoming, week: s.weekBooked })) + '</small></button>';
+        }).join('');
+      }
+      T.$('#people', body).innerHTML = html ? '<div class="card flush">' + html + '</div>' : '<div class="panel">' + T.esc(L('nobody')) + '</div>';
+      T.$$('[data-person]', body).forEach(function (b) { b.onclick = function () { openPerson(root, b.getAttribute('data-person')); }; });
+    };
+    var shell = function () {
+      body.innerHTML = '<div class="stack"><div class="spread wrap"><h2>' + T.esc(title) + '</h2>' +
+        (!tutorsTab ? '<input type="search" id="q" placeholder="' + T.esc(L('search_people')) + '" value="' + T.esc(st.search) + '" aria-label="' + T.esc(L('search_people')) + '">' : '') + '</div><div id="people"></div></div>';
+      var qi = T.$('#q', body); if (qi) qi.oninput = function () { st.search = qi.value; render(); };
+      render();
+    };
+    if (st.people) { shell(); return; }
+    body.innerHTML = '<h2>' + T.esc(title) + '</h2>' + T.skeleton(4);
+    T.authed('apiAdminPeople').then(function (r) {
+      if (!r.ok) { body.innerHTML = alertBad(r.message); return; }
+      st.people = r.data; shell();
+    }).catch(function () { });
+  }
+
+  function bookingRow(b, withCancel) {
+    var what = T.day(b.date) + ' ' + b.slot + ' · ' + b.student.name + ' · ' + b.tutor.name;
+    return '<div class="lesson"><div class="when"><span class="d">' + T.esc(T.dow(b.date, true)) + '</span><b>' + T.ddmm(b.date) + '</b>' + T.esc(b.slot) + '</div><div class="body"><div class="spread"><span>' +
+      T.esc(b.student.name) + ' · ' + T.esc(b.tutor.name) + '</span><span class="pill' + statusCls(b) + '">' + T.esc(statusLabel(b)) + '</span></div><div class="row">' +
+      '<button class="btn btn-ghost btn-sm" type="button" data-booking="' + T.esc(b.id) + '">' + T.esc(L('details_btn', { id: b.id })) + '</button>' +
+      (withCancel && b.canCancel ? '<button class="btn btn-danger btn-sm" type="button" data-cancel="' + T.esc(b.id) + '" data-what="' + T.esc(what) + '">' + T.esc(L('cancel_btn')) + '</button>' : '') + '</div></div></div>';
+  }
+
+  function openPerson(root, id) {
+    var body = T.$('#tab-body', root) || T.root();
+    var v = { kind: 'person', id: id, data: null };
+    v.draw = function (b2, r2) { if (v.data) drawPerson(b2, r2, v.data, v); else b2.innerHTML = T.skeleton(4); };
+    st.view = v;
+    markTabs(root);
+    body.innerHTML = T.skeleton(4);
+    T.authed('apiAdminPerson', id).then(function (r) {
+      if (!current(v)) return;   // đã rời trang người này (bấm tab khác, mở người khác): không vẽ đè
+      var b = T.$('#tab-body', root) || body;
+      if (!r.ok) {
+        b.innerHTML = '<div class="stack">' + backBtn() + alertBad(r.message + ' (' + id + ')') + '</div>';
+        T.$('#back', b).onclick = function () { backToList(root); };
+        return;
+      }
+      v.data = r.data;
+      drawPerson(b, root, r.data, v);
+      window.scrollTo(0, 0);
+    }).catch(function () { });
+  }
+  function drawPerson(body, root, p, v) {
+    var tutor = p.role === 'TUTOR', link = T.safeUrl(p.sheetLink);
+    var html = '<div class="stack-lg">' + backBtn() +
+      '<section class="card stack"><div class="spread"><h2>' + T.esc(p.name) + '</h2><span class="pill">' + T.esc(L(tutor ? 'role.TUTOR' : 'role.STUDENT')) + ' · ' + T.esc(userStatus(p.status)) + '</span></div>' +
+      '<small class="mono">' + T.esc(p.id) + ' · ' + T.esc(p.email) + (p.phone ? ' · ' + T.esc(p.phone) : '') + '</small>' +
+      '<small class="muted">' + T.esc(L('lang_x', { l: L(p.lang === 'en' ? 'lang.en' : p.lang === 'vi' ? 'lang.vi' : 'lang.none') })) + '</small>' +
+      (p.note ? '<small>' + T.esc(p.note) + '</small>' : '') +
+      '<div class="row">' + (link ? '<a class="btn btn-ghost btn-sm" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_users_row')) + ' ↗</a>' : '') +
+      (!tutor ? '<button class="btn btn-primary btn-sm" type="button" id="book-for">' + T.esc(L('book_for')) + '</button>' : '') + '</div></section>';
+    if (tutor) {
+      html += '<section class="stack"><h3>' + T.esc(L('stats_title')) + '</h3>' + p.stats.map(function (m) {
+        return '<div class="card spread wrap"><b class="mono">' + T.esc(m.month) + '</b><span>' + T.esc(L('stats_line', { done: m.completed, sa: m.studentAbsent, tp: m.techPaid, tu: m.techUnpaid, ta: m.tutorAbsent, confirm: m.toConfirm })) +
+          ' · <b>' + T.esc(L('payable', { n: m.payable })) + '</b></span></div>';
+      }).join('') + '</section>';
+    } else {
+      html += '<section class="stack"><h3>' + T.esc(L('packages_title')) + '</h3>' + (p.packages.length ? '<div class="card stack">' + p.packages.map(function (k) {
+        return '<div class="spread"><span>' + T.esc(pkgName(k)) + ' <small class="muted">' + T.esc(k.sp_id) + '</small></span><span class="mono">' + T.esc(pkgStatus(k.status)) +
+          (k.start ? ' · ' + T.esc(L('range', { from: T.ddmm(k.start), to: T.ddmm(k.end) })) : '') + (k.sessionLimit ? ' · ' + T.esc(L('left_of', { n: k.sessionsLeft, total: k.sessionLimit })) : '') + '</span></div>';
+      }).join('') + '</div>' : '<div class="panel">' + T.esc(L('no_pkg')) + '</div>') + '</section>';
+    }
+    html += '<section class="stack"><h3>' + T.esc(L('upcoming_title')) + '</h3>' + (p.upcoming.length ? '<div class="card stack">' + p.upcoming.map(function (b) { return bookingRow(b, true); }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.esc(L('no_upcoming')) + '</div>') + '</section>' +
+      '<section class="stack"><h3>' + T.esc(L('history_title')) + '</h3>' + (p.history.length ? '<div class="card stack">' + p.history.map(function (b) { return bookingRow(b, false); }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.esc(L('none')) + '</div>') + '</section>' +
+      '<section class="stack"><h3>' + T.esc(L('related_notifs')) + '</h3>' + (p.notifications.length ? '<div id="p-notifs">' + notifList(p.notifications, true) + '</div>' : '<div class="panel">' + T.esc(L('none')) + '</div>') + '</section>' +
+      '<section class="stack"><h3>' + T.esc(L('devices_title')) + '</h3>' + (p.sessions.length ? '<div class="card stack">' + p.sessions.map(function (x) { return '<div class="spread"><span>' + T.esc(x.device) + '</span><small class="mono muted">' + T.esc(x.created) + '</small></div>'; }).join('') + '</div>' +
+        '<button class="btn btn-danger btn-sm" type="button" id="kick">' + T.esc(L('kick_btn', { name: p.name })) + '</button><small class="muted">' + T.esc(L('kick_note')) + '</small>' : '<div class="panel">' + T.esc(L('none')) + '</div>') + '</section></div>';
+    body.innerHTML = html;
+    T.$('#back', body).onclick = function () { backToList(root); };
+    var bf = T.$('#book-for', body); if (bf) bf.onclick = function () { openBookFor(root, p); };
+    var kick = T.$('#kick', body);
+    if (kick) kick.onclick = function () {
+      T.sheet('<h2>' + T.esc(L('kick_q', { name: p.name })) + '</h2><p class="muted">' + T.esc(L('kick_q_note')) + '</p>', [{ label: L('kick_yes'), kind: 'danger', value: true }, { label: L('cancel'), value: false }]).then(function (yes) {
+        if (yes) T.authed('apiAdminLogoutUser', p.id).then(function (r) { T.toast(r.ok ? L('kicked_n', { n: r.data.count }) : r.message); if (current(v)) openPerson(root, p.id); }).catch(function () { });
+      });
+    };
+    var again = function () { refreshCounts(root); if (current(v)) openPerson(root, p.id); };
+    bindBookingButtons(body, root, again);
+    var pn = T.$('#p-notifs', body); if (pn) bindNotifs(pn, root, p.notifications, function () { if (current(v)) openPerson(root, p.id); });
+  }
+
+  function bindBookingButtons(scope, root, reload) {
+    T.$$('[data-booking]', scope).forEach(function (b) { b.onclick = function () { openBooking(root, b.getAttribute('data-booking'), reload); }; });
+    T.$$('[data-cancel]', scope).forEach(function (b) { b.onclick = function () { cancelFlow(b.getAttribute('data-cancel'), reload, b.getAttribute('data-what'), b); }; });
+  }
+
+  function cancelFlow(id, after, what, btn) {
+    // Hộp thoại bị gỡ khỏi trang ngay khi bấm nút, nên đọc lý do trong lúc người dùng gõ (không đọc sau khi đóng).
+    var reason = L('cancel_reason_default');
+    var dlg = T.sheet('<h2>' + T.esc(L('cancel_q', { id: id })) + '</h2>' + (what ? '<p><b>' + T.esc(what) + '</b></p>' : '') + '<p class="muted">' + T.esc(L('cancel_note')) + '</p>' +
+      '<label class="field" for="c-reason">' + T.esc(L('cancel_reason_label')) + '<input type="text" id="c-reason" maxlength="200" value="' + T.esc(reason) + '"></label>',
+      [{ label: L('cancel_yes'), kind: 'danger', value: true }, { label: L('keep'), value: false }]);
+    var el = document.getElementById('c-reason');
+    if (el) el.addEventListener('input', function () { reason = el.value; });
+    dlg.then(function (yes) {
+      if (!yes) return;
+      // Huỷ mất vài giây (Calendar, email): báo ngay và khoá nút để không bấm lần 2.
+      if (btn) { btn.disabled = true; btn.textContent = L('cancelling_btn'); }
+      T.toast(L('cancelling', { id: id }));
+      // Vòng 2 N1: để nguyên chữ mặc định thì gửi rỗng (máy chủ ghi lý do mặc định ở cả hai thứ tiếng).
+      var c0 = (T.boot.content || {})['ad.cancel_reason_default'] || [], rs = String(reason || '').trim();
+      if (rs === L('cancel_reason_default') || rs === String(c0[0] || '') || rs === String(c0[1] || '')) rs = '';
+      T.authed('apiAdminCancel', id, rs).then(function (r) { T.toast(r.ok ? L('cancelled', { id: id }) : (r.message || L('cancel_fail'))); if (after) after(); /* after() tải lại dữ liệu, kể cả khi chưa chắc đã huỷ */ }).catch(function () { });
+    });
+  }
+
+  function openBooking(root, id, reload) {
+    T.authed('apiAdminBooking', id).then(function (r) {
+      if (!r.ok) { T.toast(r.message); return; }
+      var b = r.data, btns = [], link = T.safeUrl(b.sheetLink), meet = T.safeUrl(b.meetLink);
+      if (b.canCancel) btns.push({ label: L('cancel_this'), kind: 'danger', value: 'cancel' });
+      btns.push({ label: L('view_student'), value: 'p:' + b.student.id }, { label: L('view_tutor'), value: 'p:' + b.tutor.id }, { label: L('close'), value: null });
+      T.sheet('<h2>' + T.esc(b.id) + ' · ' + T.esc(T.day(b.date)) + ' ' + T.esc(b.slot) + '</h2><p><span class="pill' + statusCls(b) + '">' + T.esc(statusLabel(b)) + '</span></p>' +
+        '<p>' + T.esc(L('student')) + ' <b>' + T.esc(b.student.name) + '</b> · ' + T.esc(L('tutor')) + ' <b>' + T.esc(b.tutor.name) + '</b></p>' +
+        (meet && !/^CANCELLED/.test(b.status) ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(meet) + '" target="_blank" rel="noopener">' + T.esc(L('join_meet')) + ' ↗</a></p>' : '') +
+        (b.cancelReason ? '<p class="muted">' + T.esc(L('cancel_reason_x', { r: b.cancelReasonKey && has('ad.reason.' + b.cancelReasonKey) ? L('reason.' + b.cancelReasonKey) : b.cancelReason })) + '</p>' : '') +
+        (link ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_bookings_row')) + ' ↗</a></p>' : '') +
+        (b.log.length ? '<h3>' + T.esc(L('tab_log')) + '</h3><div class="log">' + b.log.map(function (l) { return '<div><small class="mono">' + T.esc(l.time) + '</small> ' + T.esc(actorShort(l.actor)) + ' · ' + T.esc(actLabel(l.action)) + (l.detail ? ' · <small>' + T.esc(l.detail) + '</small>' : '') + '</div>'; }).join('') + '</div>' : ''),
+        btns).then(function (v) {
+        if (v === 'cancel') cancelFlow(b.id, reload || function () { openBooking(root, b.id); }, T.day(b.date) + ' ' + b.slot + ' · ' + b.student.name + ' · ' + b.tutor.name);
+        else if (v && v.indexOf('p:') === 0) openPerson(root, v.substring(2));
+      });
+    }).catch(function () { });
+  }
+
+  // ── Đặt thay học viên (bỏ qua hạn đặt; vẫn 1 buổi/ngày, hạn gói, slot khoá và trùng giờ) ──
+  function openBookFor(root, p) {
+    var body = T.$('#tab-body', root), v = { kind: 'bookfor', p: p, sel: {}, pick: {}, busy: false, data: null };   // sel: ngày → giờ; pick: ngày → tutor đã chọn
+    v.draw = function (b2, r2) { if (v.data) drawBookFor(b2, r2, v); else if (v.err) drawBookErr(b2, r2, v); else b2.innerHTML = T.skeleton(4); };
+    st.view = v;
+    body.innerHTML = T.skeleton(4);
+    T.authed('apiAdminSlots', p.id, '', 14).then(function (r) {
+      // Vòng 2 N8: lỗi về sau khi đổi ngôn ngữ: vẽ vào khung đang hiện, chỉ khi trang đặt thay vẫn đang mở.
+      if (!r.ok) { v.err = r; if (current(v)) drawBookErr(T.$('#tab-body', root), root, v); return; }
+      v.data = r;
+      if (st.view === v) drawBookFor(T.$('#tab-body', root), root, v);
+    }).catch(function () { });
+  }
+  function drawBookErr(body, root, v) { if (!body) return; body.innerHTML = '<div class="stack">' + backBtn(v.p.name) + alertBad(T.m(v.err) || v.err.message) + '</div>'; T.$('#back', body).onclick = function () { openPerson(root, v.p.id); }; }
+  function drawBookFor(body, root, v) {
+    var p = v.p, r = v.data, days = r.data, sel = v.sel, pick = v.pick;
+    body.innerHTML = '<div class="stack">' + backBtn(p.name) + '<h2>' + T.esc(L('bookfor_title', { name: p.name })) + '</h2>' +
+      (r.blocker ? '<div class="alert warn">' + T.esc(pairOf(r.blockerMsg, r.blocker)) + ' ' + T.esc(L('bookfor_blocked')) + '</div>' : '') +
+      '<p class="note">' + T.esc(L('bookfor_note')) + '</p>' +
+      (days.length ? days.map(function (d) {
+        return '<details class="day" open><summary><b>' + T.esc(T.day(d.date)) + '</b>' + (d.alreadyBooked ? '<span class="pill ok">' + T.esc(L('has_lesson')) + '</span>' : '<span class="muted" style="font-size:.82rem">' + T.esc(L('free_n', { n: d.slots.length })) + '</span>') + '</summary>' +
+          '<div class="slots">' + d.slots.map(function (s) { return '<button type="button" class="chip' + (sel[d.date] === s.slot ? ' on' : '') + '" data-date="' + T.esc(d.date) + '" data-slot="' + T.esc(s.slot) + '"' + (d.alreadyBooked ? ' disabled' : '') + '>' + T.esc(s.slot) + '</button>'; }).join('') + '</div></details>';
+      }).join('') : '<div class="panel">' + T.esc(L('no_free_slots')) + '</div>') +
+      '<div id="pick"></div></div>';
+    T.$('#back', body).onclick = function () { openPerson(root, p.id); };
+    var find = function (date, slot) { var d = days.filter(function (x) { return x.date === date; })[0]; return d && d.slots.filter(function (x) { return x.slot === slot; })[0]; };
+    var label = function () { return L('book_n', { n: Object.keys(sel).length }); };
+    var drawPick = function () {
+      var keys = Object.keys(sel).sort(), box = T.$('#pick', body);
+      if (!keys.length) { box.innerHTML = ''; return; }
+      box.innerHTML = '<div class="card stack"><h3>' + T.esc(L('chosen')) + '</h3>' + keys.map(function (k) {
+        var s = find(k, sel[k]), chosen = pick[k] || '';
+        var autoName = (s.tutors.filter(function (t) { return t.id === s.auto; })[0] || {}).name || s.auto;
+        return '<label class="field" for="t-' + T.esc(k) + '">' + T.esc(T.day(k)) + ' ' + T.esc(sel[k]) + '<select id="t-' + T.esc(k) + '" data-k="' + T.esc(k) + '"><option value="">' + T.esc(L('auto_pick', { name: autoName })) + '</option>' +
+          s.tutors.map(function (t) { return '<option value="' + T.esc(t.id) + '"' + (t.id === chosen ? ' selected' : '') + '>' + T.esc(L('tutor_load', { name: t.name, n: t.load })) + '</option>'; }).join('') + '</select></label>';
+      }).join('') + '<button class="btn btn-primary btn-block" type="button" id="do-book"' + (v.busy ? ' disabled' : '') + '>' + T.esc(v.busy ? L('booking_now') : label()) + '</button></div>';
+      // Nhớ tutor đã chọn: chọn thêm giờ ngày khác (vẽ lại danh sách) không làm mất lựa chọn trước.
+      T.$$('#pick select', body).forEach(function (sl) { sl.onchange = function () { pick[sl.getAttribute('data-k')] = sl.value; }; });
+      T.$('#do-book', body).onclick = function () {
+        if (v.busy) return;
+        var reqs = keys.map(function (k) { return { date: k, slot: sel[k], tutorId: T.$('#t-' + k, body).value }; }), btn = T.$('#do-book', body);
+        v.busy = true; btn.disabled = true; btn.textContent = L('booking_now');
+        T.authed('apiAdminBook', p.id, reqs).then(function (x) {
+          if (!x.ok) { v.busy = false; btn.disabled = false; btn.textContent = label(); T.toast(x.message); if (x.uncertain && current(v)) openPerson(root, p.id); return; }
+          var ok = x.data.filter(function (y) { return y.ok; }).length;
+          T.sheet('<h2>' + T.esc(ok ? L('booked_n', { n: ok }) : L('booked_none')) + '</h2>' + x.data.map(function (y) {
+            return '<div class="spread"><span>' + T.esc(T.day(y.date)) + ' ' + T.esc(y.slot) + '</span>' + (y.ok ? '<span class="pill ok">' + T.esc(y.tutorName) + '</span>' : '<small>' + T.esc(pairOf(y.msg, y.message)) + '</small>') + '</div>';
+          }).join('')).then(function () { refreshCounts(root); if (current(v)) openPerson(root, p.id); });
+        }).catch(function () { v.busy = false; });
+      };
+    };
+    T.$$('.chip[data-date]', body).forEach(function (c) {
+      c.onclick = function () {
+        if (v.busy) return;   // đang gửi: không đổi lựa chọn, không vẽ lại nút Đặt
+        var d = c.getAttribute('data-date'), s = c.getAttribute('data-slot');
+        if (sel[d] !== s) delete pick[d];   // đổi giờ trong ngày: tutor đã chọn của giờ cũ không còn đúng
+        sel[d] = sel[d] === s ? undefined : s; if (!sel[d]) delete sel[d];
+        T.$$('.chip[data-date="' + d + '"]', body).forEach(function (x) { x.classList.toggle('on', sel[d] === x.getAttribute('data-slot')); });
+        drawPick();
+      };
+    });
+    drawPick();
+  }
+
+  // ── Nhật ký: mỗi hoạt động một dòng xem trước (giờ, việc gì, ai, tóm tắt), bấm mở đọc đủ ──
+  function logPreview(l) { var head = (l.entity || '') + (l.entityId ? ' ' + l.entityId : ''); return (head.trim() + (l.detail ? (head.trim() ? ' · ' : '') + l.detail : '') + (l.more ? '…' : '')).trim(); }
+  function logRow(l) {
+    var sys = !l.actor || l.actor === 'SYSTEM';
+    return '<button type="button" class="nrow lrow' + (sys ? ' sys' : '') + '" data-log="' + l.row + '" data-ts="' + l.ts + '" data-act="' + T.esc(l.action) + '" data-h="' + T.esc(l.h || '') + '" title="' + T.esc(l.time + ' · ' + l.action) + '">' +
+      '<span class="dot" aria-hidden="true"></span><span class="ntext"><span class="nmsg"><b>' + T.esc(actLabel(l.action)) + '</b> · ' + T.esc(actorShort(l.actor)) + '</span>' +
+      '<span class="nmeta">' + T.esc(logPreview(l) || l.action) + '</span></span><time>' + T.esc(splitTime(l.time).hm) + '</time></button>';
+  }
+  /**
+   * Chữ tìm khớp nhãn đang hiện (cả hai thứ tiếng): gửi kèm mã hành động có nhãn chứa chữ đó, và cờ khi chữ đó khớp "Hệ thống",
+   * để tìm "Đặt buổi" hay "Signed in" ra đúng dòng dù cột action chỉ có mã (soát 5I B3).
+   */
+  function logQuery(q, extra) {
+    var text = String(q.text || '').trim().toLowerCase(), c = T.boot.content || {}, acts = [], sys = false, admin = false;
+    var hit = function (e) { return Array.isArray(e) && (String(e[0]).toLowerCase().indexOf(text) !== -1 || String(e[1]).toLowerCase().indexOf(text) !== -1); };
+    if (text) {
+      Object.keys(c).forEach(function (k) {
+        if (k.indexOf('ad.act.') !== 0 || /_$/.test(k)) return;
+        if (hit(c[k])) acts.push(k.substring(7));
+      });
+      // Vòng 2 N5: họ nhãn "Gói chuyển sang {x}", "Bảo trì: {x}": ghép đủ từng trạng thái rồi so như nhãn đang hiện.
+      [['PACKAGE', 'ad.pkg.'], ['MAINTENANCE', 'ad.maint.']].forEach(function (fam) {
+        var tpl = c['ad.act.' + fam[0] + '_']; if (!Array.isArray(tpl)) return;
+        Object.keys(c).forEach(function (k) {
+          if (k.indexOf(fam[1]) !== 0) return;
+          var x = c[k] || [], code = k.substring(fam[1].length);
+          if (hit([String(tpl[0]).replace('{x}', x[0] || code), String(tpl[1]).replace('{x}', x[1] || code)])) acts.push(fam[0] + '_' + code);
+        });
+      });
+      sys = hit(c['ad.system'] || []);
+      admin = hit(c['ad.admin_sheets'] || []);
+    }
+    var o = { text: q.text, who: q.who, acts: acts, sys: sys, admin: admin, limit: 150 };
+    Object.keys(extra || {}).forEach(function (k) { o[k] = extra[k]; });
+    return o;
+  }
+  function drawLog(body, root) {
+    var q = st.logQ;
+    body.innerHTML = '<div class="stack"><div class="section-head"><h2>' + T.esc(L('log_title')) + '</h2>' +
+      '<button class="btn btn-ghost btn-sm" type="button" id="log-refresh">' + T.esc(L('reload')) + '</button></div>' +
+      '<p class="note">' + T.esc(L('log_note', { days: (st.home && st.home.logDays) || 60 })) + '</p>' +
+      '<div class="feedbar">' + seg('data-who', q.who, [['', L('who_all')], ['people', L('who_people')], ['system', L('who_system')]], L('aria_who')) +
+      '<span class="grow"></span><input type="search" id="log-q" placeholder="' + T.esc(L('log_search')) + '" aria-label="' + T.esc(L('log_search')) + '" value="' + T.esc(q.text) + '"></div>' +
+      '<div id="log-list">' + T.skeleton(3) + '</div></div>';
+    var timer = null;
+    // Vẽ vào khung đang hiện (tìm lại theo root): kết quả về sau khi đổi ngôn ngữ vẫn hiện, không gọi máy chủ lần hai (vòng 2 N4).
+    var show = function () {
+      var box = T.$('#log-list', root), d = st.log;
+      if (!box || !d || st.tab !== 'log' || st.view) return;
+      box.innerHTML = d.items.length ? '<div class="card flush feed log">' + grouped(d.items, logRow, true) + '</div>' +
+        '<div class="spread wrap"><small class="muted">' + T.esc(L('log_count', { n: d.items.length, total: d.total })) + '</small>' +
+        (d.next ? '<button class="btn btn-ghost btn-sm" type="button" id="log-more">' + T.esc(L('load_more')) + '</button>'
+          : d.total > d.items.length ? '<button class="btn btn-ghost btn-sm" type="button" id="log-reload">' + T.esc(L('log_new')) + '</button>' : '') + '</div>'
+        : '<div class="panel">' + T.esc(L('no_rows')) + '</div>';
+      T.$$('[data-log]', box).forEach(function (el) { el.onclick = function () { openLogEntry(root, el.getAttribute('data-log'), el.getAttribute('data-ts'), el.getAttribute('data-act'), el.getAttribute('data-h')); }; });
+      var more = T.$('#log-more', box);
+      if (more) more.onclick = function () {
+        more.disabled = true; more.textContent = L('loading');
+        var my = st.logSeq, lq = st.logQ;
+        T.authed('apiAdminLog', logQuery(lq, { cursor: d.next })).then(function (r) {
+          var m2 = T.$('#log-more', root);
+          if (my !== st.logSeq || !r.ok) { if (!r.ok) T.toast(r.message); if (m2) { m2.disabled = false; m2.textContent = L('load_more'); } return; }
+          st.log = { q: { text: lq.text, who: lq.who }, items: d.items.concat(r.data.items), total: r.data.total, next: r.data.next };
+          show();
+        }).catch(function () { });
+      };
+      var rl = T.$('#log-reload', box); if (rl) rl.onclick = function () { load(); };
+    };
+    var load = function () {
+      var my = ++st.logSeq, lq = st.logQ;
+      st.logLoading = true;
+      T.authed('apiAdminLog', logQuery(lq)).then(function (r) {
+        if (my !== st.logSeq) return;   // kết quả của lần tìm cũ về sau: bỏ
+        st.logLoading = false;
+        if (!r.ok) { var bx = T.$('#log-list', root); if (bx && st.tab === 'log' && !st.view) bx.innerHTML = alertBad(r.message); return; }
+        st.log = { q: { text: lq.text, who: lq.who }, items: r.data.items, total: r.data.total, next: r.data.next };
+        show();
+      }).catch(function () { st.logLoading = false; });
+    };
+    T.$('#log-refresh', body).onclick = function () { st.log = null; load(); refreshCounts(root); };
+    T.$('#log-q', body).oninput = function () { q.text = T.$('#log-q', body).value; clearTimeout(timer); timer = setTimeout(load, 400); };
+    T.$$('[data-who]', body).forEach(function (b) { b.onclick = function () { q.who = b.getAttribute('data-who'); markSeg(body, 'data-who', q.who); load(); }; });
+    if (st.log && st.log.q.text === q.text && st.log.q.who === q.who) show(); else if (!st.logLoading) load();
+  }
+  /** Đọc đủ một dòng nhật ký: chi tiết đầy đủ (JSON xếp dòng cho dễ đọc), nút mở buổi, người, đúng dòng trong Sheets. */
+  function openLogEntry(root, row, ts, action, h) {
+    T.authed('apiAdminLogEntry', Number(row), Number(ts), action, h || '').then(function (r) {
+      if (!r.ok) { T.toast(r.message); return; }
+      var l = r.data, d = String(l.detail || ''), link = T.safeUrl(l.link), btns = [], ids = String(l.entityId || '').split(',').filter(Boolean);
+      try { if (/^[\[{]/.test(d.trim())) d = JSON.stringify(JSON.parse(d), null, 2); } catch (e) { }
+      if (ids.length === 1 && (l.entity === 'BOOKING' || /^BK\d+$/.test(ids[0]))) btns.push({ label: L('view_booking', { id: ids[0] }), kind: 'primary', value: 'b:' + ids[0] });
+      if (ids.length === 1 && /^[ST]\d+$/.test(ids[0])) btns.push({ label: L('view_person', { id: ids[0] }), value: 'p:' + ids[0] });
+      btns.push({ label: L('close'), value: null });
+      T.sheet('<span class="pill">' + T.esc(actLabel(l.action)) + '</span><h2>' + T.esc(L('log_entry_title')) + '</h2>' +
+        '<dl class="kv"><dt>' + T.esc(L('k_time')) + '</dt><dd class="mono">' + T.esc(l.time) + '</dd><dt>' + T.esc(L('k_actor')) + '</dt><dd>' + T.esc(!l.actor || l.actor === 'SYSTEM' ? L('system') : l.actor === 'ADMIN' ? L('admin_sheets') : l.actor) + '</dd>' +
+        '<dt>' + T.esc(L('k_action')) + '</dt><dd class="mono">' + T.esc(l.action) + '</dd>' + (l.entity || l.entityId ? '<dt>' + T.esc(L('k_entity')) + '</dt><dd class="mono">' + T.esc((l.entity + ' ' + l.entityId).trim()) + '</dd>' : '') + '</dl>' +
+        (d ? '<pre class="logdetail">' + T.esc(d) + '</pre>' : '<p class="muted">' + T.esc(L('no_detail')) + '</p>') +
+        (link ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_row')) + ' ↗</a></p>' : ''), btns).then(function (v) {
+        if (v && v.indexOf('b:') === 0) openBooking(root, v.substring(2));
+        else if (v && v.indexOf('p:') === 0) openPerson(root, v.substring(2));
+      });
+    }).catch(function () { });
+  }
+})();
+</script>

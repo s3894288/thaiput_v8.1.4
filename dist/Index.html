@@ -1,0 +1,2338 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light only">
+  <title>thaiput · Đặt lịch luyện nói · Speaking lessons</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans+Thai:wght@600&family=Noto+Sans+Thai+Looped:wght@600&display=swap">
+  <style>
+/* thaiput v8 · giao diện (bản thiết kế 19/10, thay bản 5H).
+   Ngôn ngữ thiết kế: nền xám lá nhạt, các khối trắng bo tròn lớn đặt trên nền (không viền, gần như không đổ bóng),
+   thẻ màu phấn (bạc hà, bơ, oải hương, hồng phấn) cho trạng thái và điểm nhấn, nút và mục đang chọn là viên thuốc màu
+   xanh rừng đậm. Một phông duy nhất Be Vietnam Pro (dấu tiếng Việt chuẩn), giờ và số dùng chữ số đều cột.
+   Chỉ giao diện sáng (không có chế độ tối). Điểm nhớ duy nhất: thẻ gói học màu bạc hà có chữ Thái พูด (nói) chìm phía sau.
+   Chỉ đổi cách hiển thị: mọi class, id, cấu trúc trang giữ nguyên như bản trước. */
+:root {
+  /* Nền và bề mặt */
+  --bg: #eceee9;
+  --surface: #ffffff;
+  --surface-2: #f3f5f1;
+  --surface-3: #e5e9e2;
+  --ink: #131a15;
+  --ink-2: #39433b;
+  --muted: #5f6861;
+  --line: #e2e6df;
+  --line-strong: #cbd2c7;
+  /* Thương hiệu: xanh rừng đậm cho nút chính, mục đang chọn; vàng chùa Thái cho dấu chữ Thái */
+  --brand: #1d3b29;
+  --brand-2: #2b5239;
+  --brand-ink: #ffffff;
+  --brand-soft: #dcefd7;
+  --gold: #b7862b;
+  --gold-soft: #fbf0cf;
+  --gold-ink: #6f4f12;
+  --mark-ink: #d9a845;
+  /* Màu phấn (nền thẻ, nhãn trạng thái) */
+  --mint: #c3efb9;
+  --butter: #fcefc0;
+  --lavender: #e0d9ff;
+  --lavender-ink: #4a3fb0;
+  --lavender-strong: #5b4ed6;
+  --blush: #fbe1de;
+  --sky: #dbeefb;
+  /* Trạng thái */
+  --on-bad: #ffffff;
+  --ok: #1d6f3f;
+  --ok-soft: #dff2da;
+  --warn: #8a530c;
+  --warn-soft: #fcefcc;
+  --bad: #b3261e;
+  --bad-soft: #fce4e1;
+  --info: #4a3fb0;
+  --focus: #2f6fd1;
+  --zalo: #0068ff;
+  --overlay: rgba(12, 20, 15, .42);
+  /* Chữ: một phông cho mọi thứ; số dùng chữ số đều cột (font-variant-numeric), không dùng phông đơn cách */
+  --font-display: 'Be Vietnam Pro', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-body: 'Be Vietnam Pro', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'Be Vietnam Pro', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-thai: 'Noto Sans Thai Looped', 'Noto Sans Thai', 'Leelawadee UI', Tahoma, sans-serif;
+  /* Bo góc: khối lớn 24, thẻ 18, ô nhập 14, ô giờ 12, viên thuốc 999 */
+  --radius-xl: 24px;
+  --radius: 18px;
+  --radius-sm: 14px;
+  --radius-xs: 12px;
+  /* Đổ bóng: chỉ cho thứ nổi trên trang (hộp thoại, thanh tab điện thoại, thanh hành động, thông báo nhỏ) */
+  --shadow: none;
+  --shadow-lg: 0 12px 36px rgba(19, 26, 21, .14), 0 2px 6px rgba(19, 26, 21, .06);
+}
+/* Chỉ một giao diện sáng (19/10): không đổi màu theo chế độ tối của máy; trình duyệt cũng không tự đảo màu ô nhập, thanh cuộn. */
+:root { color-scheme: light only; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--font-body); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-variant-numeric: tabular-nums; }
+#app { max-width: 560px; margin: 0 auto; padding-inline: 16px; padding-block: 0 116px; min-height: 100vh; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; text-wrap: balance; margin: 0; color: var(--ink); }
+h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -.025em; }
+h2 { font-size: 1.32rem; font-weight: 700; letter-spacing: -.018em; }
+h3 { font-size: 1rem; font-weight: 600; letter-spacing: -.005em; }
+p { margin: 0; }
+a { color: var(--brand); text-underline-offset: 3px; }
+small, .muted { color: var(--muted); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.005em; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.stack-lg { display: flex; flex-direction: column; gap: 24px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.spread > *, .row > * { min-width: 0; }
+/* Nhãn nhỏ phía trên: chữ thường, không viết hoa toàn bộ */
+.eyebrow { font-size: .8rem; color: var(--muted); font-weight: 500; }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+[hidden] { display: none !important; }
+#back { align-self: flex-start; }
+/* Chừa chỗ ở cuối trang cho vật nổi (thanh tab, nút Zalo, thanh hành động) để nội dung cuối không bị che khi cuộn hết */
+body:has(.fab-zalo.above-tabs) #app { padding-bottom: 160px; }
+body:has(.actionbar:not([hidden])) #app { padding-bottom: 228px; }
+/* Trình duyệt cũ không hiểu :has(): luôn chừa chỗ và đặt nút Zalo cao hơn thanh hành động (chỉ điện thoại) */
+@supports not selector(:has(a)) {
+  @media (max-width: 899px) { #app { padding-bottom: 228px; } .fab-zalo.above-tabs { bottom: calc(166px + env(safe-area-inset-bottom, 0px)); } }
+}
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.ic { stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* Thanh đầu trang: logo, nút VI | EN, nút phụ */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 8; background: var(--bg);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-block: 14px; margin-inline: -16px; padding-inline: 16px; }
+.brand { appearance: none; background: none; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; color: var(--ink); letter-spacing: -.01em; }
+.brand .mark { width: 36px; height: 36px; border-radius: 12px; background: var(--brand); color: var(--mark-ink); display: grid; place-items: center; font: 600 1.1rem/1 var(--font-thai); }
+.topbar-right { flex-wrap: nowrap; gap: 8px; }
+.topbar-right .who { font-size: .84rem; color: var(--muted); max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.langsw { appearance: none; display: inline-flex; align-items: center; border: 0; background: var(--surface); border-radius: 999px; padding: 3px; cursor: pointer; font: 600 .74rem/1 var(--font-body); letter-spacing: .03em; min-height: 36px; }
+.langsw span { padding: 7px 10px; border-radius: 999px; color: var(--muted); }
+.langsw span.on { background: var(--brand); color: var(--brand-ink); }
+
+/* Bề mặt: khối trắng bo lớn đặt trên nền xám lá, không viền */
+.card { background: var(--surface); border: 0; border-radius: var(--radius-xl); padding: 20px; box-shadow: var(--shadow); }
+.card.flush { padding: 0; overflow: hidden; }
+.panel { background: var(--surface-2); border-radius: var(--radius); padding: 14px 16px; color: var(--ink-2); }
+.card .panel, .sheet .panel { background: var(--surface-2); }
+.note { background: var(--butter); border-radius: var(--radius-sm); padding: 12px 14px; font-size: .9rem; color: var(--ink-2); }
+.alert { border-radius: var(--radius-sm); padding: 12px 14px; font-size: .92rem; border: 0; background: var(--surface); color: var(--ink-2); }
+.alert.bad { background: var(--bad-soft); color: var(--bad); }
+.alert.warn { background: var(--warn-soft); color: var(--warn); }
+.alert.ok { background: var(--ok-soft); color: var(--ok); }
+
+/* Nút: viên thuốc. Chính: xanh rừng đậm. Phụ: nền trắng viền mảnh. */
+.btn { appearance: none; border: 1px solid transparent; border-radius: 999px; padding: 11px 20px; font: 600 .94rem/1.2 var(--font-body); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; min-height: 46px; transition: background .15s, border-color .15s, color .15s; }
+.btn-primary { background: var(--brand); color: var(--brand-ink); }
+.btn-primary:hover { background: var(--brand-2); }
+.btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+.btn-ghost:hover { background: var(--surface-2); border-color: var(--ink-2); }
+.btn-danger { background: var(--surface); color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.btn-danger:hover { background: var(--bad-soft); }
+.btn-block { width: 100%; }
+.btn-sm { min-height: 36px; padding: 7px 14px; font-size: .84rem; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:focus-visible, input:focus-visible, select:focus-visible, .chip:focus-visible, .tab:focus-visible, .langsw:focus-visible, .nrow:focus-visible, .seg button:focus-visible, .person:focus-visible, .brand:focus-visible, .pkg:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+/* Ô nhập */
+label.field { display: flex; flex-direction: column; gap: 7px; font-weight: 600; font-size: .88rem; color: var(--ink-2); }
+input[type=text], input[type=email], input[type=tel], input[type=search], select { width: 100%; font: 400 1rem/1.3 var(--font-body); padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); min-height: 48px; transition: border-color .15s; }
+input[type=text]:hover, input[type=email]:hover, input[type=tel]:hover, input[type=search]:hover, select:hover { border-color: var(--ink-2); }
+input::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
+input.invalid { border-color: var(--bad); background: color-mix(in srgb, var(--bad-soft) 40%, var(--surface)); }
+.hint { font-weight: 400; font-size: .8rem; color: var(--muted); }
+.hint.bad { color: var(--bad); }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: .86rem; color: var(--ink-2); }
+.check input { margin-top: 2px; width: 20px; height: 20px; flex: none; accent-color: var(--brand); }
+.file { border: 1.5px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 16px; text-align: center; color: var(--muted); font-size: .9rem; cursor: pointer; display: block; background: var(--surface-2); }
+.file:hover { border-color: var(--ink-2); }
+.file.has { border-style: solid; border-color: transparent; color: var(--ok); background: var(--ok-soft); }
+.file input { display: none; }
+
+/* Gói học (form đăng ký) */
+.pkg-list { display: grid; gap: 10px; }
+.pkg { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1.5px solid transparent; border-radius: var(--radius); padding: 14px 16px; background: var(--surface-2); cursor: pointer; transition: border-color .15s, background .15s; }
+.pkg:hover { border-color: var(--line-strong); }
+.pkg input { width: 20px; height: 20px; accent-color: var(--brand); flex: none; }
+.pkg.on { border-color: var(--brand); background: var(--mint); }
+.pkg .price { font-weight: 700; white-space: nowrap; color: var(--ink); letter-spacing: -.01em; }
+.pkg .meta { font-size: .8rem; color: var(--muted); }
+.pkg.on .meta { color: var(--ink-2); }
+
+/* Thẻ gói của học viên: thẻ bạc hà, chữ Thái พูด chìm phía sau (điểm nhớ của thương hiệu) */
+.pass { position: relative; overflow: hidden; border-radius: var(--radius-xl); padding: 20px 20px 18px; background: var(--mint); color: var(--ink); display: flex; flex-direction: column; gap: 10px; }
+.pass::after { content: 'พูด'; position: absolute; right: -4px; bottom: -26px; font: 600 6.2rem/1 var(--font-thai); color: color-mix(in srgb, var(--brand) 9%, transparent); pointer-events: none; }
+.pass > * { position: relative; z-index: 1; }
+.pass .label { font-size: .8rem; font-weight: 600; color: var(--ink-2); }
+.pass .big { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; }
+.pass .dates { display: flex; gap: 18px; flex-wrap: wrap; font-size: .9rem; color: var(--ink-2); }
+.pass .dates b { font-weight: 700; color: var(--ink); }
+/* Nhãn trạng thái: viên thuốc màu phấn, chữ đậm cùng tông */
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 11px; font-size: .75rem; font-weight: 600; background: var(--surface-3); color: var(--ink-2); white-space: nowrap; }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+.pill.gold { background: var(--lavender); color: var(--lavender-ink); }
+.pill.info { background: var(--lavender); color: var(--lavender-ink); }
+.lesson .body > .pill, .sheet .lesson .pill { align-self: flex-start; }
+.spread > .pill { flex: none; }
+.lesson .body > .spread { flex-wrap: wrap; row-gap: 6px; }
+.pass small, .pass .muted { color: var(--ink-2); }
+.pass .pass-note { display: block; margin-top: 6px; font-size: .85rem; }
+/* Chunk 5J: buổi quá hạn chọn kết quả (trang tutor), thông báo tuần sau (trang học viên) */
+.lesson.is-overdue .when { outline: 2px solid var(--bad, #b42318); outline-offset: 2px; }
+.alert.overdue { margin-top: 8px; font-size: .85rem; }
+.week-banner .row { margin-top: 8px; gap: 8px; flex-wrap: wrap; }
+.pass .pill { background: rgba(255, 255, 255, .7); color: var(--ink); }
+
+/* Ngày và giờ */
+.day { background: var(--surface); border: 0; border-radius: var(--radius-xl); box-shadow: var(--shadow); }
+.day > summary { list-style: none; cursor: pointer; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.day > summary::-webkit-details-marker { display: none; }
+.day > summary b { font-weight: 700; font-size: 1.02rem; letter-spacing: -.01em; }
+.day[open] > summary { padding-bottom: 12px; }
+.day .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; padding: 0 16px 16px; }
+.chip { appearance: none; border: 1.5px solid transparent; background: var(--surface-2); color: var(--ink); border-radius: var(--radius-xs); padding: 10px 4px; font: 600 .92rem/1 var(--font-mono); font-variant-numeric: tabular-nums; cursor: pointer; text-align: center; min-height: 42px; transition: background .12s, border-color .12s, color .12s; }
+.chip:hover:not(:disabled) { border-color: var(--ink-2); }
+.chip.on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.chip.pending { background: var(--butter); border-color: transparent; color: var(--warn); }
+.chip.blocked, .chip.blocked:disabled { background: var(--blush); border-color: transparent; color: var(--bad); opacity: 1; text-decoration: line-through; }
+.chip.booked { background: var(--mint); border-color: transparent; color: var(--ok); box-shadow: inset 0 -3px 0 var(--ok); }
+.chip.dirty { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--lavender-strong); }
+.chip:disabled { opacity: 1; color: #7d847e; cursor: not-allowed; }
+.chip.on:disabled { background: #5e7466; border-color: #5e7466; color: #ffffff; }
+.chip.booked:disabled { background: #e3f5de; color: #2f6b45; }
+.chip.pending:disabled { color: #8a530c; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; font-size: .78rem; }
+.legend .chip { min-height: 30px; padding: 6px 12px; border-radius: 999px; font: 600 .76rem/1 var(--font-body); cursor: default; }
+.legend .chip:not(.on):not(.pending):not(.blocked):not(.booked) { background: var(--surface-2); border-color: transparent; }
+
+/* Buổi học: ô ngày giờ màu oải hương bên trái */
+.lesson { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: start; }
+.lesson .when { font-family: var(--font-mono); font-weight: 600; text-align: center; background: var(--lavender); border-radius: var(--radius-sm); padding: 9px 10px; min-width: 74px; line-height: 1.25; color: var(--lavender-ink); font-size: .86rem; }
+.lesson .when .d { display: block; font: 600 .72rem/1.2 var(--font-body); color: var(--lavender-ink); }
+.lesson .when b { display: block; font-size: 1.12rem; color: var(--ink); letter-spacing: -.01em; }
+.lesson .body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.list-divider { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+/* Thanh tab (điện thoại): thanh nổi bo tròn ở đáy, mục đang chọn là viên thuốc xanh rừng */
+.tabbar { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 9; background: var(--surface); border-radius: 22px; box-shadow: var(--shadow-lg); }
+.tabbar .inner { max-width: 536px; margin: 0 auto; padding: 6px; gap: 4px; display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); grid-auto-flow: column; }
+.tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 600 .72rem/1.2 var(--font-body); padding: 8px 4px 9px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; transition: background .15s, color .15s; }
+.tab .ic { line-height: 1; }
+.tab > span { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) { .tab { padding-inline: 2px; font-size: .69rem; letter-spacing: -.01em; } }
+@media (max-width: 350px) { .tab { font-size: .62rem; } .tab > span { white-space: normal; text-align: center; } }
+.tab:hover { color: var(--ink); }
+.tab.on { background: var(--brand); color: var(--brand-ink); }
+.tab .count { position: static; margin-left: 4px; display: inline-block; vertical-align: 1px; min-width: 18px; padding: 1px 6px; border-radius: 999px; background: var(--lavender-strong); color: #ffffff; font-size: .66rem; line-height: 1.35; text-align: center; font-weight: 700; }
+/* Điện thoại: 6 ô số liệu thành một hàng cuộn ngang, không chiếm nửa màn hình */
+/* Tab có biểu tượng: số đếm nằm ở góc biểu tượng, không đẩy chữ xuống dòng */
+.tab .ic ~ span .count { position: absolute; top: 2px; left: calc(50% + 10px); margin-left: 0; }
+
+/* Thanh hành động nổi (đã chọn giờ, lưu giờ rảnh) */
+.actionbar { position: fixed; left: 0; right: 0; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 10; padding-inline: 12px; }
+.actionbar .inner { max-width: 536px; margin: 0 auto; background: var(--brand); color: var(--brand-ink); border-radius: 22px; padding: 10px 10px 10px 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px; box-shadow: var(--shadow-lg); }
+.actionbar .btn-primary { background: var(--brand-ink); color: var(--brand); }
+.actionbar .btn-primary:hover { background: color-mix(in srgb, var(--brand-ink) 88%, var(--brand)); }
+.actionbar .btn-ghost { background: transparent; color: inherit; border-color: color-mix(in srgb, currentColor 35%, transparent); }
+
+/* Liên hệ admin, nút Zalo nổi (giữ màu Zalo để nhận ra ngay) */
+.contact { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.contact .btn { min-height: 44px; font-size: .86rem; }
+.contact:has(> :only-child) { grid-template-columns: 1fr; }
+.zalo { color: var(--zalo); border-color: color-mix(in srgb, var(--zalo) 45%, transparent); }
+.fab-zalo { position: fixed; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 15; background: #0068ff; color: #fff; border-radius: 999px; padding: 13px 18px; font: 700 .88rem/1 var(--font-body); text-decoration: none; box-shadow: var(--shadow-lg); }
+.fab-zalo.above-tabs { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+body:has(.actionbar:not([hidden])) .fab-zalo.above-tabs { bottom: calc(166px + env(safe-area-inset-bottom, 0px)); }
+
+/* Hộp thoại trong trang */
+.sheet-backdrop { position: fixed; inset: 0; background: var(--overlay); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { width: 100%; max-width: 560px; background: var(--surface); border-radius: 28px 28px 0 0; padding: 24px 20px calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 14px; max-height: 86vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.sheet::before { content: ''; align-self: center; width: 40px; height: 4px; border-radius: 4px; background: var(--line-strong); margin-top: -10px; }
+.langpick h2 { font-size: 1.3rem; }
+.sheet > .pill { align-self: flex-start; }
+.toast { position: fixed; left: 16px; right: 16px; margin-inline: auto; width: fit-content; max-width: 480px; bottom: 172px; z-index: 30; background: var(--ink); color: var(--bg); padding: 11px 18px; border-radius: 20px; font-size: .9rem; line-height: 1.4; text-align: center; box-shadow: var(--shadow-lg); }
+.skeleton { height: 64px; border-radius: var(--radius); background: linear-gradient(90deg, var(--surface-3), var(--surface), var(--surface-3)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } * { transition: none !important; } }
+.maintbar { position: relative; z-index: 24; background: var(--butter); color: var(--ink); text-align: center; font: 600 .86rem/1.35 var(--font-body); padding: 9px 16px; }
+.retrybar { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 25; background: var(--butter); color: var(--gold-ink); text-align: center; font: 600 .84rem/1.3 var(--font-body); padding: 9px 16px; }
+
+/* Trang chủ */
+.hero { padding-block: 14px 4px; display: flex; flex-direction: column; gap: 12px; }
+.hero .th-word { font-family: var(--font-thai); color: #8a6418; font-size: 1.05rem; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; background: var(--surface); padding: 6px 14px; border-radius: 999px; }
+.hero h1 { font-size: 2.15rem; line-height: 1.12; }
+.hero p { font-size: 1.02rem; max-width: 46ch; color: var(--ink-2); }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.facts div { background: var(--surface); border-radius: var(--radius); padding: 14px 12px; display: flex; flex-direction: column; gap: 4px; }
+.facts div:nth-child(1) { background: var(--mint); }
+.facts div:nth-child(2) { background: var(--lavender); }
+.facts div:nth-child(3) { background: var(--butter); }
+.facts b { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--ink); letter-spacing: -.02em; }
+.facts span { font-size: .78rem; color: var(--ink-2); line-height: 1.3; }
+
+/* Đếm số trên thẻ tutor, học viên */
+.stats .spread b { font-variant-numeric: tabular-nums; }
+.statgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.statgrid div { background: var(--surface-2); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.statgrid b { font: 700 1.3rem/1.1 var(--font-display); letter-spacing: -.02em; }
+.statgrid span { font-size: .78rem; color: var(--muted); }
+
+/* ── Trang quản trị ── */
+body[data-page=admin] #app { max-width: 1040px; }
+body[data-page=admin] .tabbar .inner { max-width: 536px; }
+/* Ô số liệu: số lớn, nhãn nhỏ; ô cần chú ý có nền phấn (hồng phấn: khẩn, bơ: cần xử lý) */
+.kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.kpi { background: var(--surface); border: 0; border-radius: var(--radius); padding: 12px 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.kpi b { font: 700 1.45rem/1 var(--font-display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.kpi span { font-size: .76rem; color: var(--ink-2); line-height: 1.25; min-width: 0; overflow-wrap: anywhere; hyphens: auto; }
+.kpi.warn { background: var(--butter); }
+.kpi.warn b { color: var(--warn); }
+.kpi.bad { background: var(--blush); }
+.kpi.bad b { color: var(--bad); }
+a.kpi { color: inherit; text-decoration: none; }
+button.kpi { appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+a.kpi:hover, button.kpi:hover { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.kpi:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+/* Điện thoại: 6 ô số liệu thành một hàng cuộn ngang, không chiếm nửa màn hình */
+@media (max-width: 600px) {
+  body .kpis { display: flex; overflow-x: auto; scrollbar-width: none; gap: 8px; margin-inline: -16px; padding-inline: 16px; scroll-padding-inline: 16px; }
+  body .kpis::-webkit-scrollbar { display: none; }
+  body .kpis .kpi { flex: 0 0 38%; }
+}
+/* Bộ lọc: các viên thuốc rời, viên đang chọn tô xanh rừng */
+.feedbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.feedbar .grow { flex: 1 1 auto; }
+.feedbar .seg + .seg { margin-left: 4px; padding-left: 10px; border-left: 1px solid var(--line-strong); border-radius: 0; }
+.seg { display: inline-flex; background: transparent; border-radius: 999px; padding: 0; gap: 6px; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { white-space: nowrap; flex: none; }
+.seg button { appearance: none; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-2); font: 600 .8rem/1 var(--font-body); padding: 8px 13px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
+.seg button:hover { border-color: var(--ink-2); }
+.seg button.on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.seg button b { font: 700 .7rem/1 var(--font-body); background: var(--lavender); color: var(--lavender-ink); border-radius: 999px; padding: 3px 7px; }
+.seg button.on b { background: var(--lavender-strong); color: #ffffff; }
+/* Danh sách thông báo, nhật ký: khay xám, mỗi dòng là một viên trắng bo tròn */
+.feed { display: flex; flex-direction: column; gap: 6px; }
+.card.flush.feed { background: var(--surface-3); padding: 8px; border-radius: var(--radius-xl); overflow: visible; }
+.fgroup { background: transparent; color: var(--muted); font: 600 .78rem/1 var(--font-body); padding: 10px 8px 4px; border: 0; }
+.nrow { appearance: none; border: 0; background: var(--surface); color: inherit; text-align: left; width: 100%; padding: 11px 14px; border-radius: var(--radius-sm); display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; align-items: start; cursor: pointer; font: inherit; transition: box-shadow .12s; }
+.nrow:hover { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.nrow .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; background: var(--line-strong); }
+.nrow.lv-bad .dot { background: var(--bad); }
+.nrow.lv-warn .dot { background: var(--gold); }
+.nrow.lv-info .dot { background: var(--lavender-strong); }
+.nrow .ntext { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nrow .nmsg { font-size: .9rem; color: var(--ink-2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.nrow .nmeta { font-size: .74rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrow time { font: 500 .76rem/1.6 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.nrow.unread .nmsg { color: var(--ink); font-weight: 600; }
+.nrow.read { background: color-mix(in srgb, var(--surface) 55%, transparent); }
+.nrow.read .nmsg { color: var(--muted); }
+.person { appearance: none; border: 0; background: transparent; color: inherit; text-align: left; width: 100%; padding: 12px 16px; display: flex; flex-direction: column; gap: 3px; cursor: pointer; font: inherit; min-width: 0; border-top: 1px solid var(--line); }
+.person:first-child { border-top: 0; }
+.card.flush:has(> .person) { background: var(--surface-3); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.card.flush:has(> .person) .person { background: var(--surface); border: 0; border-radius: var(--radius-sm); }
+.card.flush:has(> .person) .person:hover { box-shadow: inset 0 0 0 1.5px var(--line-strong); }
+.person:hover { background: var(--surface-2); }
+.person small { overflow-wrap: anywhere; }
+.spread.wrap, .row.wrap { flex-wrap: wrap; gap: 8px; }
+.stack > .spread { flex-wrap: wrap; row-gap: 8px; }
+.spread > .row { flex: none; flex-wrap: nowrap; }
+input[type=search] { max-width: 320px; border-radius: 999px; padding-inline: 18px; background: var(--surface); }
+.admin select { width: auto; }
+.log { display: flex; flex-direction: column; max-height: 62vh; overflow: auto; font-size: .84rem; overflow-wrap: anywhere; }
+.feed.log { max-height: none; overflow: visible; }
+.nrow.lrow .dot { background: var(--brand); }
+.nrow.lrow.sys .dot { background: var(--line-strong); }
+.nrow.lrow .nmsg { -webkit-line-clamp: 1; }
+.nrow.lrow .nmeta { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+dl.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; font-size: .86rem; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; overflow-wrap: anywhere; }
+pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--surface-2); border: 0; border-radius: var(--radius-sm); padding: 12px 14px; font: 500 .8rem/1.55 var(--font-body); font-variant-numeric: tabular-nums; tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.logline { border-top: 1px solid var(--line); padding: 8px 14px; }
+.logline:first-child { border-top: 0; }
+.sheet .log .logline, .sheet .log > div { padding: 6px 0; }
+.day-grid, .week-grid { display: flex; flex-direction: column; gap: 12px; }
+.row .chip { padding-inline: 14px; font-family: var(--font-body); border-radius: 999px; }
+
+/* ── Máy tính: thanh tab thành khối trắng bo tròn bên trái, mục đang chọn là viên thuốc xanh rừng ── */
+@media (min-width: 600px) and (max-width: 899px) {
+  .tabbar { left: 50%; right: auto; width: min(560px, calc(100% - 24px)); transform: translateX(-50%); }
+}
+@media (min-width: 900px) {
+  body { font-size: 15.5px; }
+  body[data-page=student], body[data-page=tutor], body[data-page=admin] { padding-left: 256px; }
+  body[data-page=student] #app, body[data-page=tutor] #app { max-width: 1060px; padding-inline: 32px; padding-bottom: 48px; }
+  body[data-page=admin] #app { padding-inline: 32px; padding-bottom: 48px; }
+  body[data-page=student] .topbar, body[data-page=tutor] .topbar, body[data-page=admin] .topbar { margin-inline: -32px; padding-inline: 32px; padding-block: 18px; }
+  body[data-page=student] .tabbar, body[data-page=tutor] .tabbar, body[data-page=admin] .tabbar { top: 16px; bottom: 16px; left: 16px; right: auto; width: 224px; border-radius: var(--radius-xl); padding-top: 84px; box-shadow: none; background: var(--surface); }
+  body[data-page=student] .tabbar .inner, body[data-page=tutor] .tabbar .inner, body[data-page=admin] .tabbar .inner { max-width: none; grid-auto-flow: row; grid-template-columns: 1fr; gap: 4px; padding: 0 12px; }
+  body[data-page=student] .tab, body[data-page=tutor] .tab, body[data-page=admin] .tab { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 12px 14px; border-radius: 16px; font-size: .92rem; }
+  .tab .count, .tab .ic ~ span .count { position: static; margin-left: 8px; }
+  body[data-page=student] .actionbar, body[data-page=tutor] .actionbar, body[data-page=admin] .actionbar { left: 256px; bottom: 24px; padding-inline: 32px; }
+  body[data-page=student] .actionbar .inner, body[data-page=tutor] .actionbar .inner { max-width: 640px; }
+  body[data-page=student] .toast, body[data-page=tutor] .toast, body[data-page=admin] .toast { left: 272px; right: 16px; bottom: 100px; }
+  .fab-zalo.above-tabs, body:has(.actionbar:not([hidden])) .fab-zalo.above-tabs { left: 32px; right: auto; bottom: 32px; }
+  body:has(.fab-zalo.above-tabs) #app, body:has(.actionbar:not([hidden])) #app { padding-bottom: 120px; }
+  /* Logo nằm đầu cột trái như ảnh tham chiếu (chỉ cổng học viên, tutor, admin) */
+  body[data-page=student] .topbar .brand, body[data-page=tutor] .topbar .brand, body[data-page=admin] .topbar .brand { position: fixed; left: 40px; top: 36px; z-index: 10; }
+  body[data-page=student] .topbar, body[data-page=tutor] .topbar, body[data-page=admin] .topbar { justify-content: flex-end; z-index: 11; }
+  .sheet-backdrop { align-items: center; }
+  .sheet { border-radius: 28px; max-height: 80vh; max-width: 540px; padding: 28px 26px 24px; }
+  .sheet::before { display: none; }
+  h1 { font-size: 2.3rem; }
+  h2 { font-size: 1.45rem; }
+  .hero h1 { font-size: 2.75rem; }
+  body[data-page=student] main { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 28px; align-items: start; }
+  body[data-page=student] main > .alert { grid-column: 1 / -1; }
+  body[data-page=student] main > .side { position: sticky; top: 90px; }
+  .week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: start; }
+  .week-grid .day { border-radius: var(--radius); }
+  .week-grid .day > summary { flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px; }
+  .week-grid .day .slots { grid-template-columns: 1fr; padding: 0 8px 10px; gap: 6px; }
+  .week-grid .day .btn { width: 100%; }
+  .week-grid .day .copy { padding: 0 8px 10px !important; }
+  .week-grid .day .copy .btn { border-radius: var(--radius-sm); font-size: .76rem; padding-inline: 10px; }
+  .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+  .kpi { padding: 14px 16px; gap: 6px; }
+  .kpi b { font-size: 1.75rem; }
+  .nrow { grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; padding: 12px 16px; }
+  .nrow .dot { margin-top: 0; }
+  .nrow .ntext { flex-direction: row; align-items: baseline; gap: 12px; }
+  .nrow .nmsg { -webkit-line-clamp: 1; flex: 1 1 auto; }
+  .nrow .nmeta { flex: 0 1 34%; text-align: right; }
+}
+@media (min-width: 1180px) {
+  .day-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+}
+@media (min-width: 900px) and (max-width: 1180px) {
+  .week-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 420px) {
+  .seg button { padding: 8px 10px; gap: 4px; }
+  .feedbar { gap: 6px; }
+  .feedbar .seg { flex-wrap: wrap; overflow: visible; }
+  .feedbar .seg + .seg { margin-left: 0; padding-left: 0; border-left: 0; }
+  .pkg { flex-wrap: wrap; }
+  .pkg .price { margin-left: 32px; }
+  .hero h1 { font-size: 1.95rem; }
+}
+@media (max-width: 360px) {
+  .facts { grid-template-columns: 1fr; }
+  .contact { grid-template-columns: 1fr; }
+  .topbar-right .who { display: none; }
+  .kpi b { font-size: 1.25rem; }
+}
+.pkg-contact { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; cursor: default; }
+</style>
+
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // Giá trị do doGet (Api.gs, bootJson_) truyền vào: trang cần mở, token link đăng nhập (nếu có), phiên bản.
+    var BOOT = <?!= bootJson ?>;
+  </script>
+  <script>
+/**
+ * App.html · Lõi phía trình duyệt (v8)
+ * Router theo "page", gọi server qua google.script.run, giữ token phiên, các tiện ích hiển thị.
+ * Không dùng alert/confirm/prompt của trình duyệt (bị chặn khi nhúng trong Google Sites): dùng T.sheet().
+ */
+(function () {
+  var T = window.T = { views: {}, state: {} };
+  T.boot = window.BOOT || { page: 'home', linkToken: '', version: '' };
+  T.lang = 'vi';
+  /**
+   * Chữ trên trang lấy từ tab CONTENT của Sheets (BOOT.content: key → [tiếng Việt, tiếng Anh], chunk 5H).
+   * Hiện theo ngôn ngữ đang chọn (T.lang, nút VI | EN). {bien} được thay bằng vars. Thiếu key thì hiện chính key.
+   */
+  T.t = function (key, vars, lang) {
+    var c = T.boot.content || {}, e = c[key], s = Array.isArray(e) ? e[(lang || T.lang) === 'en' ? 1 : 0] : e;
+    if (s === undefined || s === null) s = key;
+    return String(s).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] !== undefined ? String(vars[k]) : m; });
+  };
+
+  // ── Phiên đăng nhập: mỗi tab giữ phiên riêng (sessionStorage), để một tab đăng nhập admin, tab khác đăng nhập tutor.
+  //    Phiên gần nhất cũng lưu chung (localStorage) để tab mới mở hoặc mở lại trình duyệt vẫn còn đăng nhập.
+  //    Trình duyệt chặn bộ nhớ (nhúng Google Sites) thì giữ trong trang. ──
+  function usableStore(get) { try { var s = get(); var k = '__tp'; s.setItem(k, '1'); s.removeItem(k); return s; } catch (e) { return null; } }
+  T.store = (function () {
+    var mem = {}, tab = usableStore(function () { return window.sessionStorage; }), shared = usableStore(function () { return window.localStorage; });
+    function rd(s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }
+    function wr(s, k, v) { try { if (s) { if (v === null) s.removeItem(k); else s.setItem(k, v); return true; } } catch (e) { } return false; }
+    return {
+      persistent: !!shared,
+      tab: { get: function (k) { var v = rd(tab, k); return v !== null ? v : (k in mem ? mem[k] : null); }, set: function (k, v) { if (!wr(tab, k, v)) { if (v === null) delete mem[k]; else mem[k] = v; } } },
+      shared: { get: function (k) { return rd(shared, k); }, set: function (k, v) { wr(shared, k, v); } }
+    };
+  })();
+  var TAB_KEY = 'thaiput_tab_session', SHARED_KEY = 'thaiput_session';
+  function parse(raw) { try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  T.session = {
+    get: function () {
+      var s = parse(T.store.tab.get(TAB_KEY));
+      if (s) return s;
+      s = parse(T.store.shared.get(SHARED_KEY));       // tab mới: dùng phiên gần nhất
+      if (s) T.store.tab.set(TAB_KEY, JSON.stringify(s));
+      return s;
+    },
+    set: function (o) { var v = JSON.stringify(o); T.store.tab.set(TAB_KEY, v); T.store.shared.set(SHARED_KEY, v); },
+    tabOnly: function () { return parse(T.store.tab.get(TAB_KEY)); },
+    /** Sửa phiên của tab này (ví dụ ngôn ngữ). Phiên chung chỉ sửa khi vẫn là phiên của tab này: không đè phiên tab khác vừa đăng nhập (soát 5H R15). */
+    update: function (o) {
+      var v = JSON.stringify(o), last = parse(T.store.shared.get(SHARED_KEY));
+      T.store.tab.set(TAB_KEY, v);
+      if (!last || last.token === o.token) T.store.shared.set(SHARED_KEY, v);
+    },
+    clear: function () {
+      var mine = parse(T.store.tab.get(TAB_KEY)), last = parse(T.store.shared.get(SHARED_KEY));
+      T.store.tab.set(TAB_KEY, null);
+      if (!mine || (last && last.token === mine.token)) T.store.shared.set(SHARED_KEY, null);
+    }
+  };
+  T.token = function () { var s = T.session.get(); return s ? s.token : ''; };
+
+  // ── Ngôn ngữ (chunk 5H): mỗi người tự chọn VI hoặc EN. Lưu trên máy (localStorage) và vào USERS.lang khi đã đăng nhập,
+  //    để thiết bị khác và email dùng đúng ngôn ngữ. Chưa chọn: học viên tiếng Việt, tutor tiếng Anh, khách tiếng Việt. ──
+  var LANG_KEY = 'thaiput_lang';
+  T.langTouched = false;   // người dùng đã bấm chọn trong lần mở trang này: không để giá trị trên máy chủ đè lại
+  T.storedLang = function () { var v = T.store.shared.get(LANG_KEY) || T.store.tab.get(LANG_KEY); return v === 'vi' || v === 'en' ? v : ''; };
+  T.defaultLang = function (role) {
+    if (role === 'TUTOR') return 'en';
+    if (role) return 'vi';
+    try { if (/^th/i.test(String(navigator.language || ''))) return 'en'; } catch (e) { }   // máy tiếng Thái (tutor chưa đăng nhập)
+    return 'vi';
+  };
+  /** Đổi ngôn ngữ. o.save: lưu lên máy chủ (đã đăng nhập); o.rerender: vẽ lại trang đang xem bằng dữ liệu đã có. */
+  T.setLang = function (l, o) {
+    o = o || {};
+    if (l !== 'vi' && l !== 'en') return;
+    var changed = l !== T.lang;
+    T.lang = l;
+    try { document.documentElement.lang = l; } catch (e) { }
+    if (o.local) return;   // chỉ áp dụng cho lần mở trang này (giá trị khởi đầu), không ghi lại trên máy
+    T.store.shared.set(LANG_KEY, l); T.store.tab.set(LANG_KEY, l);
+    // Trang đổi link lấy phiên: phiên trên máy có thể của người khác; chỉ lưu trên máy, T.signedIn gửi sau khi có phiên mới.
+    // Chỉ dùng phiên riêng của tab này: tab đã thoát không được mượn phiên chung của tab khác để đổi ngôn ngữ của người đó (soát 5H C3).
+    var waiting = !o.signedIn && (T.state.page === 'auth' || T.state.page === 'gauth' || T.state.page === 'login');
+    var s = waiting ? null : T.session.tabOnly();
+    if (s && s.token && s.lang !== l) { s.lang = l; T.session.update(s); }
+    // Không chờ kết quả: bảo trì hay mất mạng thì trang vẫn đổi ngôn ngữ tại chỗ (lưu trên máy).
+    // Bấm liên tục: chỉ gửi lựa chọn cuối sau một nhịp ngắn (mỗi lượt gửi là một lần ghi có khoá, soát 5H R07).
+    if (o.save && s && s.token) {
+      clearTimeout(langTimer);
+      var tok = s.token;
+      langPending = function () { langPending = null; if (langSent[tok] !== T.lang) { langSent[tok] = T.lang; return T.api('apiSetLanguage', tok, T.lang); } return Promise.resolve(); };
+      langTimer = setTimeout(function () { if (langPending) langPending(); }, T.langSaveDelay);
+    }
+    if (o.rerender && changed) T.relabel();
+  };
+  var langTimer = null, langSent = {}, langPending = null;
+  /** Gửi ngay lựa chọn ngôn ngữ đang chờ (trước khi thoát, soát 5H C7). */
+  T.flushLang = function () { clearTimeout(langTimer); return langPending ? langPending() : Promise.resolve(); };
+  T.langSaveDelay = window.__TP_RETRY_DELAYS ? 0 : 1200;
+  /** Vẽ lại trang hiện tại theo ngôn ngữ mới, giữ tab và lựa chọn đang có (không gọi lại máy chủ nếu trang hỗ trợ). */
+  T.relabel = function () {
+    var page = T.state.page, v = T.views[page];
+    if (document.body.getAttribute('data-page') === 'maint') T.maintScreen(T.state.maintRes);   // cổng đang đóng vì bảo trì: chỉ đổi chữ trang báo
+    else if (v && v.relabel) v.relabel(T.root()); else if (v) v.render(T.root(), T.state.opts || {});
+    var eff = document.body.getAttribute('data-page') === 'maint' ? 'maint' : page;
+    T.fab(eff); T.maint(page);
+    var rb = document.getElementById('tp-retry'); if (rb) rb.textContent = T.t('a.retrying');
+    var sw = document.querySelector('[data-langsw]'); if (sw) try { sw.focus(); } catch (e) { }   // bàn phím: giữ chỗ đứng
+  };
+  /** Ngôn ngữ đã lưu trên máy chủ (cổng học viên, tutor trả về): dùng nếu người dùng chưa bấm chọn trong lần mở trang này. */
+  T.adoptLang = function (l) { if ((l === 'vi' || l === 'en') && l !== T.lang && !T.langTouched) T.setLang(l, {}); };
+  /** Nút VI | EN trên thanh đầu trang (mọi trang, kể cả trang quản trị từ chunk 5I). */
+  T.langSwitch = function () {
+    return '<button type="button" class="langsw" data-langsw aria-label="' + T.esc(T.t('a.lang_aria')) + '" title="' + T.esc(T.t('a.lang_aria')) + '">' +
+      '<span' + (T.lang === 'vi' ? ' class="on"' : '') + ' lang="vi">VI</span><span' + (T.lang === 'en' ? ' class="on"' : '') + ' lang="en">EN</span></button>';
+  };
+  /** Hộp chọn ngôn ngữ lần đầu đăng nhập bằng link (tài khoản chưa chọn). Đóng hộp mà không chọn: dùng mặc định. */
+  T.askLang = function (def) {
+    var both = function (k) { var a = T.t(k, null, 'vi'), b = T.t(k, null, 'en'); return a === b ? T.esc(a) : T.esc(a) + '<br><span class="muted" lang="en">' + T.esc(b) + '</span>'; };
+    return T.sheet('<div class="langpick" data-lang-pick><h2>' + T.esc(T.t('a.lang_title', null, 'vi')) + ' · <span lang="en">' + T.esc(T.t('a.lang_title', null, 'en')) + '</span></h2>' +
+      '<p class="muted">' + both('a.lang_note') + '</p></div>',
+      [{ label: T.t('a.lang_vi', null, 'vi'), kind: def === 'en' ? 'ghost' : 'primary', value: 'vi' }, { label: T.t('a.lang_en', null, 'en'), kind: def === 'en' ? 'primary' : 'ghost', value: 'en' }])
+      .then(function (v) { return v === 'vi' || v === 'en' ? v : def; });
+  };
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-langsw]') : null;
+    if (!b) return;
+    // Đang gửi (đặt, huỷ, lưu, đăng ký) hoặc đang mở hộp thoại: không vẽ lại trang, tránh nút gửi bật lại và gửi 2 lần (soát 5H R01 đến R04).
+    if (T.inflight > 0) { T.toast(T.t('a.lang_wait')); return; }
+    if (document.querySelector('.sheet-backdrop')) return;
+    T.langTouched = true;
+    T.setLang(T.lang === 'vi' ? 'en' : 'vi', { save: true, rerender: true });
+  });
+  /** Câu báo lỗi của máy chủ theo ngôn ngữ đang chọn (máy chủ gửi cả hai thứ tiếng trong msg). */
+  T.m = function (x) { return x && x.msg && typeof x.msg === 'object' ? (x.msg[T.lang] || x.message || '') : (x && x.message) || ''; };
+
+  // ── Gọi server: luôn trả Promise với { ok, reason, message, data } ──
+  // Chunk 5F: tự thử lại khi Google từ chối lượt gọi (lỗi mạng, quá 30 lượt cùng lúc) hoặc máy chủ báo bận.
+  //   Lượt chỉ đọc: tối đa 4 lần. Lượt ghi có mã chống gửi trùng (rid): tối đa 3 lần, cùng một mã, nên không đặt hay huỷ 2 lần.
+  //   Lượt ghi khác: chỉ thử lại khi máy chủ báo bận (máy chủ báo bận nghĩa là chưa ghi gì).
+  //   Chờ tăng dần cộng ngẫu nhiên, để nhiều người cùng thử lại không dồn vào cùng một giây.
+  var READ_APIS = { apiPublicInfo: 1, apiStudentHome: 1, apiStudentSlots: 1, apiTutorHome: 1, apiTutorAvailability: 1, apiTutorStats: 1,
+    apiAdminHome: 1, apiAdminNotifications: 1, apiAdminPeople: 1, apiAdminPerson: 1, apiAdminBooking: 1, apiAdminSlots: 1, apiAdminLog: 1, apiAdminLessons: 1, apiAdminLogEntry: 1 };
+  var RID_APIS = { apiStudentBook: 1, apiStudentCancel: 1, apiTutorSetAvailability: 1, apiTutorSubmitResult: 1, apiTutorSubmitResults: 1,
+    apiAdminBook: 1, apiAdminCancel: 1, apiExchangeToken: 1, apiGoogleExchange: 1 };
+  T.retryDelays = window.__TP_RETRY_DELAYS || [600, 1200, 2400, 4800, 8000, 10000, 10000, 12000];   // test đặt 0 để khỏi chờ thật
+  T.retryJitter = window.__TP_RETRY_DELAYS ? 0 : 400;
+  T.rid = function () { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 8); };
+  function callOnce(name, args) {
+    return new Promise(function (resolve) {
+      try {
+        var runner = google.script.run
+          .withSuccessHandler(function (r) { if (r && r.msg) r.message = T.m(r); resolve(r || { ok: false, reason: 'SERVER_ERROR', message: T.t('a.no_response') }); })
+          .withFailureHandler(function () { resolve({ ok: false, reason: 'NETWORK', message: T.t('a.network_error') }); });
+        runner[name].apply(runner, args);
+      } catch (e) { resolve({ ok: false, reason: 'NETWORK', message: T.t('a.network_error') }); }
+    });
+  }
+  // Dải "đang thử lại" nằm yên tới khi xong (không phải toast tự tắt sau 3,8 giây; soát R2 T3).
+  var retryCount = 0;
+  T.retrying = function (d) {
+    retryCount = Math.max(0, retryCount + d);
+    var el = document.getElementById('tp-retry');
+    if (!el) { el = document.createElement('div'); el.id = 'tp-retry'; el.className = 'retrybar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+    el.textContent = T.t('a.retrying'); el.hidden = !retryCount;
+  };
+  // Số lần phải thử lại và số lượt thất bại hẳn: gom, gửi một lần sau 30 giây (không thêm lượt gọi lúc đang đông).
+  var pendingReport = { retry: 0, fail: 0 }, reportTimer = null;
+  T.report = function (kind, n) {
+    pendingReport[kind] = (pendingReport[kind] || 0) + (n || 1);
+    if (reportTimer) return;
+    reportTimer = setTimeout(function () {
+      reportTimer = null;
+      Object.keys(pendingReport).forEach(function (k) { if (pendingReport[k]) { callOnce('apiClientReport', [k, Math.min(50, pendingReport[k])]); pendingReport[k] = 0; } });
+    }, 30000);
+  };
+  /** Số lượt ghi đang chờ máy chủ (không tính lượt đọc, báo số đo, lưu ngôn ngữ, thoát). */
+  T.inflight = 0;
+  /** Giữ trạng thái "đang gửi" cả trong lúc đọc ảnh trước khi gọi máy chủ. Trả hàm nhả (gọi nhiều lần cũng chỉ nhả một lần). */
+  T.hold = function () { T.inflight++; var done = false; return function () { if (!done) { done = true; T.inflight = Math.max(0, T.inflight - 1); } }; };
+  var QUIET_APIS = { apiSetLanguage: 1, apiClientReport: 1, apiLogout: 1 };
+  T.api = function (name) {
+    var write = !READ_APIS[name] && !QUIET_APIS[name];
+    if (write) T.inflight++;
+    return apiCall.apply(null, arguments).then(function (r) { if (write) T.inflight = Math.max(0, T.inflight - 1); return r; });
+  };
+  function apiCall(name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (RID_APIS[name]) args = args.concat([T.rid()]);
+    // Lượt ghi có mã: máy chủ báo IN_PROGRESS (lượt trước cùng mã còn chạy) hoặc mất mạng thì hỏi lại cùng mã tới khoảng 60 giây.
+    var netRetry = !!(READ_APIS[name] || RID_APIS[name]), max = READ_APIS[name] ? 4 : RID_APIS[name] ? 9 : 2, attempt = 0, noted = false, t0 = Date.now();
+    return new Promise(function (resolve) {
+      (function once() {
+        callOnce(name, args).then(function (r) {
+          var again = r && !r.ok && (r.reason === 'BUSY' || r.reason === 'IN_PROGRESS' || (r.reason === 'NETWORK' && netRetry));
+          if (RID_APIS[name] && again && r.reason === 'BUSY' && attempt >= 2) again = false;   // bận thật (chưa ghi gì): 3 lần là đủ
+          if (again && attempt < max - 1 && Date.now() - t0 < 60000) {
+            attempt++;
+            if (!noted) { noted = true; T.retrying(1); }
+            var d = T.retryDelays[attempt - 1]; setTimeout(once, (typeof d === 'number' ? d : 4800) + Math.floor(Math.random() * T.retryJitter));   /* 0 hợp lệ: không dùng || */
+            return;
+          }
+          if (noted) T.retrying(-1);
+          if (attempt) T.report('retry', attempt);
+          if (r && !r.ok && (r.reason === 'NETWORK' || r.reason === 'BUSY')) T.report('fail', 1);
+          // Lượt ghi mất mạng cả sau khi thử lại: không biết máy chủ đã lưu chưa. Trang gọi phải tải lại để hiện đúng sự thật.
+          // Lượt ghi có mã: trang gọi tải lại để hiện sự thật. Lượt ghi khác (đăng ký, hồ sơ): không tự tải lại, chỉ nói thật (soát R2 T3).
+          if (r && !r.ok && (r.reason === 'NETWORK' || r.reason === 'IN_PROGRESS') && RID_APIS[name]) { r.uncertain = true; r.message = T.t('a.write_unknown'); }
+          else if (r && !r.ok && r.reason === 'NETWORK' && !READ_APIS[name]) r.message = T.t('a.write_maybe');
+          resolve(r);
+        });
+      })();
+    });
+  }
+  /** Gọi API cần đăng nhập; phiên hết hạn thì đưa về trang đăng nhập. */
+  T.authed = function (name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return T.api.apply(null, [name, T.token()].concat(args)).then(function (r) {
+      if (!r.ok && r.reason === 'SESSION_INVALID') { T.session.clear(); T.toast(r.message || T.t('a.session_expired')); T.go('login'); throw new Error('SESSION'); }
+      // Chunk 5G: máy chủ báo bảo trì (CONFIG đổi sau khi mở trang): hiện thanh báo; đóng hẳn thì thay cả trang.
+      // Máy chủ gắn r.maint khi đang bảo trì; lượt thành công không có r.maint nghĩa là đã tắt: thanh báo tự tắt.
+      var cur = (T.boot.maint && T.boot.maint.mode) || 'OFF';
+      if (!r.ok && (r.reason === 'MAINT_READONLY' || r.reason === 'MAINT_CLOSED')) {
+        T.boot.maint = { mode: r.reason === 'MAINT_CLOSED' ? 'CLOSED' : 'READONLY', until: (r.maint && r.maint.until) || (T.boot.maint && T.boot.maint.until) || '' };
+        if (r.reason === 'MAINT_CLOSED') { T.maintScreen(r); throw new Error('MAINT'); }
+        T.maint(T.state.page);
+      } else if (r.ok && (r.maint ? r.maint.mode : 'OFF') !== cur) {
+        T.boot.maint = r.maint || { mode: 'OFF', until: '' };
+        T.maint(T.state.page);
+      }
+      return r;
+    });
+  };
+
+  // ── Tiện ích hiển thị ──
+  /** Link lấy từ CONFIG (Zalo, website, đăng nhập Google): chỉ nhận https, chặn javascript: và kiểu lạ. */
+  /** Màn hình rộng (máy tính): bố cục 2 cột, mở sẵn mọi ngày (chunk 5F). */
+  T.wide = function () { try { return window.matchMedia('(min-width: 900px)').matches; } catch (e) { return false; } };
+  T.safeUrl = function (u) { u = String(u || '').trim(); return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : ''; };
+  T.esc = function (s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  /**
+   * Ô chọn trình độ (h.levels): hiện theo ngôn ngữ đang chọn, giá trị luôn là bản tiếng Việt cùng vị trí (Sheets lưu một thứ tiếng).
+   * cur: giá trị đang lưu; không thuộc danh sách (admin gõ tay) thì vẫn có một lựa chọn giữ nguyên chữ đó (soát 5I B13).
+   */
+  T.levelOptions = function (cur) {
+    var vi = T.t('h.levels', null, 'vi').split('|'), shown = T.t('h.levels').split('|'), found = false, c = String(cur || '').trim();
+    var html = shown.map(function (v, i) { v = v.trim(); var val = (vi[i] || v).trim(); if (!v) return ''; var on = c && val === c; if (on) found = true; return '<option value="' + T.esc(val) + '"' + (on ? ' selected' : '') + '>' + T.esc(v) + '</option>'; }).join('');
+    return (c && !found ? '<option value="' + T.esc(c) + '" selected>' + T.esc(c) + '</option>' : (!c ? '<option value="" selected></option>' : '')) + html;
+  };
+  /** Tên gói theo ngôn ngữ đang chọn (PACKAGES.name_en, chunk 5I); chưa có tên tiếng Anh thì dùng tên tiếng Việt. */
+  T.pkgName = function (p) { return p ? (T.lang === 'en' && p.nameEn ? p.nameEn : p.name) : ''; };
+  T.money = function (n) { return Number(n || 0).toLocaleString('vi-VN') + 'đ'; };
+  T.$ = function (sel, root) { return (root || document).querySelector(sel); };
+  T.$$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+  T.root = function () { return document.getElementById('app'); };
+  T.skeleton = function (n) { var h = ''; for (var i = 0; i < (n || 3); i++) h += '<div class="skeleton"></div>'; return '<div class="stack">' + h + '</div>'; };
+  T.ddmm = function (key) { var p = String(key || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : key; };
+  T.ddmmyyyy = function (key) { var p = String(key || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : key; };
+  /** Tên thứ của ngày yyyy-mm-dd theo ngôn ngữ đang chọn (a.dow, a.dow_short). Tính theo lịch, không theo múi giờ máy. */
+  T.dow = function (key, short, lang) {
+    var p = String(key || '').split('-'); if (p.length !== 3) return '';
+    var i = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]))).getUTCDay();
+    return (T.t(short ? 'a.dow_short' : 'a.dow', null, lang).split('|')[i] || '').trim();
+  };
+  /** Nhãn ngày "Thứ 4 14/10" hoặc "Wed 14/10". */
+  T.day = function (key, short, lang) { var d = T.dow(key, short, lang); return (d ? d + ' ' : '') + T.ddmm(key); };
+
+  var toastTimer = null;
+  T.toast = function (msg) {
+    var el = document.getElementById('tp-toast');
+    if (!el) { el = document.createElement('div'); el.id = 'tp-toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 3800);
+  };
+
+  /** Hộp thoại dưới đáy màn hình. buttons: [{ label, kind, value }]. Trả Promise với value nút được bấm. */
+  T.sheet = function (html, buttons) {
+    return new Promise(function (resolve) {
+      var bd = document.createElement('div'); bd.className = 'sheet-backdrop';
+      var btns = (buttons || [{ label: T.t('a.close'), kind: 'primary', value: true }]).map(function (b, i) {
+        return '<button type="button" class="btn btn-' + (b.kind || 'ghost') + ' btn-block" data-i="' + i + '">' + T.esc(b.label) + '</button>';
+      }).join('');
+      bd.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">' + html + '<div class="stack">' + btns + '</div></div>';
+      document.body.appendChild(bd);
+      // Vòng 2 N6: hộp có tên (tiêu đề đầu tiên) cho trình đọc màn hình; phím Tab chỉ đi trong hộp.
+      var dlg = bd.querySelector('.sheet'), ttl = dlg.querySelector('h1, h2, h3');
+      if (ttl) { ttl.id = ttl.id || 'tp-sheet-title'; dlg.setAttribute('aria-labelledby', ttl.id); }
+      // Soát 5I B15: đóng hộp thì trả chỗ đứng bàn phím về nút đã mở hộp (nếu nút còn trên trang); phím Esc đóng hộp.
+      var opener = document.activeElement, done = false;
+      var onKey = function (e) {
+        if (e.key === 'Escape' || e.key === 'Esc') { close(null); return; }
+        if (e.key !== 'Tab') return;
+        var f = Array.prototype.slice.call(dlg.querySelectorAll('button, a[href], input, select, textarea')).filter(function (x) { return !x.disabled; });
+        if (!f.length) return;
+        var i = f.indexOf(document.activeElement);
+        if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+      };
+      var close = function (v) {
+        if (done) return; done = true;
+        document.removeEventListener('keydown', onKey); bd.remove(); resolve(v);
+        try { if (opener && opener.focus && document.body.contains(opener)) opener.focus(); } catch (e) { }
+      };
+      document.addEventListener('keydown', onKey);
+      bd.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-i]');
+        if (b) close((buttons || [{ value: true }])[Number(b.getAttribute('data-i'))].value);
+        else if (e.target === bd) close(null);
+      });
+      var first = bd.querySelector('button'); if (first) first.focus();
+    });
+  };
+
+  /** Nút liên hệ admin (Zalo, gọi). Số điện thoại luôn hiện thành chữ để chép được nếu link không mở. */
+  /** Liên hệ admin: chỉ Zalo và website (không có nút gọi điện, chunk 5A). */
+  T.contact = function (c) {
+    if (!c || (!c.zalo && !c.site)) return '';
+    var zalo = T.safeUrl(c.zalo), site = T.safeUrl(c.site);
+    if (!zalo && !site) return '';
+    return '<div class="contact">' +
+      (zalo ? '<a class="btn btn-ghost zalo" href="' + T.esc(zalo) + '" target="_blank" rel="noopener">' + T.t('a.zalo') + '</a>' : '') +
+      (site ? '<a class="btn btn-ghost" href="' + T.esc(site) + '" target="_blank" rel="noopener">' + T.t('a.website') + '</a>' : '') + '</div>';
+  };
+
+  /** 5K (BL06): gói giá 0 không chọn được trên web; hiện thẻ gói kèm nút Zalo admin. */
+  T.pkgContact = function (p) {
+    var zalo = T.safeUrl(T.boot.zalo);
+    return '<div class="pkg pkg-contact"><span><b>' + T.esc(T.pkgName(p)) + '</b><br><span class="meta">' + T.t('a.pkg_contact_note') + '</span></span>' +
+      (zalo ? '<a class="btn btn-ghost zalo" href="' + T.esc(zalo) + '" target="_blank" rel="noopener">' + T.t('a.pkg_contact_btn') + '</a>' : '<span class="price">' + T.t('a.price_contact') + '</span>') + '</div>';
+  };
+
+  /** 5K: số điện thoại tự do (không cần định dạng, không bắt buộc), như server (Phone.gs). Trả chuỗi đã gọn, trống trả null. */
+  T.phone = function (input) {
+    var s = String(input || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return s && s.length <= 40 ? s : null;   // quá 40 ký tự: báo ngay (server cắt còn 40 nếu lọt qua)
+  };
+
+  /** Đọc ảnh chụp chuyển khoản, thu nhỏ còn cạnh dài 1600px để gửi nhanh. PDF và ảnh không đọc được thì gửi nguyên. */
+  T.readUpload = function (file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return reject(new Error(T.t('a.file_none')));
+      if (file.size > 12 * 1024 * 1024) return reject(new Error(T.t('a.file_big')));
+      var fr = new FileReader();
+      fr.onerror = function () { reject(new Error(T.t('a.file_read'))); };
+      fr.onload = function () {
+        var dataUrl = String(fr.result), raw = { name: file.name, mimeType: file.type || 'application/octet-stream', base64: dataUrl.split(',')[1] };
+        if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) return resolve(raw);
+        var img = new Image(), done = false;
+        // Dự phòng: trình duyệt không báo onload/onerror trong 8 giây thì gửi file gốc, không treo nút Gửi.
+        var guard = setTimeout(function () { if (!done) { done = true; resolve(raw); } }, 8000);
+        img.onload = function () {
+          if (done) return; done = true; clearTimeout(guard);
+          try {
+            var scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+            var c = document.createElement('canvas'); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            var out = c.toDataURL('image/jpeg', 0.82);
+            resolve({ name: file.name.replace(/\.[^.]+$/, '') + '.jpg', mimeType: 'image/jpeg', base64: out.split(',')[1] });
+          } catch (e) { resolve(raw); }
+        };
+        img.onerror = function () { if (!done) { done = true; clearTimeout(guard); resolve(raw); } };
+        img.src = dataUrl;
+      };
+      fr.readAsDataURL(file);
+    });
+  };
+
+  // ── Router ──
+  // Chunk 5I: trang quản trị song ngữ như mọi trang (bỏ việc ép tiếng Việt của 5H).
+  T.go = function (page, opts) {
+    T.state.page = page; T.state.opts = opts || {};
+    try { document.body.setAttribute('data-page', page); } catch (e) { }
+    window.scrollTo(0, 0);
+    var v = T.views[page] || T.views.home;
+    v.render(T.root(), opts || {});
+    T.fab(page);
+    T.maint(page);
+  };
+
+  /** Thanh báo bảo trì (chunk 5G) trên mọi trang trừ admin: CONFIG MAINTENANCE_MODE READONLY hoặc CLOSED. Theo ngôn ngữ đang chọn. */
+  T.maint = function (page) {
+    var m = T.boot.maint || {}, el = document.getElementById('tp-maint');
+    if (!m.mode || m.mode === 'OFF' || page === 'admin') { if (el) el.hidden = true; document.body.classList.remove('has-maint'); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'tp-maint'; el.className = 'maintbar'; el.setAttribute('role', 'status'); document.body.insertBefore(el, document.body.firstChild); }
+    var k = m.mode === 'CLOSED' ? 'a.maint_closed' : 'a.maint_readonly', v = { until: m.until ? ' (' + m.until + ')' : '' };
+    var mv = T.safeUrl(m.movedTo || '');   // 5L: hệ thống đã chuyển: chỉ báo link mới
+    if (mv) el.innerHTML = T.esc(T.t('a.moved')) + ' <a href="' + T.esc(mv) + '">' + T.esc(mv) + '</a>'; else el.textContent = T.t(k, v);
+    el.hidden = false; document.body.classList.add('has-maint');
+  };
+  /** Cổng đóng vì bảo trì: một trang báo, nút Zalo, nút đăng xuất. */
+  T.maintScreen = function (res) {
+    T.state.maintRes = res;
+    var msg = res && typeof res === 'object' ? T.m(res) : res;
+    var page = T.state.page, tutor = page === 'tutor';
+    // Bố cục một cột như trang chủ (không chừa chỗ thanh tab bên trái trên máy tính, nút Zalo không nâng lên trên thanh tab).
+    try { document.body.setAttribute('data-page', 'maint'); } catch (e) { }
+    T.fab('maint');
+    T.root().innerHTML = T.topbar('<button class="btn btn-ghost btn-sm" type="button" id="logout">' + T.t(tutor ? 't.logout' : 's.logout_full') + '</button>') +
+      '<main class="stack-lg" id="maint-screen"><h1>' + T.t('a.maint_title') + '</h1><div class="alert warn">' + T.esc(msg || '') + '</div>' +
+      (T.safeUrl((T.boot.maint || {}).movedTo || '') ? '<div class="alert">' + T.esc(T.t('a.moved')) + ' <a id="moved-link" href="' + T.esc(T.boot.maint.movedTo) + '">' + T.esc(T.boot.maint.movedTo) + '</a></div>' : '') +
+      T.contact({ zalo: T.boot.zalo }) + '</main>';
+    var b = document.getElementById('logout'); if (b) b.onclick = T.logout;
+    T.maint(page);
+  };
+
+  /** Nút Zalo nổi ở góc dưới phải mọi trang (khi CONFIG có ADMIN_ZALO_URL). Nằm trên thanh tab ở cổng học viên và tutor. */
+  T.fab = function (page) {
+    var el = document.getElementById('tp-fab');
+    var zalo = T.safeUrl(T.boot.zalo);
+    if (!zalo || page === 'admin') { if (el) el.hidden = true; return; }   // admin không cần nút nhắn admin
+    if (!el) { el = document.createElement('a'); el.id = 'tp-fab'; el.className = 'fab-zalo'; el.target = '_blank'; el.rel = 'noopener'; document.body.appendChild(el); }
+    el.hidden = false; el.href = zalo; el.textContent = T.t('a.zalo_fab');
+    el.setAttribute('aria-label', T.t('a.zalo'));
+    el.classList.toggle('above-tabs', page === 'student' || page === 'tutor');
+  };
+
+  T.topbar = function (right) {
+    // Bấm logo về trang chủ (vẫn giữ đăng nhập; trang chủ có nút "Vào lịch của tôi").
+    return '<header class="topbar"><button type="button" class="brand" onclick="T.go(\'home\')" aria-label="' + T.esc(T.t('a.home_aria')) + '"><span class="mark" aria-hidden="true">พ</span><span>thaiput</span></button>' +
+      '<div class="row topbar-right">' + T.langSwitch() + (right || '') + '</div></header>';
+  };
+
+  T.logout = function () {
+    var tok = T.token();
+    var pending = T.flushLang();   // lựa chọn ngôn ngữ vừa bấm tới máy chủ trước khi phiên bị huỷ
+    T.session.clear();
+    if (tok) pending.then(function () { T.api('apiLogout', tok); });
+    T.go('login');
+  };
+
+  T.portalOf = function (role) { return role === 'TUTOR' ? 'tutor' : role === 'ADMIN' ? 'admin' : 'student'; };
+  /** Chuỗi trình duyệt gửi lên khi đăng nhập, để máy chủ ghi tên thiết bị (Chrome · Windows) vào nhật ký và trang quản trị. */
+  T.device = function () { try { return String(navigator.userAgent || '').substring(0, 400); } catch (e) { return ''; } };
+  /** Bỏ mã link khỏi địa chỉ trang sau khi đăng nhập, để làm mới trang không đổi mã lần nữa (google.script.history của Apps Script). */
+  T.cleanUrl = function (role) {
+    try { if (window.google && google.script && google.script.history) google.script.history.replace(null, { page: T.portalOf(role) }, ''); } catch (e) { }
+  };
+
+  T.start = function () {
+    var page = T.boot.page || 'home', s = T.session.get();
+    // Ngôn ngữ ban đầu: lựa chọn đã lưu trên máy, rồi ngôn ngữ của phiên, rồi mặc định theo vai trò.
+    T.setLang(T.storedLang() || (s && s.lang) || T.defaultLang(s && s.role), { local: true });
+    if (page === 'auth' && T.boot.linkToken) return T.go('auth', { linkToken: T.boot.linkToken });
+    if (page === 'gauth') return T.go('gauth');
+    if ((page === 'student' || page === 'tutor' || page === 'admin' || page === 'login') && s && s.token) return T.go(T.portalOf(s.role));
+    if ((page === 'student' || page === 'tutor' || page === 'admin' || page === 'renew') && !(s && s.token)) return T.go('login');
+    if (page === 'renew') return T.go('student', { tab: 'account', renew: true });
+    T.go(T.views[page] ? page : 'home');
+  };
+})();
+</script>
+
+  <script>
+/** Home.html · Trang chủ và form đăng ký (câu 33, 39, 40, 50) */
+(function () {
+  var T = window.T;
+
+  function pkgMeta(p) {
+    if (p.code === 'TRIAL') return T.t('h.pkg_trial', { n: p.sessions, d: p.days });
+    if (p.type === 'DAYS') return T.t('h.pkg_days', { d: p.days });
+    return p.sessions ? T.t('h.pkg_sessions', { n: p.sessions }) : '';
+  }
+
+  function topBtn(s) {
+    return s && s.token
+      ? '<button class="btn btn-ghost btn-sm" type="button" id="go-portal">' + T.t('h.btn_portal') + '</button>'
+      : '<button class="btn btn-ghost btn-sm" type="button" id="go-login">' + T.t('h.btn_login') + '</button>';
+  }
+
+  /** Trình độ: hiện theo ngôn ngữ đang chọn, giá trị gửi lên luôn là bản tiếng Việt cùng vị trí (Sheets lưu một thứ tiếng). */
+  function levelOptions() {
+    var vi = T.t('h.levels', null, 'vi').split('|');
+    return T.t('h.levels').split('|').map(function (v, i) { v = v.trim(); var val = (vi[i] || v).trim(); return v ? '<option value="' + T.esc(val) + '">' + T.esc(v) + '</option>' : ''; }).join('');
+  }
+  var chosenFile = null;   // ảnh chuyển khoản đã chọn; giữ lại khi đổi ngôn ngữ (ô chọn file không đặt lại được bằng code)
+
+  T.views.home = {
+    render: function (root) {
+      var s = T.session.get();
+      chosenFile = null;
+      root.innerHTML = T.topbar(topBtn(s)) + T.skeleton(4);
+      // Nút Đăng nhập, Vào cổng bấm được ngay cả khi trang chủ còn đang tải (soát 20/10).
+      var gl0 = T.$('#go-login', root); if (gl0) gl0.onclick = function () { T.go('login'); };
+      var gp0 = T.$('#go-portal', root); if (gp0) gp0.onclick = function () { var s2 = T.session.get(); T.go(s2 && s2.role === 'TUTOR' ? 'tutor' : 'student'); };
+      T.api('apiPublicInfo').then(function (r) {
+        if (T.state.page !== 'home') return;   // đã sang trang khác (bấm Đăng nhập) trước khi có kết quả: không vẽ đè (soát 20/10)
+        if (!r.ok) { root.innerHTML = T.topbar() + '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+        T.state.info = r.data;
+        draw(root, r.data, s);
+      });
+    },
+    /** Đổi ngôn ngữ: vẽ lại bằng dữ liệu đã có, giữ chữ đã nhập trong form. */
+    relabel: function (root) {
+      if (!T.state.info || !T.$('#reg', root)) return T.views.home.render(root);
+      var keep = {}, ids = ['f-name', 'f-email', 'f-phone'];
+      ids.forEach(function (id) { var el = T.$('#' + id, root); if (el) keep[id] = el.value; });
+      var lv = T.$('#f-level', root), pk = T.$('input[name=pkg]:checked', root), cs = T.$('#f-consent', root);
+      var lvIdx = lv ? lv.selectedIndex : 0, pkVal = pk ? pk.value : '', csOn = cs ? cs.checked : false;
+      draw(root, T.state.info, T.session.get());
+      ids.forEach(function (id) { var el = T.$('#' + id, root); if (el && keep[id]) el.value = keep[id]; });
+      if (T.$('#f-level', root)) T.$('#f-level', root).selectedIndex = Math.max(0, lvIdx);
+      var p2 = pkVal && T.$('#pkg-' + pkVal, root); if (p2) { p2.checked = true; T.$$('.pkg', root).forEach(function (l) { l.classList.toggle('on', l.contains(p2)); }); }
+      if (T.$('#f-consent', root)) T.$('#f-consent', root).checked = csOn;
+      if (chosenFile) { T.$('#f-file-label', root).textContent = T.t('a.file_chosen', { name: chosenFile.name }); T.$('#f-file-box', root).classList.add('has'); }
+      var ph = T.$('#f-phone', root); if (ph && ph.value) ph.oninput();
+    }
+  };
+
+  function draw(root, info, s) {
+    // 5K (BL06): gói giá 0 không chọn được, chỉ có nút Zalo admin.
+    var paid = info.packages.filter(function (p) { return p.price > 0; }), contact = info.packages.filter(function (p) { return !(p.price > 0); });
+    var pk = paid.map(function (p, i) {
+      return '<label class="pkg' + (i === 0 ? ' on' : '') + '" for="pkg-' + p.code + '"><span class="row" style="flex-wrap:nowrap;gap:12px">' +
+        '<input type="radio" name="pkg" id="pkg-' + p.code + '" value="' + T.esc(p.code) + '"' + (i === 0 ? ' checked' : '') + '>' +
+        '<span><b>' + T.esc(T.pkgName(p)) + '</b><br><span class="meta">' + T.esc(pkgMeta(p)) + '</span></span></span>' +
+        '<span class="price">' + T.money(p.price) + '</span></label>';
+    }).join('') + contact.map(T.pkgContact).join('') + (paid.length ? '' : '<div class="alert warn">' + T.t('a.pkg_none') + '</div>');
+    var bank = info.bank && info.bank.account
+      ? '<div class="panel stack"><span class="eyebrow">' + T.t('h.bank_title') + '</span><div class="mono">' + T.esc(info.bank.name) + ' · ' + T.esc(info.bank.account) + '<br>' + T.esc(info.bank.holder) + '</div>' +
+        '<small>' + T.t('h.bank_note') + '</small></div>'
+      : '';
+    root.innerHTML = T.topbar(topBtn(s)) +
+      '<main class="stack-lg">' +
+      '<section class="hero"><span class="th-word" lang="th">' + T.t('h.hero_th') + '</span><h1>' + T.t('h.hero_title') + '</h1>' +
+      '<p class="muted">' + T.t('h.hero_sub') + '</p></section>' +
+      '<div class="facts"><div><b>' + T.t('h.fact1_big') + '</b><span>' + T.t('h.fact1') + '</span></div><div><b>' + T.t('h.fact2_big') + '</b><span>' + T.t('h.fact2') + '</span></div>' + (info.bookingLeadHours >= 0 ? '<div><b>' + (info.bookingLeadHours ? info.bookingLeadHours + 'h' : T.t('h.fact3_lead_zero')) + '</b><span>' + T.t('h.fact3_lead') + '</span></div>' : '<div><b>15:00</b><span>' + T.t('h.fact3_deadline') + '</span></div>') + '</div>' +
+      '<form id="reg" class="card stack" novalidate>' +
+      '<h2>' + T.t('h.form_title') + '</h2>' +
+      '<div class="pkg-list" role="radiogroup" aria-label="' + T.esc(T.t('h.pkg_aria')) + '">' + pk + '</div>' +
+      '<label class="field" for="f-name">' + T.t('h.f_name') + '<input type="text" id="f-name" autocomplete="name" required></label>' +
+      '<label class="field" for="f-email">' + T.t('h.f_email') + '<input type="email" id="f-email" autocomplete="email" inputmode="email" required><span class="hint">' + T.t('h.f_email_hint') + '</span></label>' +
+      '<label class="field" for="f-phone">' + T.t('h.f_phone') + '<input type="text" id="f-phone" autocomplete="tel" inputmode="text" placeholder="' + T.esc(T.t('h.f_phone_ph')) + '"><span class="hint" id="f-phone-hint">' + T.t('h.f_phone_hint') + '</span></label>' +
+      '<label class="field" for="f-level">' + T.t('h.f_level') + '<select id="f-level">' + levelOptions() + '</select></label>' +
+      bank +
+      '<label class="file" id="f-file-box" for="f-file"><input type="file" id="f-file" accept="image/*,application/pdf"><span id="f-file-label">' + T.t('a.file_label') + '</span></label>' +
+      '<label class="check" for="f-consent"><input type="checkbox" id="f-consent"><span>' + T.t('h.f_consent') + '' +
+      (T.safeUrl(info.policyUrl) ? ' (<a href="' + T.esc(T.safeUrl(info.policyUrl)) + '" target="_blank" rel="noopener">' + T.t('h.f_policy') + '</a>)' : '') + '.</span></label>' +
+      '<div class="hp" aria-hidden="true"><label for="f-website">Website</label><input type="text" id="f-website" tabindex="-1" autocomplete="off"></div>' +
+      '<div id="reg-msg" hidden></div>' +
+      '<button type="submit" class="btn btn-primary btn-block" id="reg-submit">' + T.t('h.f_submit') + '</button>' +
+      '</form>' +
+      '<section class="stack"><h3>' + T.t('h.help') + '</h3>' + T.contact(info.contact) + '</section>' +
+      '</main>';
+    bind(root);
+    // Chunk 5G (soát R2 T13): đang bảo trì thì báo ngay trên form và khoá nút Gửi, không để khách điền rồi mới biết.
+    var mm = T.boot.maint || {};
+    if (mm.mode && mm.mode !== 'OFF') {
+      showMsg(root, 'warn', T.esc(T.t(mm.mode === 'CLOSED' ? 'a.maint_closed' : 'a.maint_readonly', { until: mm.until ? ' (' + mm.until + ')' : '' })));
+      T.$('#reg-submit', root).disabled = true;
+    }
+  }
+
+  function bind(root) {
+    var gl = T.$('#go-login', root); if (gl) gl.onclick = function () { T.go('login'); };
+    var gp = T.$('#go-portal', root); if (gp) gp.onclick = function () { var s = T.session.get(); T.go(s && s.role === 'TUTOR' ? 'tutor' : 'student'); };
+    T.$$('.pkg input', root).forEach(function (r) { r.onchange = function () { T.$$('.pkg', root).forEach(function (l) { l.classList.toggle('on', l.contains(T.$('input:checked', l))); }); }; });
+    var phone = T.$('#f-phone', root), hint = T.$('#f-phone-hint', root);
+    phone.oninput = function () {
+      var ok = !phone.value || T.phone(phone.value);
+      phone.classList.toggle('invalid', !ok);
+      hint.className = 'hint' + (ok ? '' : ' bad');
+      hint.innerHTML = ok ? T.t('h.f_phone_hint') : T.t('h.f_phone_bad');
+    };
+    var file = T.$('#f-file', root);
+    file.onchange = function () {
+      var f = file.files[0];
+      chosenFile = f || null;
+      T.$('#f-file-label', root).textContent = f ? T.t('a.file_chosen', { name: f.name }) : T.t('a.file_label');
+      T.$('#f-file-box', root).classList.toggle('has', !!f);
+    };
+    T.$('#reg', root).onsubmit = function (e) { e.preventDefault(); submit(root); };
+  }
+
+  function showMsg(root, kind, html) { var m = T.$('#reg-msg', root); m.className = 'alert ' + kind; m.innerHTML = html; m.hidden = false; }
+
+  function submit(root) {
+    var errs = [];
+    var name = T.$('#f-name', root).value.trim(), email = T.$('#f-email', root).value.trim(), phoneRaw = T.$('#f-phone', root).value;
+    if (!name) errs.push(T.t('h.err_name'));
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errs.push(T.t('a.err_email'));
+    if (phoneRaw.trim() && !T.phone(phoneRaw)) errs.push(T.t('a.err_phone'));
+    var f = T.$('#f-file', root).files[0] || chosenFile;
+    if (!f) errs.push(T.t('a.err_file'));
+    if (!T.$('#f-consent', root).checked) errs.push(T.t('h.err_consent'));
+    if (!T.$('input[name=pkg]:checked', root)) errs.push(T.t('a.pkg_none'));
+    if (errs.length) return showMsg(root, 'bad', errs.map(T.esc).join('<br>'));
+    var btn = T.$('#reg-submit', root); btn.disabled = true; btn.textContent = T.t('a.sending');
+    var release = T.hold();
+    T.readUpload(f).then(function (shot) {
+      return T.api('apiSubmitRegistration', {
+        name: name, email: email, phone: phoneRaw, level_self: T.$('#f-level', root).value,
+        package_code: T.$('input[name=pkg]:checked', root).value, consent: true, screenshot: shot, website: T.$('#f-website', root).value
+      });
+    }).then(function (r) {
+      btn.disabled = false; btn.textContent = T.t('h.f_submit');
+      if (!r.ok) return showMsg(root, 'bad', T.esc(r.message || T.t('a.err_send')));
+      T.sheet('<h2>' + T.t('h.done_title') + '</h2><p>' + T.t('h.done_code') + '</p><p class="mono" style="font-size:1.2rem;font-weight:600">' + T.esc(r.data.transferCode) + '</p>' +
+        '<p class="muted">' + T.t('h.done_note', { email: T.esc(email) }) + '</p>');
+      T.$('#reg', root).reset(); chosenFile = null;
+      T.$('#f-file-label', root).textContent = T.t('a.file_label'); T.$('#f-file-box', root).classList.remove('has');
+    }).catch(function (e) { btn.disabled = false; btn.textContent = T.t('h.f_submit'); showMsg(root, 'bad', T.esc(e.message)); }).then(release, release);
+  }
+})();
+</script>
+
+  <script>
+/** Login.html · Đăng nhập bằng link email và đổi link lấy phiên (câu 32) */
+(function () {
+  var T = window.T;
+
+  var sentTo = '';   // đã gửi link cho email này: đổi ngôn ngữ vẫn hiện câu "đã gửi"
+  T.views.login = {
+    render: function (root) {
+      root.innerHTML = T.topbar('<button class="btn btn-ghost btn-sm" type="button" id="go-home">' + T.t('l.btn_home') + '</button>') +
+        '<main class="stack-lg"><section class="hero"><h1>' + T.t('l.title') + '</h1><p class="muted">' + T.t('l.intro') + '</p></section>' +
+        // Chunk 5J: admin đăng nhập Google là đường chính, nút lên đầu trang.
+        (T.safeUrl(T.boot.googleLoginUrl) ? '<section class="stack"><a class="btn btn-primary btn-block" id="l-google" href="' + T.esc(T.safeUrl(T.boot.googleLoginUrl)) + '" target="_blank" rel="noopener">' + T.t('l.google') + '</a><small class="muted">' + T.t('l.google_note') + '</small></section>' : '') +
+        '<form id="login" class="card stack" novalidate><label class="field" for="l-email">' + T.t('h.f_email') + '<input type="email" id="l-email" autocomplete="email" inputmode="email" required></label>' +
+        '<div id="l-msg" hidden></div><button type="submit" class="btn btn-primary btn-block" id="l-submit">' + T.t('l.submit') + '</button></form>' +
+        (T.store.persistent ? '' : '<div class="alert warn">' + T.t('l.storage_warn') + '</div>') +
+        '</main>';
+      T.$('#go-home', root).onclick = function () { T.go('home'); };
+      T.$('#login', root).onsubmit = function (e) {
+        e.preventDefault();
+        var email = T.$('#l-email', root).value.trim(), m = T.$('#l-msg', root), btn = T.$('#l-submit', root);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { m.className = 'alert bad'; m.textContent = T.t('a.err_email'); m.hidden = false; return; }
+        btn.disabled = true; btn.textContent = T.t('a.sending');
+        T.api('apiRequestLogin', email).then(function (r) {
+          btn.disabled = false; btn.textContent = T.t('l.submit');
+          m.hidden = false;
+          if (r.ok) { m.className = 'alert ok'; m.innerHTML = T.t('l.sent'); sentTo = email; }
+          else { m.className = 'alert bad'; m.textContent = r.message || T.t('a.err_send'); }
+        });
+      };
+    },
+    relabel: function (root) {
+      var e = T.$('#l-email', root), v = e ? e.value : '';
+      T.views.login.render(root);
+      if (v) T.$('#l-email', root).value = v;
+      if (sentTo && sentTo === v) { var m = T.$('#l-msg', root); m.className = 'alert ok'; m.innerHTML = T.t('l.sent'); m.hidden = false; }
+    }
+  };
+  /** Đang đổi link lấy phiên: đổi ngôn ngữ chỉ đổi chữ trên thanh đầu trang và tiêu đề, không gọi máy chủ lần nữa. */
+  function relabelWaiting(key) {
+    return function (root) {
+      var tb = T.$('.topbar', root); if (tb) tb.outerHTML = T.topbar();
+      var h = T.$('h1[data-k]', root); if (h) h.textContent = T.t(h.getAttribute('data-k'));
+    };
+  }
+
+  T.views.auth = {
+    render: function (root, opts) {
+      root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.signing">' + T.t('l.signing') + '</h1>' + T.skeleton(1) + '</main>';
+      T.api('apiExchangeToken', opts.linkToken || T.boot.linkToken, T.device()).then(function (r) {
+        if (!r.ok) {
+          // Link hết hạn nhưng tab này vẫn đang đăng nhập (ví dụ làm mới trang): vào thẳng cổng, không báo lỗi.
+          var s = T.session.get();
+          if (s && s.token) { T.cleanUrl(s.role); return T.go(T.portalOf(s.role)); }
+          root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.fail">' + T.t('l.fail') + '</h1><div class="alert bad">' + T.esc(r.message) + '</div>' +
+            '<button class="btn btn-primary btn-block" type="button" id="again">' + T.t('l.again') + '</button></main>';
+          T.$('#again', root).onclick = function () { T.go('login'); };
+          return;
+        }
+        T.signedIn(r.data, true);
+      });
+    },
+    relabel: relabelWaiting()
+  };
+  /**
+   * Đã có phiên: lưu, bỏ mã link khỏi địa chỉ, vào cổng. Chunk 5H: đăng nhập bằng link mà tài khoản chưa chọn ngôn ngữ
+   * (USERS.lang trống) thì hỏi một lần trước khi vào cổng; đã chọn thì dùng luôn. Chunk 5I: admin cũng được hỏi (trang quản trị song ngữ).
+   */
+  T.signedIn = function (d, ask) {
+    T.session.set({ token: d.sessionToken, role: d.role, name: d.name, lang: d.lang || '' });
+    T.cleanUrl(d.role);
+    var go = function () { T.go(T.portalOf(d.role)); };
+    if (T.langTouched) { T.setLang(T.lang, { save: true, signedIn: true }); return go(); }   // vừa bấm VI | EN trên trang này: theo lựa chọn đó
+    if (d.lang) { T.setLang(d.lang, {}); return go(); }
+    if (!ask) return go();
+    T.askLang(T.storedLang() || T.defaultLang(d.role)).then(function (l) { T.langTouched = true; T.setLang(l, { save: true, signedIn: true }); go(); });
+  };
+  // Đăng nhập bằng tài khoản Google (chunk 5D): dự án phụ chuyển sang ?page=gauth kèm email, thời điểm, chữ ký.
+  T.views.gauth = {
+    render: function (root) {
+      root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.google_wait">' + T.t('l.google_wait') + '</h1>' + T.skeleton(1) + '</main>';
+      var g = T.boot.glogin;
+      var fail = function (msg) {
+        root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.fail">' + T.t('l.fail') + '</h1><div class="alert bad">' + T.esc(msg) + '</div>' +
+          '<button class="btn btn-primary btn-block" type="button" id="again">' + T.t('l.again') + '</button></main>';
+        T.$('#again', root).onclick = function () { T.go('login'); };
+      };
+      if (!g) return fail(T.t('l.google_bad'));
+      T.api('apiGoogleExchange', g.e, g.ts, g.sig, T.device()).then(function (r) {
+        if (!r.ok) {
+          // Làm mới trang sau khi đã vào (chữ ký đã dùng) mà tab vẫn còn phiên: vào thẳng cổng, không báo lỗi.
+          var s = T.session.get();
+          if (s && s.token && r.reason === 'GLOGIN_USED') { T.cleanUrl(s.role); return T.go(T.portalOf(s.role)); }
+          return fail(r.message);
+        }
+        T.signedIn(r.data, true);   // soát 5I B14: đăng nhập Google (đường chính của admin) cũng hỏi ngôn ngữ khi tài khoản chưa chọn
+      });
+    },
+    relabel: relabelWaiting()
+  };
+})();
+</script>
+
+  <script>
+/** Student.html · Cổng học viên: đặt lịch, lịch của tôi, tài khoản và gia hạn. Hai thứ tiếng theo nút VI | EN (chunk 5H). */
+(function () {
+  var T = window.T;
+  var ICON = {
+    book: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></svg>',
+    list: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/></svg>',
+    user: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'
+  };
+  var PILL_KIND = { ACTIVE: 'ok', INACTIVE: 'gold', QUEUED: 'gold', EXPIRED: 'bad' };
+  function statusPill(code) { return PILL_KIND[code] ? [T.t('s.pill_' + code.toLowerCase()), PILL_KIND[code]] : [code, '']; }
+  var st = { tab: 'book', home: null, days: null, daysAt: 0, sel: {} };
+  var renewFile = null;   // ảnh gia hạn đã chọn; giữ khi đổi ngôn ngữ (ô chọn file không đặt lại được bằng code)
+  var SLOTS_FRESH_MS = 60000;   // slot đi kèm lượt mở cổng (chunk 5F) dùng lại trong 60 giây, khỏi gọi máy chủ lần nữa
+
+  T.views.student = {
+    render: function (root, opts) {
+      st.tab = opts.tab || st.tab || 'book';
+      st.sel = {}; renewFile = null;
+      root.innerHTML = T.topbar() + T.skeleton(3);
+      load(root, opts);
+    },
+    /** Đổi ngôn ngữ: vẽ lại bằng dữ liệu đã có, giữ tab và các giờ đang chọn. */
+    relabel: function (root) {
+      if (!st.home) return T.views.student.render(root, {});
+      // Tab Tài khoản: giữ chữ đang sửa, gói gia hạn đã chọn, ảnh đã chọn (soát 5H R04)
+      var keep = {}, ids = ['p-name', 'p-phone', 'p-level', 'r-phone'];
+      ids.forEach(function (id) { var el = T.$('#' + id, root); if (el) keep[id] = el.value; });
+      var pk = T.$('input[name=rpkg]:checked', root), pkVal = pk ? pk.value : '';
+      frame(root, { keep: true });
+      ids.forEach(function (id) { var el = T.$('#' + id, root); if (el && keep[id] !== undefined) el.value = keep[id]; });
+      var p2 = pkVal && T.$('#r-' + pkVal, root); if (p2) { p2.checked = true; T.$$('#renew-pkgs .pkg', root).forEach(function (l) { l.classList.toggle('on', l.contains(p2)); }); }
+      if (renewFile && T.$('#r-file-label', root)) { T.$('#r-file-label', root).textContent = T.t('a.file_chosen', { name: renewFile.name }); T.$('#r-file-box', root).classList.add('has'); }
+    }
+  };
+  /** Nhãn trạng thái buổi theo ngôn ngữ đang chọn (máy chủ gửi mã trạng thái và cờ "chờ tutor xác nhận"). */
+  function statusLabel(l) {
+    var k = l.awaiting ? 'st.awaiting' : 'st.' + l.status, c = T.boot.content || {};
+    return c[k] ? T.t(k) : l.status;
+  }
+  function whenBox(date, slot) { return '<div class="when"><span class="d">' + T.esc(T.dow(date, true)) + '</span><b>' + T.ddmm(date) + '</b>' + T.esc(slot) + '</div>'; }
+
+  function load(root, opts) {
+    T.authed('apiStudentHome', { slots: true }).then(function (r) {
+      if (!r.ok) { root.innerHTML = T.topbar() + '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+      st.home = r.data;
+      T.adoptLang(r.data.profile && r.data.profile.lang);   // ngôn ngữ đã lưu trên máy chủ (chọn ở thiết bị khác)
+      if (r.data.slots) { st.days = r.data.slots; st.daysAt = Date.now(); }
+      frame(root, opts || {});
+    }).catch(function () { });
+  }
+
+  function passCard(p) {
+    var pill = statusPill(p.status);
+    var dates = p.start ? '<div class="dates"><span>' + T.t('s.pass_from') + ' <b>' + T.ddmmyyyy(p.start) + '</b></span><span>' + T.t('s.pass_to') + ' <b>' + T.ddmmyyyy(p.end) + '</b></span></div>'
+      : (p.status === 'INACTIVE' ? '<small>' + T.t('s.pass_inactive') + '</small>' : '');
+    // Chunk 5M: ngày bắt đầu còn tạm tính; ngày bù đã cộng.
+    if (p.start && p.startPending) dates += '<small class="pass-note">' + T.t('s.start_pending') + '</small>';
+    if (p.end && p.compDays > 0) dates += '<small class="pass-note">' + T.t('s.comp_note', { days: p.compDays, end: T.ddmmyyyy(p.end) }) + '</small>';
+    var left = p.sessionLimit ? '<span class="pill">' + T.t('s.pass_left', { left: p.sessionsLeft, total: p.sessionLimit }) + '</span>' : '<span class="pill">' + T.t('s.pass_daily') + '</span>';
+    return '<div class="pass"><div class="spread"><span class="label">' + T.t('s.pass_label') + '</span><span class="pill">' + pill[0] + '</span></div>' +
+      '<div class="big">' + T.esc(T.pkgName(p)) + '</div>' + dates + '<div class="row">' + left + '</div></div>';
+  }
+
+  // Chunk 5J: thông báo "đã có giờ học tuần sau" (thay email Chủ nhật). "Đã xem" ẩn trên thiết bị này cho tuần đó.
+  var WB_KEY = 'thaiput_week_banner_seen';
+  function weekBanner(h) {
+    var w = h.weekBanner;
+    if (!w) return '';
+    var seen = ''; try { seen = T.store.shared.get(WB_KEY) || ''; } catch (e) { }
+    if (seen === w.week) return '';
+    return '<div class="alert ok week-banner" id="week-banner"><b>' + T.t('s.week_banner_title') + '</b><div>' + T.t('s.week_banner', { monday: T.esc(w.monday), cutoff: T.esc(w.cutoff) }) + '</div>' +
+      '<div class="row"><button class="btn btn-primary btn-sm" type="button" id="wb-book">' + T.t('s.week_banner_btn') + '</button><button class="btn btn-ghost btn-sm" type="button" id="wb-seen">' + T.t('s.week_banner_seen') + '</button></div></div>';
+  }
+
+  function frame(root, opts) {
+    var h = st.home, pkgs = h.packages.slice().sort(function (a, b) { var o = { ACTIVE: 0, INACTIVE: 1, QUEUED: 2, EXPIRED: 3 }, ka = a.status in o ? o[a.status] : 9, kb = b.status in o ? o[b.status] : 9; return ka - kb; /* ACTIVE = 0: không dùng ||, vì 0 bị coi là sai */ });
+    var main = pkgs.length ? passCard(pkgs[0]) : '<div class="alert warn">' + T.t('s.no_package') + '</div>';
+    var others = pkgs.slice(1).map(function (p) { var pill = statusPill(p.status); return '<div class="spread"><span>' + T.esc(T.pkgName(p)) + (p.start ? ' · <span class="mono">' + T.t('s.range', { from: T.ddmm(p.start), to: T.ddmm(p.end) }) + '</span>' : '') + '</span><span class="pill ' + pill[1] + '">' + pill[0] + '</span></div>'; }).join('');
+    root.innerHTML = T.topbar('<span class="who">' + T.esc(h.profile.name) + '</span><button class="btn btn-ghost btn-sm" type="button" id="logout">' + T.t('s.logout') + '</button>') +
+      '<main class="stack-lg">' +
+      (h.profile.status === 'SUSPENDED' ? '<div class="alert warn">' + T.t('s.suspended') + '</div>' : '') +
+      (h.profile.needsPhone ? '<div class="alert warn">' + T.t('s.needs_phone') + '</div>' : '') +
+      weekBanner(h) +
+      '<div class="stack side">' + main + (others ? '<div class="panel stack">' + others + '</div>' : '') + '</div>' +
+      '<section id="tab-body"></section></main>' +
+      '<div class="actionbar" id="actionbar" hidden><div class="inner"><span id="ab-text"></span><button class="btn btn-primary btn-sm" type="button" id="ab-go">' + T.t('s.btn_book') + '</button></div></div>' +
+      '<nav class="tabbar" aria-label="' + T.esc(T.t('s.nav_aria')) + '"><div class="inner">' +
+      tabBtn('book', ICON.book, T.t('s.tab_book')) + tabBtn('lessons', ICON.list, T.t('s.tab_lessons')) + tabBtn('account', ICON.user, T.t('s.tab_account')) + '</div></nav>';
+    T.$('#logout', root).onclick = T.logout;
+    T.$$('.tab', root).forEach(function (b) { b.onclick = function () { st.tab = b.getAttribute('data-tab'); st.sel = {}; frame(root, {}); }; });
+    T.$('#ab-go', root).onclick = function () { submitBooking(root); };
+    var wb = T.$('#wb-book', root), ws = T.$('#wb-seen', root);
+    if (wb) wb.onclick = function () { st.tab = 'book'; st.sel = {}; frame(root, {}); };
+    if (ws) ws.onclick = function () { try { T.store.shared.set(WB_KEY, h.weekBanner.week); } catch (e) { } var x = T.$('#week-banner', root); if (x) x.hidden = true; };
+    var body = T.$('#tab-body', root);
+    if (st.tab === 'book') drawBook(body, root, opts && opts.keep);
+    else if (st.tab === 'lessons') drawLessons(body, root);
+    else drawAccount(body, root, opts);
+  }
+  function tabBtn(id, icon, label) { return '<button class="tab' + (st.tab === id ? ' on' : '') + '" type="button" data-tab="' + id + '"' + (st.tab === id ? ' aria-current="page"' : '') + '>' + icon + '<span>' + label + '</span></button>'; }
+
+  // ── Đặt lịch ──
+  function drawBook(body, root, keep) {
+    // Đổi ngôn ngữ (keep): dùng lại danh sách giờ đang hiện dù đã cũ, không gọi máy chủ (luật 50). Đặt lịch luôn kiểm lại ở máy chủ.
+    if (st.days && (keep || Date.now() - st.daysAt < SLOTS_FRESH_MS)) { renderDays(body, root); return; }
+    body.innerHTML = '<div class="stack"><div class="spread"><h2>' + T.t('s.book_title') + '</h2><small>' + T.t('s.book_per_day') + '</small></div>' + T.skeleton(3) + '</div>';
+    T.authed('apiStudentSlots').then(function (r) {
+      if (!r.ok) { body.innerHTML = '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+      st.days = r.data; st.daysAt = Date.now();
+      renderDays(body, root);
+    }).catch(function () { });
+  }
+  function renderDays(body, root) {
+    {
+      if (!st.days.length) {
+        body.innerHTML = '<div class="stack"><h2>' + T.t('s.book_title') + '</h2><div class="panel">' + T.t('s.book_empty') + '</div></div>';
+        return;
+      }
+      body.innerHTML = '<div class="stack"><div class="spread"><h2>' + T.t('s.book_title') + '</h2><small>' + T.t('s.book_per_day') + '</small></div>' +
+        ruleNote(st.home.rules) + '<div class="day-grid">' +
+        st.days.map(function (d, i) {
+          return '<details class="day"' + (i < 3 && !d.alreadyBooked ? ' open' : '') + '><summary><b>' + T.esc(T.day(d.date)) + '</b>' +
+            (d.alreadyBooked ? '<span class="pill ok">' + T.t('s.day_booked') + '</span>' : '<span class="muted" style="font-size:.82rem">' + T.t('s.day_free', { n: d.slots.length }) + '</span>') + '</summary>' +
+            '<div class="slots">' + d.slots.map(function (s) {
+              return '<button type="button" class="chip" data-date="' + d.date + '" data-slot="' + s + '"' + (d.alreadyBooked ? ' disabled' : '') + ' aria-pressed="false">' + s + '</button>';
+            }).join('') + '</div></details>';
+        }).join('') + '</div></div>';
+      if (T.wide()) T.$$('details.day', body).forEach(function (d) { d.open = true; });
+      // Giờ đã chọn trước khi vẽ lại (đổi ngôn ngữ): giữ nguyên, ngày đó mở sẵn.
+      Object.keys(st.sel).forEach(function (d) {
+        var c = T.$('.chip[data-date="' + d + '"][data-slot="' + st.sel[d] + '"]', body);
+        if (!c || c.disabled) { delete st.sel[d]; return; }
+        c.classList.add('on'); c.setAttribute('aria-pressed', 'true'); var det = c.closest('details'); if (det) det.open = true;
+      });
+      updateBar(root);
+      T.$$('.chip', body).forEach(function (c) {
+        c.onclick = function () {
+          var d = c.getAttribute('data-date'), s = c.getAttribute('data-slot');
+          st.sel[d] = st.sel[d] === s ? undefined : s;
+          if (!st.sel[d]) delete st.sel[d];
+          T.$$('.chip[data-date="' + d + '"]', body).forEach(function (x) { var on = st.sel[d] === x.getAttribute('data-slot'); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+          updateBar(root);
+        };
+      });
+    }
+  }
+  function ruleNote(r) {
+    r = r || {}; var c = (r.cutoffHour || 15) + ':00', k = (r.cancelHour || 15) + ':00';
+    if (r.bookingLeadHours === 0) return '<p class="note">' + T.t('s.rule_until_start', { cancel: k }) + '</p>';
+    return r.bookingLeadHours > 0
+      ? '<p class="note">' + T.t('s.rule_lead', { hours: r.bookingLeadHours, cancel: k }) + '</p>'
+      : '<p class="note">' + T.t('s.rule_day_before', { cutoff: c, cancel: k }) + '</p>';
+  }
+  function updateBar(root) {
+    var n = Object.keys(st.sel).length, bar = T.$('#actionbar', root);
+    bar.hidden = !n;
+    T.$('#ab-text', root).textContent = T.t('s.bar_selected', { n: n });
+    T.$('#ab-go', root).textContent = T.t('s.bar_book', { n: n });
+  }
+  function submitBooking(root) {
+    var reqs = Object.keys(st.sel).sort().map(function (d) { return { date: d, slot: st.sel[d] }; });
+    if (!reqs.length) return;
+    var btn = T.$('#ab-go', root); btn.disabled = true; btn.textContent = T.t('s.booking');
+    T.authed('apiStudentBook', reqs).then(function (r) {
+      btn.disabled = false;
+      st.days = null;   // slot đã đổi: lần sau đọc lại
+      if (T.state.page !== 'student') return;   // người dùng đã rời trang trong lúc thử lại (soát R2 L5)
+      if (!r.ok) { updateBar(root); T.toast(r.message || T.t('s.err_book')); if (r.uncertain) T.views.student.render(root, { tab: 'lessons' }); return; }
+      var ok = r.data.filter(function (x) { return x.ok; }).length;
+      var lines = r.data.map(function (x) {
+        return '<div class="lesson">' + whenBox(x.date, x.slot) + '<div class="body">' +
+          (x.ok ? '<span class="pill ok">' + T.t('s.res_ok') + '</span><span>' + T.t('s.tutor_prefix') + ' ' + T.esc(x.tutorName) + '</span>' : '<span class="pill bad">' + T.t('s.res_bad') + '</span><small>' + T.esc(T.m(x)) + '</small>') + '</div></div>';
+      }).join('<hr class="list-divider">');
+      T.sheet('<h2>' + (ok ? T.t('s.res_title_ok', { n: ok }) : T.t('s.res_title_none')) + '</h2>' + lines +
+        (ok ? '<p class="muted">' + T.t('s.res_meet_note') + '</p>' : ''), [{ label: T.t('s.res_go_lessons'), kind: 'primary', value: 'lessons' }, { label: T.t('s.res_more'), value: 'book' }])
+        .then(function (v) { st.tab = v || 'book'; T.views.student.render(root, { tab: st.tab }); });
+    }).catch(function () { });
+  }
+
+  // ── Lịch của tôi ──
+  function lessonRow(l, upcoming) {
+    var pillKind = { CONFIRMED: 'ok', COMPLETED: '', STUDENT_ABSENT: 'warn', TECH_ISSUE: 'warn', TUTOR_ABSENT: 'warn' }[l.status];
+    if (/^CANCELLED/.test(l.status)) pillKind = 'bad';
+    var actions = '';
+    if (upcoming) {
+      actions = '<div class="row">' + (l.meetLink ? '<a class="btn btn-primary btn-sm" href="' + T.esc(T.safeUrl(l.meetLink)) + '" target="_blank" rel="noopener">' + T.t('s.join') + '</a>' : '<small class="muted">' + (l.inviteWhen ? T.t('s.meet_pending_at', { when: T.esc(l.inviteWhen) }) : T.t('s.meet_pending')) + '</small>') +
+        (l.canCancel ? '<button class="btn btn-danger btn-sm" type="button" data-cancel="' + T.esc(l.bookingId) + '">' + T.t('s.cancel') + '</button>' : '<small>' + T.t('s.cancel_passed', { deadline: T.esc(l.cancelDeadline) }) + '</small>') + '</div>';
+    }
+    if (l.awaiting) pillKind = 'gold';
+    return '<div class="lesson">' + whenBox(l.date, l.slot) + '<div class="body">' +
+      '<div class="spread"><span>' + T.t('s.tutor_prefix') + ' <b>' + T.esc(l.tutorName) + '</b></span><span class="pill ' + (pillKind || '') + '">' + T.esc(statusLabel(l)) + '</span></div>' + actions + '</div></div>';
+  }
+  function drawLessons(body, root) {
+    var h = st.home;
+    body.innerHTML = '<div class="stack-lg"><section class="stack"><h2>' + T.t('s.upcoming') + '</h2>' +
+      (h.upcoming.length ? '<div class="card stack">' + h.upcoming.map(function (l) { return lessonRow(l, true); }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.t('s.upcoming_empty') + '</div>') +
+      '</section><section class="stack"><h2>' + T.t('s.history') + '</h2>' +
+      (h.history.length ? '<div class="card stack">' + h.history.map(function (l) { return lessonRow(l, false); }).join('<hr class="list-divider">') + '</div>' : '<p class="muted">' + T.t('s.history_empty') + '</p>') +
+      '</section><section class="stack"><h3>' + T.t('s.tutor_issue') + '</h3>' + T.contact(h.contact) + '</section></div>';
+    T.$$('[data-cancel]', body).forEach(function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-cancel'), l = h.upcoming.filter(function (x) { return x.bookingId === id; })[0];
+        T.sheet('<h2>' + T.t('s.cancel_q', { date: T.ddmm(l.date), slot: T.esc(l.slot) }) + '</h2><p class="muted">' + T.t('s.cancel_note') + '</p>',
+          [{ label: T.t('s.cancel_yes'), kind: 'danger', value: true }, { label: T.t('s.cancel_no'), value: false }]).then(function (yes) {
+          if (!yes) return;
+          b.disabled = true; b.textContent = T.t('s.cancelling');   // khoá nút trong lúc gửi (có thể tự thử lại vài chục giây)
+          T.authed('apiStudentCancel', id).then(function (r) {
+            st.days = null;
+            if (T.state.page !== 'student') return;
+            T.toast(r.ok ? T.t('s.cancel_done', { date: T.ddmm(l.date), slot: l.slot }) : (r.message || T.t('s.err_cancel')));
+            T.views.student.render(root, { tab: 'lessons' });
+          }).catch(function () { });
+        });
+      };
+    });
+  }
+
+  // ── Tài khoản và gia hạn ──
+  function drawAccount(body, root, opts) {
+    var p = st.home.profile;
+    body.innerHTML = '<div class="stack-lg">' +
+      '<form id="prof" class="card stack" novalidate><h2>' + T.t('s.me_title') + '</h2><small class="mono">' + T.esc(p.email) + '</small>' +
+      '<label class="field" for="p-name">' + T.t('s.me_name') + '<input type="text" id="p-name" value="' + T.esc(p.name) + '"></label>' +
+      '<label class="field" for="p-phone">' + T.t('s.me_phone') + '<input type="text" id="p-phone" autocomplete="tel" inputmode="text" value="' + T.esc(p.phoneDisplay) + '" placeholder="' + T.esc(T.t('s.me_phone_ph')) + '"></label>' +
+      '<label class="field" for="p-level">' + T.t('s.me_level') + '<select id="p-level">' + T.levelOptions(p.level) + '</select></label>' +
+      '<button class="btn btn-primary btn-block" type="submit">' + T.t('s.me_save') + '</button></form>' +
+      '<form id="renew" class="card stack" novalidate><h2>' + T.t('s.renew_title') + '</h2><div id="renew-pkgs">' + T.skeleton(1) + '</div>' +
+      '<div id="renew-bank"></div>' +
+      (p.needsPhone ? '<label class="field" for="r-phone">' + T.t('s.me_phone') + '<input type="text" id="r-phone" autocomplete="tel" inputmode="text" placeholder="' + T.esc(T.t('s.me_phone_ph')) + '"></label>' : '') +
+      '<label class="file" id="r-file-box" for="r-file"><input type="file" id="r-file" accept="image/*,application/pdf"><span id="r-file-label">' + T.t('a.file_label') + '</span></label>' +
+      '<button class="btn btn-primary btn-block" type="submit" id="r-submit">' + T.t('s.renew_submit') + '</button>' +
+      '<small>' + T.t('s.renew_note') + '</small></form>' +
+      '<section class="stack"><h3>' + T.t('s.contact_title') + '</h3>' + T.contact(st.home.contact) + '</section>' +
+      '<button class="btn btn-ghost btn-block" type="button" id="logout2">' + T.t('s.logout_full') + '</button></div>';
+    T.$('#logout2', body).onclick = T.logout;
+    T.$('#prof', body).onsubmit = function (e) {
+      e.preventDefault();
+      var ph = T.$('#p-phone', body).value;
+      if (ph && !T.phone(ph)) { T.toast(T.t('a.err_phone')); return; }
+      T.authed('apiStudentUpdateProfile', { name: T.$('#p-name', body).value, phone: ph, level: T.$('#p-level', body).value }).then(function (r) {
+        T.toast(r.ok ? T.t('s.me_saved') : (r.message || T.t('s.err_save')));
+        if (r.ok) load(root, { tab: 'account' });
+      }).catch(function () { });
+    };
+    var file = T.$('#r-file', body);
+    file.onchange = function () { var f = file.files[0]; renewFile = f || null; T.$('#r-file-label', body).textContent = f ? T.t('a.file_chosen', { name: f.name }) : T.t('a.file_label'); T.$('#r-file-box', body).classList.toggle('has', !!f); };
+    var info = T.state.info;
+    var withInfo = function (i) {
+      T.state.info = i;
+      var rp = i.packages.filter(function (x) { return x.code !== 'TRIAL'; });
+      var rpaid = rp.filter(function (x) { return x.price > 0; });   // 5K (BL06): gói giá 0 chỉ có nút Zalo
+      T.$('#renew-pkgs', body).innerHTML = '<div class="pkg-list">' + rpaid.map(function (x, k) {
+        return '<label class="pkg' + (k === 0 ? ' on' : '') + '" for="r-' + x.code + '"><span class="row" style="flex-wrap:nowrap;gap:12px"><input type="radio" name="rpkg" id="r-' + x.code + '" value="' + x.code + '"' + (k === 0 ? ' checked' : '') + '><b>' + T.esc(T.pkgName(x)) + '</b></span><span class="price">' + T.money(x.price) + '</span></label>';
+      }).join('') + rp.filter(function (x) { return !(x.price > 0); }).map(T.pkgContact).join('') + (rpaid.length ? '' : '<div class="alert warn">' + T.t('a.pkg_none') + '</div>') + '</div>';
+      T.$$('#renew-pkgs input', body).forEach(function (r) { r.onchange = function () { T.$$('#renew-pkgs .pkg', body).forEach(function (l) { l.classList.toggle('on', l.contains(T.$('input:checked', l))); }); }; });
+      if (i.bank && i.bank.account) T.$('#renew-bank', body).innerHTML = '<div class="panel mono">' + T.esc(i.bank.name) + ' · ' + T.esc(i.bank.account) + '<br>' + T.esc(i.bank.holder) + '</div>';
+    };
+    if (info) withInfo(info); else T.api('apiPublicInfo').then(function (r) { if (r.ok) withInfo(r.data); });
+    T.$('#renew', body).onsubmit = function (e) {
+      e.preventDefault();
+      var f = file.files[0] || renewFile, code = T.$('input[name=rpkg]:checked', body);
+      if (!code) return T.toast(T.t('s.renew_pick'));
+      if (!f) return T.toast(T.t('a.err_file'));
+      var rp = T.$('#r-phone', body);
+      if (rp && !T.phone(rp.value)) return T.toast(T.t('a.err_phone'));
+      var btn = T.$('#r-submit', body); btn.disabled = true; btn.textContent = T.t('a.sending');
+      var release = T.hold();
+      T.readUpload(f).then(function (shot) { return T.authed('apiStudentRenew', { package_code: code.value, screenshot: shot, phone: rp ? rp.value : undefined }); }).then(function (r) {
+        btn.disabled = false; btn.textContent = T.t('s.renew_submit');
+        if (!r.ok) return T.toast(r.message || T.t('a.err_send'));
+        T.sheet('<h2>' + T.t('s.renew_done_title') + '</h2><p>' + T.t('s.renew_done_code') + '</p><p class="mono" style="font-size:1.2rem;font-weight:600">' + T.esc(r.data.transferCode) + '</p><p class="muted">' + T.t('s.renew_done_note') + '</p>');
+      }).catch(function (err) { btn.disabled = false; btn.textContent = T.t('s.renew_submit'); if (err && err.message !== 'SESSION' && err.message !== 'MAINT') T.toast(err.message); }).then(release, release);
+    };
+    if (opts && opts.renew) T.$('#renew', body).scrollIntoView({ behavior: 'smooth' });
+  }
+})();
+</script>
+
+  <script>
+/** Tutor.html · Cổng tutor: lịch dạy, giờ rảnh, xác nhận kết quả, số buổi. Mặc định tiếng Anh, đổi được bằng nút VI | EN (chunk 5H). */
+(function () {
+  var T = window.T;
+  var ICON = {
+    schedule: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    avail: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    user: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+    check: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>'
+  };
+  var st = { tab: 'schedule', home: null, av: null, week: 1, dirty: {}, pick: {} };
+
+  T.views.tutor = {
+    render: function (root, opts) {
+      st.tab = (opts && opts.tab) || st.tab || 'schedule';
+      root.innerHTML = T.topbar() + T.skeleton(3);
+      T.authed('apiTutorHome').then(function (r) {
+        if (!r.ok) { root.innerHTML = T.topbar() + '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+        st.home = r.data;
+        T.adoptLang(r.data.profile && r.data.profile.lang);
+        frame(root);
+      }).catch(function () { });
+    },
+    /** Đổi ngôn ngữ: vẽ lại bằng dữ liệu đã có, giữ giờ rảnh chưa lưu và kết quả đang chọn. */
+    relabel: function (root) { if (st.home) frame(root, true); else T.views.tutor.render(root, {}); }
+  };
+  /** Trình độ lưu tiếng Việt trong Sheets (h.levels bản vi): hiện bản cùng vị trí theo ngôn ngữ đang chọn; giá trị lạ hiện nguyên văn. */
+  function levelLabel(v) {
+    var vi = T.t('h.levels', null, 'vi').split('|').map(function (x) { return x.trim(); }), i = vi.indexOf(String(v).trim());
+    var cur = T.t('h.levels').split('|'); return i !== -1 && cur[i] ? cur[i].trim() : v;
+  }
+  function whenBox(date, slot) { return '<div class="when"><span class="d">' + T.esc(T.dow(date, true)) + '</span><b>' + T.ddmm(date) + '</b>' + T.esc(slot) + '</div>'; }
+
+  function frame(root, keep) {
+    var h = st.home, n = h.schedule.toConfirm.length;
+    root.innerHTML = T.topbar('<span class="who">' + T.esc(h.profile.name) + '</span><button class="btn btn-ghost btn-sm" type="button" id="logout">' + T.t('t.logout') + '</button>') +
+      '<main class="stack-lg" id="tab-body"></main>' +
+      '<div class="actionbar" id="actionbar" hidden><div class="inner"><span id="ab-text"></span><button class="btn btn-primary btn-sm" type="button" id="ab-go">' + T.t('t.save') + '</button></div></div>' +
+      '<nav class="tabbar" aria-label="' + T.esc(T.t('t.nav_aria')) + '"><div class="inner">' +
+      tabBtn('schedule', ICON.schedule, T.t('t.tab_schedule')) + tabBtn('avail', ICON.avail, T.t('t.tab_avail')) + tabBtn('confirm', ICON.check, T.t('t.tab_confirm'), n) + tabBtn('account', ICON.user, T.t('t.tab_account')) + '</div></nav>';
+    T.$('#logout', root).onclick = T.logout;
+    T.$$('.tab', root).forEach(function (b) { b.onclick = function () { st.tab = b.getAttribute('data-tab'); st.dirty = {}; st.pick = {}; frame(root); }; });
+    T.$('#ab-go', root).onclick = function () { if (st.tab === 'confirm') reviewResults(root); else save(root); };
+    var body = T.$('#tab-body', root);
+    if (st.tab === 'schedule') drawSchedule(body);
+    else if (st.tab === 'avail') { if (keep && st.av) { renderAvail(body, root); updateBar(root); } else drawAvail(body, root); }
+    else if (st.tab === 'account') drawAccount(body, keep);
+    else drawConfirm(body, root);
+  }
+
+  // ── Account: số buổi trong tháng (căn cứ tính lương). 16/10: bỏ danh sách thiết bị ──
+  function drawAccount(body, keep) {
+    body.innerHTML = '<section class="stack" id="stats"><h2>' + T.t('t.stats_title') + '</h2>' + T.skeleton(2) + '</section>' +
+      '<button class="btn btn-ghost btn-block" type="button" id="logout2">' + T.t('t.logout') + '</button>';
+    T.$('#logout2', body).onclick = T.logout;
+    // Đổi ngôn ngữ: vẽ lại từ số đã tải, không gọi máy chủ (luật 50).
+    var got = keep && st.stats ? Promise.resolve(st.stats) : T.authed('apiTutorStats');
+    got.then(function (r) {
+      if (r.ok) st.stats = r;
+      var box = T.$('#stats', body);
+      if (!r.ok) { box.innerHTML = '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+      var rows = [['t.st_completed', 'completed'], ['t.st_absent', 'studentAbsent'], ['t.st_tech_paid', 'techPaid'], ['t.st_tech_unpaid', 'techUnpaid'], ['t.st_tutor_absent', 'tutorAbsent'], ['t.st_not_completed', 'notCompleted'], ['t.st_waiting', 'toConfirm']];
+      if (st.tab !== 'account' || !T.$('#stats', body)) return;
+      box.innerHTML = '<h2>' + T.t('t.stats_title') + '</h2>' + r.data.months.map(function (m) {
+        return '<div class="card stack stats"><div class="spread"><b class="mono">' + T.esc(m.month) + '</b><span class="pill ok">' + T.t('t.st_payable') + ': ' + m.payable + '</span></div>' +
+          rows.map(function (x) { return '<div class="spread"><span>' + T.t(x[0]) + '</span><b class="mono">' + m[x[1]] + '</b></div>'; }).join('') + '</div>';
+      }).join('') + '<small class="muted">' + T.t('t.stats_note') + '</small>';
+    }).catch(function () { });
+  }
+  function legend() {
+    var cls = ['on', 'booked', 'pending', 'blocked', ''];
+    return '<div class="legend">' + T.t('t.legend').split('|').map(function (x, i) { return '<span class="chip' + (cls[i] ? ' ' + cls[i] : '') + '" aria-hidden="true">' + T.esc(x.trim()) + '</span>'; }).join('') + '</div>';
+  }
+  function tabBtn(id, icon, label, count) { return '<button class="tab' + (st.tab === id ? ' on' : '') + '" type="button" data-tab="' + id + '"' + (st.tab === id ? ' aria-current="page"' : '') + '>' + icon + '<span>' + label + (count ? '<span class="count">' + count + '</span>' : '') + '</span></button>'; }
+
+  function lessonRow(l, extra) {
+    var s = l.student || {};
+    // Chunk 5J: quá hạn chọn kết quả thì tô đỏ, ghi giờ sẽ thành Không hoàn thành.
+    if (l.overdue) extra = '<div class="alert bad overdue">' + T.t('t.overdue', { at: T.esc(l.expireAt) }) + '</div>' + (extra || '');
+    return '<div class="lesson' + (l.overdue ? ' is-overdue' : '') + '">' + whenBox(l.date, l.slot) + '<div class="body">' +
+      '<div class="spread"><b>' + T.esc(s.name) + '</b>' + (s.level ? '<span class="pill">' + T.esc(levelLabel(s.level)) + '</span>' : '') + '</div>' +
+      (s.note ? '<small>' + T.esc(s.note) + '</small>' : '') + (extra || '') + '</div></div>';
+  }
+
+  function drawSchedule(body) {
+    var up = st.home.schedule.upcoming, late = st.home.schedule.toConfirm.filter(function (l) { return l.overdue; }).length;
+    body.innerHTML = (late ? '<div class="alert bad" id="overdue-top">' + T.t('t.overdue_top', { n: late }) + ' <button class="btn btn-sm btn-primary" type="button" id="go-confirm">' + T.t('t.overdue_go') + '</button></div>' : '') +
+      '<section class="stack"><div class="spread"><h2>' + T.t('t.upcoming') + '</h2><small class="mono">' + T.esc(st.home.now) + '</small></div>' +
+      (up.length ? '<div class="card stack">' + up.map(function (l) {
+        return lessonRow(l, l.meetLink ? '<div class="row"><a class="btn btn-primary btn-sm" href="' + T.esc(T.safeUrl(l.meetLink)) + '" target="_blank" rel="noopener">' + T.t('t.open_meet') + '</a></div>' : '<small class="muted">' + (l.inviteWhen ? T.t('t.meet_pending_at', { when: T.esc(l.inviteWhen) }) : T.t('t.meet_pending')) + '</small>');
+      }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.t('t.upcoming_empty') + '</div>') +
+      '</section><section class="stack"><h3>' + T.t('t.help') + '</h3>' + T.contact(st.home.contact) + '</section>';
+    var gc = T.$('#go-confirm', body);
+    if (gc) gc.onclick = function () { var b = document.querySelector('.tab[data-tab="confirm"]'); if (b) b.click(); };
+  }
+
+  // ── Availability ──
+  function parseNow(s) { var m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/); return m ? { key: m[3] + '-' + m[2] + '-' + m[1], hm: m[4] + ':' + m[5] } : { key: '', hm: '' }; }
+  function addDaysKey(key, n) { var p = key.split('-'), d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function dowOf(key) { return T.dow(key, true); }
+
+  function drawAvail(body, root) {
+    body.innerHTML = '<h2>' + T.t('t.avail_title') + '</h2>' + T.skeleton(3);
+    T.authed('apiTutorAvailability', '', 14).then(function (r) {
+      if (!r.ok) { body.innerHTML = '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+      st.av = r.data; st.dirty = {};
+      renderAvail(body, root);
+    }).catch(function () { });
+  }
+
+  function stateOf(key) {
+    if (key in st.dirty) return st.dirty[key] ? 'on' : 'off';
+    var it = st.av.map[key];
+    if (!it) return 'off';
+    if (it.status === 'BLOCKED') return 'blocked';
+    if (it.status === 'CANCEL_PENDING') return 'pending';
+    return it.booked ? 'booked' : 'on';
+  }
+
+  function renderAvail(body, root) {
+    var av = st.av, now = parseNow(av.now);
+    av.map = {}; av.items.forEach(function (it) { av.map[it.date + '|' + it.slot] = it; });
+    var w = av.weeks[st.week] || av.weeks[0];
+    var days = []; for (var i = 0; i < 7; i++) days.push(addDaysKey(w.monday, i));
+    body.innerHTML = '<div class="stack"><div class="spread"><h2>' + T.t('t.avail_title') + '</h2><div class="row">' +
+      av.weeks.map(function (wk, i) { return '<button type="button" class="btn btn-sm ' + (i === st.week ? 'btn-primary' : 'btn-ghost') + '" data-week="' + i + '">' + T.t(i === 0 ? 't.this_week' : 't.next_week') + '</button>'; }).join('') + '</div></div>' +
+      '<p class="note">' + T.t('t.deadline', { week: T.ddmm(w.monday), deadline: T.esc(w.deadline) }) + T.t(w.deadlinePassed ? 't.deadline_passed' : 't.deadline_open') + '</p>' +
+      legend() + '<div class="week-grid">' +
+      days.map(function (k, i) {
+        var past = k < now.key;
+        return '<details class="day"' + (i < 2 && !past ? ' open' : '') + '><summary><b>' + dowOf(k) + ' ' + T.ddmm(k) + '</b><span class="muted" style="font-size:.82rem" data-count="' + k + '"></span></summary>' +
+          '<div class="slots">' + av.slots.map(function (s) {
+            var key = k + '|' + s, dis = past || (k === now.key && s <= now.hm);
+            return '<button type="button" class="chip" data-key="' + key + '"' + (dis ? ' disabled' : '') + '>' + s + '</button>';
+          }).join('') + '</div>' +
+          (past ? '' : '<div class="copy" style="padding:0 14px 14px"><button type="button" class="btn btn-ghost btn-sm" data-copy="' + k + '">' + T.t('t.copy_day') + '</button></div>') + '</details>';
+      }).join('') + '</div></div>';
+    if (T.wide()) T.$$('details.day', body).forEach(function (d) { d.open = true; });
+    paint(body);
+    T.$$('[data-week]', body).forEach(function (b) { b.onclick = function () { st.week = Number(b.getAttribute('data-week')); st.dirty = {}; updateBar(root); renderAvail(body, root); }; });
+    T.$$('.chip[data-key]', body).forEach(function (c) { c.onclick = function () { tap(c.getAttribute('data-key'), body, root); }; });
+    T.$$('[data-copy]', body).forEach(function (b) {
+      b.onclick = function () {
+        var src = b.getAttribute('data-copy'), idx = days.indexOf(src);
+        days.slice(idx + 1).forEach(function (k) {
+          av.slots.forEach(function (s) {
+            var want = ['on', 'booked', 'pending'].indexOf(stateOf(src + '|' + s)) !== -1, key = k + '|' + s, cur = stateOf(key);
+            if (cur === 'booked' || cur === 'pending' || cur === 'blocked') return;
+            setWant(key, want);
+          });
+        });
+        paint(body); updateBar(root); T.toast(T.t('t.copied'));
+      };
+    });
+  }
+
+  /** Ghi thay đổi mong muốn; nếu trùng trạng thái gốc thì bỏ khỏi danh sách thay đổi. */
+  function setWant(key, open) {
+    var it = st.av.map[key], orig = it ? (it.status === 'OPEN' || it.status === 'CANCEL_PENDING') : false;
+    if (it && it.status === 'CANCEL_PENDING' && open) { st.dirty[key] = true; return; }
+    if (open === orig) delete st.dirty[key]; else st.dirty[key] = open;
+  }
+
+  function tap(key, body, root) {
+    var cur = stateOf(key);
+    if (cur === 'blocked') { T.toast(T.t('t.blocked')); return; }
+    if (cur === 'booked' && !(key in st.dirty)) {
+      T.sheet('<h2>' + T.t('t.cancel_q', { slot: T.esc(key.replace('|', ' ')) }) + '</h2><p class="muted">' + T.t('t.cancel_note') + '</p>',
+        [{ label: T.t('t.cancel_yes'), kind: 'danger', value: true }, { label: T.t('t.cancel_no'), value: false }]).then(function (yes) {
+        if (yes) { st.dirty[key] = false; paint(body); updateBar(root); }
+      });
+      return;
+    }
+    if (key in st.dirty) delete st.dirty[key];
+    else setWant(key, cur === 'off' || cur === 'pending');
+    paint(body); updateBar(root);
+  }
+
+  function paint(body) {
+    var counts = {};
+    T.$$('.chip[data-key]', body).forEach(function (c) {
+      var key = c.getAttribute('data-key'), s = stateOf(key), orig = st.av.map[key];
+      c.className = 'chip' + (s === 'on' ? ' on' : s === 'booked' ? ' booked' : s === 'pending' ? ' pending' : s === 'blocked' ? ' blocked' : '') + (key in st.dirty ? ' dirty' : '');
+      if (orig && orig.booked && s === 'off') c.className = 'chip pending dirty';
+      c.setAttribute('aria-pressed', s === 'off' ? 'false' : 'true');
+      var d = key.split('|')[0];
+      if (s !== 'off' && s !== 'blocked') counts[d] = (counts[d] || 0) + 1;
+    });
+    T.$$('[data-count]', body).forEach(function (el) { var n = counts[el.getAttribute('data-count')] || 0; el.textContent = n ? T.t('t.count_open', { n: n }) : T.t('t.count_off'); });
+  }
+
+  function updateBar(root) {
+    var n = Object.keys(st.dirty).length, bar = T.$('#actionbar', root);
+    if (!bar) return;
+    bar.hidden = !n;
+    T.$('#ab-text', root).textContent = T.t('t.changes', { n: n });
+    T.$('#ab-go', root).textContent = T.t('t.save');
+  }
+
+  function save(root) {
+    var changes = Object.keys(st.dirty).map(function (k) { var p = k.split('|'); return { date: p[0], slot: p[1], open: st.dirty[k] }; });
+    if (!changes.length) return;
+    var btn = T.$('#ab-go', root); btn.disabled = true; btn.textContent = T.t('t.saving');
+    T.authed('apiTutorSetAvailability', changes).then(function (r) {
+      btn.disabled = false;
+      if (T.state.page !== 'tutor') return;
+      if (!r.ok) {
+        updateBar(root); T.toast(r.message || T.t('t.err_save'));
+        if (r.uncertain) { st.dirty = {}; updateBar(root); drawAvail(T.$('#tab-body', root), root); }   // tải lại để thấy đúng đã lưu chưa
+        return;
+      }
+      var c = { OPEN: 0, CANCELLED: 0, CANCEL_PENDING: 0, bad: 0 };
+      r.data.forEach(function (x) { if (!x.ok) c.bad++; else if (c[x.state] !== undefined) c[x.state]++; });
+      T.sheet('<h2>' + T.t('t.saved') + '</h2><ul style="margin:0;padding-left:18px">' +
+        (c.OPEN ? '<li>' + T.t('t.saved_open', { n: c.OPEN }) + '</li>' : '') + (c.CANCELLED ? '<li>' + T.t('t.saved_removed', { n: c.CANCELLED }) + '</li>' : '') +
+        (c.CANCEL_PENDING ? '<li>' + T.t('t.saved_pending', { n: c.CANCEL_PENDING }) + '</li>' : '') + (c.bad ? '<li>' + T.t('t.saved_bad', { n: c.bad }) + '</li>' : '') + '</ul>')
+        .then(function () { st.dirty = {}; updateBar(root); drawAvail(T.$('#tab-body', root), root); });
+    }).catch(function () { });
+  }
+
+  // ── Confirm results (chunk 5F: xác nhận 2 bước) ──
+  // Bước 1: chọn kết quả cho từng buổi (bấm lại để bỏ chọn). Bước 2: xem lại danh sách rồi mới Lưu, một lượt gọi cho cả lô.
+  // Kết quả là căn cứ tính lương; tutor không tự sửa được sau khi lưu, nên không lưu ngay khi bấm như trước.
+  var RES = [['COMPLETED', 't.res_completed'], ['STUDENT_ABSENT', 't.res_absent'], ['TECH_ISSUE', 't.res_tech']];
+  function resLabel(code) { for (var i = 0; i < RES.length; i++) if (RES[i][0] === code) return T.t(RES[i][1]); return code; }
+  function drawConfirm(body, root) {
+    var list = st.home.schedule.toConfirm;
+    body.innerHTML = '<section class="stack"><h2>' + T.t('t.confirm_title') + '</h2><p class="muted">' + T.t('t.confirm_note', st.home.rules || { notice: 24, expire: 48 }) + '</p>' +
+      (list.length ? '<div class="card stack">' + list.map(function (l) {
+        return lessonRow(l, '<div class="row" role="group">' + RES.map(function (x) {
+          return '<button class="chip" type="button" aria-pressed="false" data-res="' + x[0] + '" data-id="' + T.esc(l.bookingId) + '">' + T.t(x[1]) + '</button>';
+        }).join('') + '</div>');
+      }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.t('t.confirm_empty') + '</div>') + '</section>';
+    paintPicks(body);
+    updateConfirmBar(root);
+    T.$$('[data-res]', body).forEach(function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-id'), res = b.getAttribute('data-res');
+        if (st.pick[id] === res) delete st.pick[id]; else st.pick[id] = res;
+        paintPicks(body); updateConfirmBar(root);
+      };
+    });
+  }
+  function paintPicks(body) {
+    T.$$('[data-res]', body).forEach(function (b) {
+      var on = st.pick[b.getAttribute('data-id')] === b.getAttribute('data-res');
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  function updateConfirmBar(root) {
+    var n = Object.keys(st.pick).length, bar = T.$('#actionbar', root);
+    if (!bar) return;
+    bar.hidden = !n;
+    T.$('#ab-text', root).textContent = T.t('t.chosen', { n: n });
+    T.$('#ab-go', root).textContent = T.t('t.save_results', { n: n });
+  }
+  function reviewResults(root) {
+    var byId = {}; st.home.schedule.toConfirm.forEach(function (l) { byId[l.bookingId] = l; });
+    var items = Object.keys(st.pick).filter(function (id) { return byId[id]; }).map(function (id) { return { bookingId: id, result: st.pick[id] }; });
+    if (!items.length) return;
+    T.sheet('<h2>' + T.t('t.review_title') + '</h2><p class="muted">' + T.t('t.review_note') + '</p><ul class="review" style="margin:0;padding-left:18px">' +
+      items.map(function (it) { var l = byId[it.bookingId]; return '<li><b>' + T.esc(T.day(l.date)) + ' ' + T.esc(l.slot) + '</b> · ' + T.esc(l.student.name) + ': <b>' + T.esc(resLabel(it.result)) + '</b></li>'; }).join('') + '</ul>',
+      [{ label: T.t('t.btn_save_confirm'), kind: 'primary', value: true }, { label: T.t('t.btn_back'), value: false }]).then(function (yes) {
+      if (!yes) return;
+      var btn = T.$('#ab-go', root); if (btn) { btn.disabled = true; btn.textContent = T.t('t.saving'); }
+      T.authed('apiTutorSubmitResults', items).then(function (r) {
+        if (btn) btn.disabled = false;
+        if (T.state.page !== 'tutor') return;
+        if (!r.ok) { updateConfirmBar(root); T.toast(r.message || T.t('t.err_save')); if (r.uncertain) { st.pick = {}; T.views.tutor.render(root, { tab: 'confirm' }); } return; }
+        var bad = r.data.items.filter(function (x) { return !x.ok; });
+        st.pick = {};
+        var done = function () { T.views.tutor.render(root, { tab: 'confirm' }); };
+        if (!bad.length) { T.toast(T.t('t.saved_results', { n: r.data.saved })); done(); return; }
+        T.sheet('<h2>' + T.t('t.saved_results', { n: r.data.saved }) + '</h2><p>' + T.t('t.saved_some_bad', { n: bad.length }) + '</p><ul style="margin:0;padding-left:18px">' +
+          bad.map(function (x) { var l = byId[x.bookingId] || {}; return '<li>' + T.esc((l.date ? T.day(l.date) : x.bookingId) + ' ' + (l.slot || '')) + ': ' + T.esc(T.m(x) || x.reason) + '</li>'; }).join('') + '</ul>').then(done);
+      }).catch(function () { });
+    });
+  }
+})();
+</script>
+
+  <script>
+/**
+ * Admin.html · Giao diện admin (chunk 5E): thông báo, tutor, học viên, đặt thay, huỷ, nhật ký.
+ * Chunk 5H: thông báo gọn, mỗi thông báo một dòng (chấm màu theo mức, nội dung, giờ), gom theo ngày; bộ lọc là nút phân đoạn.
+ * Chunk 5I: song ngữ (chữ ad.* trong tab CONTENT, nút VI | EN như cổng học viên, tutor); 6 ô số liệu đều bấm được;
+ *   nhật ký mỗi dòng một dòng xem trước, bấm mở đọc đủ; đổi ngôn ngữ vẽ lại bằng dữ liệu đã có (không gọi lại máy chủ).
+ *   Mở trang lần đầu dùng luôn danh sách thông báo apiAdminHome gửi kèm (bớt một lượt gọi máy chủ).
+ */
+(function () {
+  var T = window.T;
+  var L = function (k, v) { return T.t('ad.' + k, v); };
+  var has = function (k) { var c = T.boot.content || {}; return c[k] !== undefined && c[k] !== null; };
+  var LEVEL_CLS = { CRITICAL: 'bad', WARNING: 'warn', INFO: 'info' };
+  // view: trang con đang mở trong khung (người, danh sách buổi, đặt thay), giữ dữ liệu để đổi ngôn ngữ không gọi lại máy chủ.
+  var st = { tab: 'feed', home: null, people: null, filter: { unread: true, level: '' }, search: '', feed: null, log: null, logQ: { text: '', who: '' }, view: null,
+    feedSeq: 0, feedLoading: false, logSeq: 0, logLoading: false };
+
+  /** Trang không tải được: câu báo theo ngôn ngữ đang chọn (máy chủ gửi cả hai thứ tiếng) và nút Thử lại (soát 5I B7). */
+  function drawErr(root) {
+    // Vòng 2 N3: chữ ad.* chưa có khi trang chưa tải được: dùng chữ chung a.* (có sẵn trong trang), dựng lại câu báo theo ngôn ngữ mỗi lần vẽ.
+    var e = st.err, msg = e.reason === 'NETWORK' ? T.t('a.network_error') : (e.msg ? T.m(e) : e.reason === 'SERVER_ERROR' ? T.t('a.no_response') : e.message);
+    root.innerHTML = T.topbar() + '<main class="stack-lg admin">' + alertBad(msg) + '<button class="btn btn-primary" type="button" id="retry">' + T.esc(T.t('a.retry')) + '</button></main>';
+    T.$('#retry', root).onclick = function () { T.views.admin.render(root, {}); };
+  }
+  function sameQ(a, b) { return !!a && !!b && !!a.unread === !!b.unread && String(a.level || '') === String(b.level || ''); }
+  function alertBad(msg) { return '<div class="alert bad">' + T.esc(msg) + '</div>'; }
+
+  T.views.admin = {
+    render: function (root, opts) {
+      opts = opts || {};
+      if (opts.tab) st.tab = opts.tab;
+      if (opts.filter) st.filter = { unread: !!opts.filter.unread, level: opts.filter.level || '' };
+      st.view = null;
+      root.innerHTML = T.topbar() + T.skeleton(3);
+      st.err = null;
+      T.authed('apiAdminHome').then(function (r) {
+        if (!r.ok) { st.err = r; drawErr(root); return; }
+        st.home = r.data;
+        // Chữ của trang admin (ad.*) đến cùng dữ liệu, không nằm trong trang chung của học viên, tutor.
+        var c = T.boot.content = T.boot.content || {}; Object.keys(r.data.content || {}).forEach(function (k) { c[k] = r.data.content[k]; });
+        T.adoptLang(r.data.me && r.data.me.lang);
+        st.feed = sameQ(st.filter, r.data.feedQuery) ? { q: { unread: st.filter.unread, level: st.filter.level }, data: r.data.feed } : null;
+        st.people = null; st.log = null;
+        frame(root);
+        if (opts.person) openPerson(root, opts.person);
+      }).catch(function () { });
+    },
+    /** Đổi VI | EN: vẽ lại bằng dữ liệu đã có, giữ tab, trang con, bộ lọc, chữ đang gõ, giờ đã chọn khi đặt thay. */
+    relabel: function (root) {
+      if (!st.home) { if (st.err) drawErr(root); else root.innerHTML = T.topbar() + T.skeleton(3); return; }
+      var q = T.$('#q', root), lq = T.$('#log-q', root);
+      if (q) st.search = q.value;
+      if (lq) st.logQ.text = lq.value;
+      frame(root, true);
+    }
+  };
+
+  // ── Nhãn theo ngôn ngữ ──
+  function levelLabel(lv) { return has('ad.lv.' + lv) ? L('lv.' + lv) : lv; }
+  function evLabel(ev) { return has('ad.ev.' + ev) ? L('ev.' + ev) : ev; }
+  function actLabel(a) {
+    a = String(a || '');
+    if (has('ad.act.' + a)) return L('act.' + a);
+    var m = a.match(/^(PACKAGE|MAINTENANCE)_(.+)$/);
+    if (m && has('ad.act.' + m[1] + '_')) return L('act.' + m[1] + '_', { x: m[1] === 'PACKAGE' ? pkgStatus(m[2]) : (has('ad.maint.' + m[2]) ? L('maint.' + m[2]) : m[2]) });
+    return a;
+  }
+  /** Màu nhãn trạng thái buổi, cùng hệ với cổng học viên: xác nhận xanh, huỷ đỏ, chờ tutor tím (thiết kế 20/10). */
+  // Chunk 5J: buổi quá hạn chọn kết quả tô đỏ, nhãn "Quá hạn xác nhận".
+  function statusCls(b) { return b.overdue ? ' bad' : b.awaiting ? ' gold' : b.status === 'CONFIRMED' ? ' ok' : /^CANCELLED/.test(String(b.status || '')) || b.status === 'NOT_COMPLETED' ? ' bad' : ''; }
+  function statusLabel(b) { return b.overdue ? L('st.overdue') : b.awaiting ? L('st.awaiting') : has('ad.st.' + b.status) ? L('st.' + b.status) : b.status; }
+  function pkgStatus(s) { return has('ad.pkg.' + s) ? L('pkg.' + s) : s; }
+  function userStatus(s) { return has('ad.us.' + s) ? L('us.' + s) : s; }
+  function pkgName(p) { return T.pkgName(p); }
+  function msgOf(n) { return T.lang === 'en' && n.messageEn ? n.messageEn : n.message; }
+  function pairOf(p, fallback) { return p && typeof p === 'object' ? (p[T.lang] || p.vi || fallback || '') : (fallback || ''); }
+  function actorShort(a) { a = String(a || ''); return !a || a === 'SYSTEM' ? L('system') : a === 'ADMIN' ? L('admin_sheets') : a.split('@')[0]; }
+
+  /** "dd/MM/yyyy HH:mm" (máy chủ gửi) thành nhóm ngày và giờ để gom: Hôm nay, Hôm qua, hoặc ngày. */
+  function splitTime(s) { var m = String(s || '').match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2})/); return m ? { day: m[3] + '-' + m[2] + '-' + m[1], hm: m[4] } : { day: '', hm: String(s || '') }; }
+  function dayTitle(key, todayKey) {
+    if (!key) return L('day_unknown');
+    if (key === todayKey) return L('today');
+    var p = todayKey.split('-'), y = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]) - 1)), yk = y.toISOString().slice(0, 10);
+    return key === yk ? L('yesterday') : T.day(key);
+  }
+  function todayKey() { return (st.home && st.home.today) || splitTime(st.home && st.home.now).day || new Date().toISOString().slice(0, 10); }
+  /** Gom danh sách (mới nhất trước) theo ngày: rowFn vẽ một dòng. */
+  function grouped(items, rowFn, withGroups) {
+    var today = todayKey(), last = null, out = '';
+    items.forEach(function (n) {
+      var d = splitTime(n.time).day;
+      if (withGroups && d !== last) { out += '<div class="fgroup">' + T.esc(dayTitle(d, today)) + '</div>'; last = d; }
+      out += rowFn(n);
+    });
+    return out;
+  }
+
+  // ── Khung trang: ô số liệu, thanh tab ──
+  /**
+   * Ô số liệu. Mọi ô bấm được: ô có link mở đúng tab Sheets (đăng ký chờ duyệt, tutor xin huỷ); ô khác lọc thông báo
+   * hoặc mở danh sách buổi ngay trên trang. Link Sheets chưa có (hiếm): bấm hiện câu hướng dẫn.
+   */
+  function kpi(id, n, kind, act, href) {
+    var cls = 'kpi' + (n && kind ? ' ' + kind : ''), url = href ? T.safeUrl(href) : '';
+    var inner = '<b class="mono">' + n + '</b><span>' + T.esc(L('kpi.' + id)) + (url ? '\u00a0↗' : '\u00a0›') + '</span>';
+    if (url) return '<a class="' + cls + '" href="' + T.esc(url) + '" target="_blank" rel="noopener" data-kpi-link="' + id + '">' + inner + '</a>';
+    return '<button type="button" class="' + cls + '" data-kpi="' + (act || 'nolink:' + id) + '">' + inner + '</button>';
+  }
+  function kpis(u, c, l) {
+    return kpi('critical', u.CRITICAL, 'bad', 'feed:CRITICAL') + kpi('warning', u.WARNING, 'warn', 'feed:WARNING') +
+      kpi('regs', c.pendingRegistrations, 'warn', '', l.registrations || '-') + kpi('tutor_cancels', c.pendingTutorCancels, 'warn', '', l.availability || '-') +
+      kpi('today', c.lessonsToday, '', 'lessons:today') + kpi('waiting', c.waitingResult, '', 'lessons:waiting');
+  }
+  function bindKpis(root) {
+    T.$$('[data-kpi]', root).forEach(function (b) {
+      b.onclick = function () {
+        var a = b.getAttribute('data-kpi').split(':');
+        if (a[0] === 'feed') { st.tab = 'feed'; st.view = null; st.filter = { unread: true, level: a[1] }; st.feed = null; frame(root); refreshCounts(root); window.scrollTo(0, 0); focusOn(root, '[data-kpi="' + b.getAttribute('data-kpi') + '"]'); }
+        else if (a[0] === 'lessons') openLessons(root, a[1]);
+        else T.toast(L('no_sheet_link'));
+      };
+    });
+  }
+  function frame(root, keep) {
+    var h = st.home, u = h.unread, c = h.counts, l = h.links || {};
+    root.innerHTML = T.topbar('<span class="who">' + T.esc(h.me.name) + '</span><button class="btn btn-ghost btn-sm" type="button" id="logout">' + T.esc(L('logout')) + '</button>') +
+      '<main class="stack-lg admin">' +
+      '<div class="kpis">' + kpis(u, c, l) + '</div>' +
+      '<section id="tab-body"></section></main>' +
+      '<nav class="tabbar" aria-label="' + T.esc(L('nav_aria')) + '"><div class="inner">' +
+      tabBtn('feed', L('tab_feed'), u.CRITICAL + u.WARNING) + tabBtn('tutors', L('tab_tutors')) + tabBtn('students', L('tab_students')) + tabBtn('log', L('tab_log')) + '</div></nav>';
+    T.$('#logout', root).onclick = T.logout;
+    // Vòng 2 N2: bấm tab luôn lấy dữ liệu mới (thông báo, nhật ký, người) và số trên ô; dữ liệu đã có chỉ dùng khi đổi ngôn ngữ.
+    T.$$('.tab', root).forEach(function (b) { b.onclick = function () {
+      var t = b.getAttribute('data-tab'); st.tab = t; st.view = null;
+      if (t === 'feed') st.feed = null; else if (t === 'log') st.log = null; else st.people = null;
+      frame(root); refreshCounts(root); focusOn(root, '.tab[data-tab="' + t + '"]');
+    }; });
+    bindKpis(root);
+    var body = T.$('#tab-body', root);
+    if (keep && st.view) { st.view.draw(body, root); return; }
+    st.view = null;
+    if (st.tab === 'feed') drawFeed(body, root);
+    else if (st.tab === 'tutors' || st.tab === 'students') drawPeople(body, root);
+    else drawLog(body, root);
+  }
+  /** Vòng 2 N6: sau khi vẽ lại khung, trả chỗ đứng bàn phím về đúng nút vừa bấm (nút cũ đã bị thay). */
+  function focusOn(root, sel) { try { var el = T.$(sel, root); if (el && el.focus) el.focus(); } catch (e) { } }
+  // Biểu tượng nét mảnh cho từng tab, cùng kiểu với cổng học viên, tutor (thiết kế 19/10). Chỉ trang trí: aria-hidden.
+  var TAB_ICONS = {
+    feed: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+    tutors: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.5c2.5 0 4 1.3 4.5 4"/></svg>',
+    students: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c2 2 10 2 12 0v-5"/></svg>',
+    log: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>'
+  };
+  function tabBtn(id, label, count) { return '<button class="tab' + (st.tab === id && !st.view ? ' on' : '') + '" type="button" data-tab="' + id + '"' + (st.tab === id && !st.view ? ' aria-current="page"' : '') + '>' + (TAB_ICONS[id] || '') + '<span>' + T.esc(label) + (count ? '<span class="count">' + count + '</span>' : '') + '</span></button>'; }
+  function backBtn(label) { return '<button class="btn btn-ghost btn-sm" type="button" id="back">← ' + T.esc(label || L('back')) + '</button>'; }
+  /** Quay về danh sách: tải lại số liệu (sau khi huỷ, đặt thay, đánh dấu đã đọc thì số đã đổi). */
+  function backToList(root) { T.views.admin.render(root, { tab: st.tab }); }
+
+  // ── Thông báo ──
+  function notifRow(n) {
+    var cls = LEVEL_CLS[n.level] || '', meta = evLabel(n.event) + (n.actor && n.actor !== 'SYSTEM' ? ' · ' + n.actor : '');
+    return '<button type="button" class="nrow lv-' + cls + (n.read ? ' read' : ' unread') + '" data-notif="' + T.esc(n.id) + '" title="' + T.esc(levelLabel(n.level) + ' · ' + n.time) + '">' +
+      '<span class="dot" aria-label="' + T.esc(levelLabel(n.level)) + '"></span><span class="ntext"><span class="nmsg">' + T.esc(msgOf(n)) + '</span>' +
+      '<span class="nmeta">' + T.esc(meta) + '</span></span><time>' + T.esc(splitTime(n.time).hm) + '</time></button>';
+  }
+  /** Danh sách thông báo gom theo ngày (danh sách đã xếp mới nhất trước). withGroups false: không có tiêu đề ngày. */
+  function notifList(items, withGroups) { return '<div class="card flush feed">' + grouped(items, notifRow, withGroups) + '</div>'; }
+  function seg(attr, cur, opts, aria) {
+    return '<div class="seg" role="group"' + (aria ? ' aria-label="' + T.esc(aria) + '"' : '') + '>' + opts.map(function (o) {
+      return '<button type="button" ' + attr + '="' + o[0] + '"' + (String(cur) === String(o[0]) ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>' + T.esc(o[1]) + (o[2] ? '<b>' + o[2] + '</b>' : '') + '</button>';
+    }).join('') + '</div>';
+  }
+  function drawFeed(body, root) {
+    var f = st.filter, un = st.home.unread;
+    body.innerHTML = '<div class="stack"><div class="section-head"><h2>' + T.esc(L('feed_title')) + '</h2>' +
+      (st.home.sheetUrl ? '<a class="btn btn-ghost btn-sm" href="' + T.esc(st.home.sheetUrl) + '" target="_blank" rel="noopener">' + T.esc(L('open_notif_tab')) + ' ↗</a>' : '') + '</div>' +
+      '<div class="feedbar" id="feedbar">' + seg('data-fu', f.unread ? 1 : 0, [[1, L('f_unread'), un.CRITICAL + un.WARNING + un.INFO], [0, L('f_all')]], L('aria_read')) +
+      seg('data-fl', f.level, [['', L('f_all_levels')], ['CRITICAL', levelLabel('CRITICAL'), un.CRITICAL], ['WARNING', levelLabel('WARNING'), un.WARNING], ['INFO', levelLabel('INFO')]], L('aria_level')) +
+      '<span class="grow"></span><button class="btn btn-ghost btn-sm" type="button" id="feed-reload">' + T.esc(L('reload')) + '</button>' +
+      '<button class="btn btn-ghost btn-sm" type="button" id="read-all">' + T.esc(L('read_all')) + '</button></div>' +
+      '<div id="feed">' + T.skeleton(3) + '</div></div>';
+    // Kết quả về muộn vẽ vào khung đang hiện (tìm lại theo root): đổi ngôn ngữ lúc đang tải không gọi máy chủ lần hai (vòng 2 N4).
+    var show = function () {
+      var box = T.$('#feed', root), data = st.feed && st.feed.data;
+      if (!box || !data || st.tab !== 'feed' || st.view) return;
+      box.innerHTML = data.items.length ? notifList(data.items, true) +
+        (data.total > data.items.length ? '<small class="muted">' + T.esc(L('shown_of', { n: data.items.length, total: data.total })) + '</small>' : '')
+        : '<div class="panel">' + T.esc(L(st.filter.unread ? 'no_unread_notifs' : 'no_notifs')) + '</div>';
+      // Đóng chi tiết của thông báo vừa đọc: vẽ lại danh sách tại chỗ (dòng đó đã rời "Chưa đọc"), không tải lại cả trang.
+      bindNotifs(box, root, data.items, function (n) {
+        if (st.view || st.tab !== 'feed') return;
+        frame(root, false);
+        focusOn(root, n && T.$('[data-notif="' + n.id + '"]', root) ? '[data-notif="' + n.id + '"]' : '#feed .nrow, #feed-reload');
+      });
+    };
+    var load = function () {
+      var my = ++st.feedSeq;   // bấm lọc liên tiếp: chỉ nhận kết quả của lần bấm cuối
+      var q = { unread: f.unread, level: f.level };
+      st.feedLoading = true;
+      T.authed('apiAdminNotifications', { unread: q.unread, level: q.level, limit: 100 }).then(function (r) {
+        if (my !== st.feedSeq) return;
+        st.feedLoading = false;
+        if (!r.ok) { var bx = T.$('#feed', root); if (bx && st.tab === 'feed' && !st.view) bx.innerHTML = alertBad(r.message); return; }
+        st.feed = { q: q, data: r.data };
+        show();
+      }).catch(function () { st.feedLoading = false; });
+    };
+    T.$('#feed-reload', body).onclick = function () { st.feed = null; load(); refreshCounts(root); };
+    // Bấm nút lọc: đổi trạng thái nút ngay, tải lại danh sách (không vẽ lại cả trang).
+    T.$$('[data-fu]', body).forEach(function (b) { b.onclick = function () { f.unread = b.getAttribute('data-fu') === '1'; markSeg(body, 'data-fu', f.unread ? '1' : '0'); load(); }; });
+    T.$$('[data-fl]', body).forEach(function (b) { b.onclick = function () { f.level = b.getAttribute('data-fl'); markSeg(body, 'data-fl', f.level); load(); }; });
+    T.$('#read-all', body).onclick = function () {
+      var u2 = st.home.unread, total = u2.CRITICAL + u2.WARNING + u2.INFO;
+      T.sheet('<h2>' + T.esc(L('read_all_q', { n: total })) + '</h2><p class="muted">' + T.esc(L('read_all_note', { c: u2.CRITICAL, w: u2.WARNING })) + '</p>',
+        [{ label: L('read_all'), kind: 'primary', value: true }, { label: L('cancel'), value: false }]).then(function (yes) {
+        if (yes) T.authed('apiAdminMarkRead', 'ALL').then(function (r) { T.toast(r.ok ? L('read_n', { n: r.data.count }) : r.message); T.views.admin.render(root, { tab: 'feed' }); }).catch(function () { });
+      });
+    };
+    if (st.feed && sameQ(st.feed.q, f)) show(); else if (!st.feedLoading) load();
+  }
+  /** Bỏ thông báo vừa đọc khỏi danh sách "Chưa đọc" đã tải (không gọi máy chủ). */
+  function dropFromFeed(n) { if (st.feed && st.feed.q.unread) { var before = st.feed.data.items.length; st.feed.data.items = st.feed.data.items.filter(function (x) { return x.id !== n.id; }); if (st.feed.data.items.length < before) st.feed.data.total = Math.max(0, st.feed.data.total - 1); } }
+  /** Vẽ lại số trên 6 ô và số trên tab Thông báo từ dữ liệu đang có, không vẽ lại phần thân. */
+  function paintCounts(root) {
+    var h = st.home, u = h.unread, c = h.counts, l = h.links || {}, box = T.$('.kpis', root);
+    if (box) { box.innerHTML = kpis(u, c, l); bindKpis(root); }
+    var tb = T.$('.tab[data-tab="feed"] > span', root); if (tb) tb.innerHTML = T.esc(L('tab_feed')) + (u.CRITICAL + u.WARNING ? '<span class="count">' + (u.CRITICAL + u.WARNING) + '</span>' : '');
+  }
+  /** Sau khi huỷ, đặt thay: đọc lại số liệu (một lượt) rồi vẽ lại các ô, không đụng trang đang xem (soát 5I B2). */
+  function refreshCounts(root) {
+    T.authed('apiAdminHome').then(function (r) { if (!r.ok || !st.home) return; st.home.counts = r.data.counts; st.home.unread = r.data.unread; paintCounts(root); }).catch(function () { });
+  }
+  function markSeg(scope, attr, val) { T.$$('[' + attr + ']', scope).forEach(function (x) { var on = x.getAttribute(attr) === val; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }
+  /** Bấm một thông báo: mở chi tiết (đánh dấu đã đọc như email). afterRead(n): gọi khi đóng chi tiết của thông báo vừa đọc. */
+  function bindNotifs(box, root, items, afterRead) {
+    T.$$('[data-notif]', box).forEach(function (el) {
+      el.onclick = function () {
+        var n = items.filter(function (x) { return x.id === el.getAttribute('data-notif'); })[0];
+        if (!n) return;
+        var ids = String(n.entityId || '').split(',').filter(Boolean), btns = [], people = {};
+        // Soát 5I B17: thông báo nhiều buổi có tối đa 3 nút; thông báo về tài khoản (USER) có nút xem từng người.
+        if (n.entity === 'BOOKING') ids.slice(0, 3).forEach(function (id, i) { btns.push({ label: L('view_booking', { id: id }), kind: i ? 'ghost' : 'primary', value: 'b:' + id }); });
+        String(n.studentId || '').split(',').filter(Boolean).slice(0, 1).forEach(function (id) { people[id] = 1; btns.push({ label: L('view_student_id', { id: id }), value: 'p:' + id }); });
+        String(n.tutorId || '').split(',').filter(Boolean).slice(0, 2).forEach(function (id) { people[id] = 1; btns.push({ label: L('view_tutor_id', { id: id }), value: 'p:' + id }); });
+        if (n.entity === 'USER') ids.filter(function (id) { return /^[ST]\d+$/.test(id) && !people[id]; }).slice(0, 3).forEach(function (id) { btns.push({ label: L('view_person', { id: id }), value: 'p:' + id }); });
+        btns.push({ label: L('close'), value: null });
+        var wasUnread = !n.read, markP = null;
+        if (wasUnread) {
+          n.read = true; el.classList.remove('unread'); el.classList.add('read');
+          if (st.home && st.home.unread && st.home.unread[n.level] > 0) st.home.unread[n.level]--;
+          markP = T.authed('apiAdminMarkRead', [n.id]).catch(function () { });
+        }
+        var link = T.safeUrl(n.link);
+        T.sheet('<span class="pill ' + (LEVEL_CLS[n.level] || '') + '">' + T.esc(levelLabel(n.level)) + '</span><h2>' + T.esc(L('notif_title')) + '</h2><p>' + T.esc(msgOf(n)) + '</p>' +
+          '<p class="muted mono">' + T.esc(n.time) + (n.actor ? ' · ' + T.esc(n.actor === 'SYSTEM' ? L('system') : n.actor) : '') + ' · ' + T.esc(evLabel(n.event)) + (has('ad.ev.' + n.event) ? ' (' + T.esc(n.event) + ')' : '') + '</p>' +
+          (link ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_row')) + ' ↗</a></p>' : ''), btns).then(function (v) {
+          if (wasUnread) {
+            // Soát 5I B6: đã đọc là bỏ khỏi danh sách Chưa đọc và cập nhật số trên ô, cả khi đi tiếp sang buổi học hay người.
+            dropFromFeed(n); paintCounts(root);
+            if (!v && afterRead) (markP || Promise.resolve()).then(function () { afterRead(n); });   // đóng: chờ ghi "đã đọc" xong (soát 5H C6)
+          }
+          if (v && v.indexOf('b:') === 0) openBooking(root, v.substring(2));
+          else if (v && v.indexOf('p:') === 0) openPerson(root, v.substring(2));
+        });
+      };
+    });
+  }
+
+  // ── Danh sách buổi (ô "Buổi hôm nay", "Chờ tutor xác nhận") ──
+  /*
+   * Trang con (danh sách buổi, một người, đặt thay) giữ đối tượng view riêng. Kết quả máy chủ về muộn chỉ vẽ khi view đó vẫn đang
+   * mở (soát 5I B1, B2); đổi ngôn ngữ lúc đang tải chỉ vẽ khung chờ, lượt đang chạy tự vẽ khi về (B8).
+   */
+  function current(v) { return st.view === v; }
+  function openLessons(root, kind) {
+    var v = { kind: 'lessons', loading: true, data: null };
+    v.draw = function (b2, r2) { if (v.data) drawLessons(b2, r2, v); else b2.innerHTML = T.skeleton(4); };
+    st.view = v;
+    markTabs(root);
+    loadLessons(root, v, kind);
+    window.scrollTo(0, 0);
+  }
+  function loadLessons(root, v, kind) {
+    v.kind2 = kind; v.loading = true;
+    var body = T.$('#tab-body', root); if (body) body.innerHTML = T.skeleton(4);
+    T.authed('apiAdminLessons', kind).then(function (r) {
+      v.loading = false;
+      if (!current(v)) return;
+      var b = T.$('#tab-body', root);
+      if (!r.ok) { b.innerHTML = '<div class="stack">' + backBtn() + alertBad(r.message) + '</div>'; T.$('#back', b).onclick = function () { st.view = null; frame(root); }; return; }
+      v.data = r.data;
+      drawLessons(b, root, v);
+    }).catch(function () { });
+  }
+  function drawLessons(body, root, v) {
+    var data = v.data, kind = v.kind2;
+    var title = L(kind === 'waiting' ? 'lessons_waiting' : 'lessons_today', { n: data.total });
+    body.innerHTML = '<div class="stack">' + backBtn() + '<div class="section-head"><h2>' + T.esc(title) + '</h2>' +
+      (T.safeUrl(data.sheetLink) ? '<a class="btn btn-ghost btn-sm" href="' + T.esc(T.safeUrl(data.sheetLink)) + '" target="_blank" rel="noopener">' + T.esc(L('open_bookings_tab')) + ' ↗</a>' : '') + '</div>' +
+      (kind === 'waiting' ? '<p class="note">' + T.esc(L('waiting_note', { hours: data.hours !== undefined && data.hours !== null && data.hours !== '' ? data.hours : '24', expire: data.expireHours || '48' })) + '</p>' : '') +
+      (data.items.length ? '<div class="card stack">' + data.items.map(function (b) { return bookingRow(b, true); }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.esc(L('none')) + '</div>') +
+      (data.total > data.items.length ? '<small class="muted">' + T.esc(L('shown_of', { n: data.items.length, total: data.total })) + '</small>' : '') + '</div>';
+    T.$('#back', body).onclick = function () { st.view = null; frame(root); };
+    bindBookingButtons(body, root, function () { refreshCounts(root); if (current(v)) loadLessons(root, v, kind); });
+  }
+  function markTabs(root) { T.$$('.tab', root).forEach(function (b) { b.classList.remove('on'); }); }
+
+  // ── Tutor và học viên ──
+  function drawPeople(body, root) {
+    var tutorsTab = st.tab === 'tutors', title = L(tutorsTab ? 'tab_tutors' : 'tab_students');
+    var render = function () {
+      var p = st.people, q = st.search.toLowerCase(), html;
+      if (tutorsTab) {
+        html = p.tutors.map(function (t) {
+          return '<button type="button" class="person" data-person="' + T.esc(t.id) + '"><span class="spread"><b>' + T.esc(t.name) + '</b>' + (t.unread ? '<span class="pill warn">' + T.esc(L('new_n', { n: t.unread })) + '</span>' : '') + '</span>' +
+            '<small class="muted">' + T.esc(L('tutor_line', { id: t.id, status: userStatus(t.status), week: t.weekLessons, confirm: t.toConfirm, open: t.openNextWeek })) + '</small></button>';
+        }).join('');
+      } else {
+        html = p.students.filter(function (s) { return !q || (s.name + ' ' + s.email + ' ' + s.id).toLowerCase().indexOf(q) !== -1; }).map(function (s) {
+          var pk = s.pkg ? pkgName(s.pkg) + ' (' + pkgStatus(s.pkg.status) + (s.pkg.end ? ', ' + L('ends', { d: T.ddmm(s.pkg.end) }) : '') + (s.pkg.left !== null && s.pkg.left !== undefined ? ', ' + L('left_n', { n: s.pkg.left }) : '') + ')' : L('no_pkg');
+          return '<button type="button" class="person" data-person="' + T.esc(s.id) + '"><span class="spread"><b>' + T.esc(s.name) + '</b>' + (s.unread ? '<span class="pill warn">' + T.esc(L('new_n', { n: s.unread })) + '</span>' : '') + '</span>' +
+            '<small class="muted">' + T.esc(L('student_line', { id: s.id, email: s.email, pkg: pk, up: s.upcoming, week: s.weekBooked })) + '</small></button>';
+        }).join('');
+      }
+      T.$('#people', body).innerHTML = html ? '<div class="card flush">' + html + '</div>' : '<div class="panel">' + T.esc(L('nobody')) + '</div>';
+      T.$$('[data-person]', body).forEach(function (b) { b.onclick = function () { openPerson(root, b.getAttribute('data-person')); }; });
+    };
+    var shell = function () {
+      body.innerHTML = '<div class="stack"><div class="spread wrap"><h2>' + T.esc(title) + '</h2>' +
+        (!tutorsTab ? '<input type="search" id="q" placeholder="' + T.esc(L('search_people')) + '" value="' + T.esc(st.search) + '" aria-label="' + T.esc(L('search_people')) + '">' : '') + '</div><div id="people"></div></div>';
+      var qi = T.$('#q', body); if (qi) qi.oninput = function () { st.search = qi.value; render(); };
+      render();
+    };
+    if (st.people) { shell(); return; }
+    body.innerHTML = '<h2>' + T.esc(title) + '</h2>' + T.skeleton(4);
+    T.authed('apiAdminPeople').then(function (r) {
+      if (!r.ok) { body.innerHTML = alertBad(r.message); return; }
+      st.people = r.data; shell();
+    }).catch(function () { });
+  }
+
+  function bookingRow(b, withCancel) {
+    var what = T.day(b.date) + ' ' + b.slot + ' · ' + b.student.name + ' · ' + b.tutor.name;
+    return '<div class="lesson"><div class="when"><span class="d">' + T.esc(T.dow(b.date, true)) + '</span><b>' + T.ddmm(b.date) + '</b>' + T.esc(b.slot) + '</div><div class="body"><div class="spread"><span>' +
+      T.esc(b.student.name) + ' · ' + T.esc(b.tutor.name) + '</span><span class="pill' + statusCls(b) + '">' + T.esc(statusLabel(b)) + '</span></div><div class="row">' +
+      '<button class="btn btn-ghost btn-sm" type="button" data-booking="' + T.esc(b.id) + '">' + T.esc(L('details_btn', { id: b.id })) + '</button>' +
+      (withCancel && b.canCancel ? '<button class="btn btn-danger btn-sm" type="button" data-cancel="' + T.esc(b.id) + '" data-what="' + T.esc(what) + '">' + T.esc(L('cancel_btn')) + '</button>' : '') + '</div></div></div>';
+  }
+
+  function openPerson(root, id) {
+    var body = T.$('#tab-body', root) || T.root();
+    var v = { kind: 'person', id: id, data: null };
+    v.draw = function (b2, r2) { if (v.data) drawPerson(b2, r2, v.data, v); else b2.innerHTML = T.skeleton(4); };
+    st.view = v;
+    markTabs(root);
+    body.innerHTML = T.skeleton(4);
+    T.authed('apiAdminPerson', id).then(function (r) {
+      if (!current(v)) return;   // đã rời trang người này (bấm tab khác, mở người khác): không vẽ đè
+      var b = T.$('#tab-body', root) || body;
+      if (!r.ok) {
+        b.innerHTML = '<div class="stack">' + backBtn() + alertBad(r.message + ' (' + id + ')') + '</div>';
+        T.$('#back', b).onclick = function () { backToList(root); };
+        return;
+      }
+      v.data = r.data;
+      drawPerson(b, root, r.data, v);
+      window.scrollTo(0, 0);
+    }).catch(function () { });
+  }
+  function drawPerson(body, root, p, v) {
+    var tutor = p.role === 'TUTOR', link = T.safeUrl(p.sheetLink);
+    var html = '<div class="stack-lg">' + backBtn() +
+      '<section class="card stack"><div class="spread"><h2>' + T.esc(p.name) + '</h2><span class="pill">' + T.esc(L(tutor ? 'role.TUTOR' : 'role.STUDENT')) + ' · ' + T.esc(userStatus(p.status)) + '</span></div>' +
+      '<small class="mono">' + T.esc(p.id) + ' · ' + T.esc(p.email) + (p.phone ? ' · ' + T.esc(p.phone) : '') + '</small>' +
+      '<small class="muted">' + T.esc(L('lang_x', { l: L(p.lang === 'en' ? 'lang.en' : p.lang === 'vi' ? 'lang.vi' : 'lang.none') })) + '</small>' +
+      (p.note ? '<small>' + T.esc(p.note) + '</small>' : '') +
+      '<div class="row">' + (link ? '<a class="btn btn-ghost btn-sm" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_users_row')) + ' ↗</a>' : '') +
+      (!tutor ? '<button class="btn btn-primary btn-sm" type="button" id="book-for">' + T.esc(L('book_for')) + '</button>' : '') + '</div></section>';
+    if (tutor) {
+      html += '<section class="stack"><h3>' + T.esc(L('stats_title')) + '</h3>' + p.stats.map(function (m) {
+        return '<div class="card spread wrap"><b class="mono">' + T.esc(m.month) + '</b><span>' + T.esc(L('stats_line', { done: m.completed, sa: m.studentAbsent, tp: m.techPaid, tu: m.techUnpaid, ta: m.tutorAbsent, confirm: m.toConfirm })) +
+          ' · <b>' + T.esc(L('payable', { n: m.payable })) + '</b></span></div>';
+      }).join('') + '</section>';
+    } else {
+      html += '<section class="stack"><h3>' + T.esc(L('packages_title')) + '</h3>' + (p.packages.length ? '<div class="card stack">' + p.packages.map(function (k) {
+        return '<div class="spread"><span>' + T.esc(pkgName(k)) + ' <small class="muted">' + T.esc(k.sp_id) + '</small></span><span class="mono">' + T.esc(pkgStatus(k.status)) +
+          (k.start ? ' · ' + T.esc(L('range', { from: T.ddmm(k.start), to: T.ddmm(k.end) })) : '') + (k.sessionLimit ? ' · ' + T.esc(L('left_of', { n: k.sessionsLeft, total: k.sessionLimit })) : '') + '</span></div>';
+      }).join('') + '</div>' : '<div class="panel">' + T.esc(L('no_pkg')) + '</div>') + '</section>';
+    }
+    html += '<section class="stack"><h3>' + T.esc(L('upcoming_title')) + '</h3>' + (p.upcoming.length ? '<div class="card stack">' + p.upcoming.map(function (b) { return bookingRow(b, true); }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.esc(L('no_upcoming')) + '</div>') + '</section>' +
+      '<section class="stack"><h3>' + T.esc(L('history_title')) + '</h3>' + (p.history.length ? '<div class="card stack">' + p.history.map(function (b) { return bookingRow(b, false); }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.esc(L('none')) + '</div>') + '</section>' +
+      '<section class="stack"><h3>' + T.esc(L('related_notifs')) + '</h3>' + (p.notifications.length ? '<div id="p-notifs">' + notifList(p.notifications, true) + '</div>' : '<div class="panel">' + T.esc(L('none')) + '</div>') + '</section>' +
+      '<section class="stack"><h3>' + T.esc(L('devices_title')) + '</h3>' + (p.sessions.length ? '<div class="card stack">' + p.sessions.map(function (x) { return '<div class="spread"><span>' + T.esc(x.device) + '</span><small class="mono muted">' + T.esc(x.created) + '</small></div>'; }).join('') + '</div>' +
+        '<button class="btn btn-danger btn-sm" type="button" id="kick">' + T.esc(L('kick_btn', { name: p.name })) + '</button><small class="muted">' + T.esc(L('kick_note')) + '</small>' : '<div class="panel">' + T.esc(L('none')) + '</div>') + '</section></div>';
+    body.innerHTML = html;
+    T.$('#back', body).onclick = function () { backToList(root); };
+    var bf = T.$('#book-for', body); if (bf) bf.onclick = function () { openBookFor(root, p); };
+    var kick = T.$('#kick', body);
+    if (kick) kick.onclick = function () {
+      T.sheet('<h2>' + T.esc(L('kick_q', { name: p.name })) + '</h2><p class="muted">' + T.esc(L('kick_q_note')) + '</p>', [{ label: L('kick_yes'), kind: 'danger', value: true }, { label: L('cancel'), value: false }]).then(function (yes) {
+        if (yes) T.authed('apiAdminLogoutUser', p.id).then(function (r) { T.toast(r.ok ? L('kicked_n', { n: r.data.count }) : r.message); if (current(v)) openPerson(root, p.id); }).catch(function () { });
+      });
+    };
+    var again = function () { refreshCounts(root); if (current(v)) openPerson(root, p.id); };
+    bindBookingButtons(body, root, again);
+    var pn = T.$('#p-notifs', body); if (pn) bindNotifs(pn, root, p.notifications, function () { if (current(v)) openPerson(root, p.id); });
+  }
+
+  function bindBookingButtons(scope, root, reload) {
+    T.$$('[data-booking]', scope).forEach(function (b) { b.onclick = function () { openBooking(root, b.getAttribute('data-booking'), reload); }; });
+    T.$$('[data-cancel]', scope).forEach(function (b) { b.onclick = function () { cancelFlow(b.getAttribute('data-cancel'), reload, b.getAttribute('data-what'), b); }; });
+  }
+
+  function cancelFlow(id, after, what, btn) {
+    // Hộp thoại bị gỡ khỏi trang ngay khi bấm nút, nên đọc lý do trong lúc người dùng gõ (không đọc sau khi đóng).
+    var reason = L('cancel_reason_default');
+    var dlg = T.sheet('<h2>' + T.esc(L('cancel_q', { id: id })) + '</h2>' + (what ? '<p><b>' + T.esc(what) + '</b></p>' : '') + '<p class="muted">' + T.esc(L('cancel_note')) + '</p>' +
+      '<label class="field" for="c-reason">' + T.esc(L('cancel_reason_label')) + '<input type="text" id="c-reason" maxlength="200" value="' + T.esc(reason) + '"></label>',
+      [{ label: L('cancel_yes'), kind: 'danger', value: true }, { label: L('keep'), value: false }]);
+    var el = document.getElementById('c-reason');
+    if (el) el.addEventListener('input', function () { reason = el.value; });
+    dlg.then(function (yes) {
+      if (!yes) return;
+      // Huỷ mất vài giây (Calendar, email): báo ngay và khoá nút để không bấm lần 2.
+      if (btn) { btn.disabled = true; btn.textContent = L('cancelling_btn'); }
+      T.toast(L('cancelling', { id: id }));
+      // Vòng 2 N1: để nguyên chữ mặc định thì gửi rỗng (máy chủ ghi lý do mặc định ở cả hai thứ tiếng).
+      var c0 = (T.boot.content || {})['ad.cancel_reason_default'] || [], rs = String(reason || '').trim();
+      if (rs === L('cancel_reason_default') || rs === String(c0[0] || '') || rs === String(c0[1] || '')) rs = '';
+      T.authed('apiAdminCancel', id, rs).then(function (r) { T.toast(r.ok ? L('cancelled', { id: id }) : (r.message || L('cancel_fail'))); if (after) after(); /* after() tải lại dữ liệu, kể cả khi chưa chắc đã huỷ */ }).catch(function () { });
+    });
+  }
+
+  function openBooking(root, id, reload) {
+    T.authed('apiAdminBooking', id).then(function (r) {
+      if (!r.ok) { T.toast(r.message); return; }
+      var b = r.data, btns = [], link = T.safeUrl(b.sheetLink), meet = T.safeUrl(b.meetLink);
+      if (b.canCancel) btns.push({ label: L('cancel_this'), kind: 'danger', value: 'cancel' });
+      btns.push({ label: L('view_student'), value: 'p:' + b.student.id }, { label: L('view_tutor'), value: 'p:' + b.tutor.id }, { label: L('close'), value: null });
+      T.sheet('<h2>' + T.esc(b.id) + ' · ' + T.esc(T.day(b.date)) + ' ' + T.esc(b.slot) + '</h2><p><span class="pill' + statusCls(b) + '">' + T.esc(statusLabel(b)) + '</span></p>' +
+        '<p>' + T.esc(L('student')) + ' <b>' + T.esc(b.student.name) + '</b> · ' + T.esc(L('tutor')) + ' <b>' + T.esc(b.tutor.name) + '</b></p>' +
+        (meet && !/^CANCELLED/.test(b.status) ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(meet) + '" target="_blank" rel="noopener">' + T.esc(L('join_meet')) + ' ↗</a></p>' : '') +
+        (b.cancelReason ? '<p class="muted">' + T.esc(L('cancel_reason_x', { r: b.cancelReasonKey && has('ad.reason.' + b.cancelReasonKey) ? L('reason.' + b.cancelReasonKey) : b.cancelReason })) + '</p>' : '') +
+        (link ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_bookings_row')) + ' ↗</a></p>' : '') +
+        (b.log.length ? '<h3>' + T.esc(L('tab_log')) + '</h3><div class="log">' + b.log.map(function (l) { return '<div><small class="mono">' + T.esc(l.time) + '</small> ' + T.esc(actorShort(l.actor)) + ' · ' + T.esc(actLabel(l.action)) + (l.detail ? ' · <small>' + T.esc(l.detail) + '</small>' : '') + '</div>'; }).join('') + '</div>' : ''),
+        btns).then(function (v) {
+        if (v === 'cancel') cancelFlow(b.id, reload || function () { openBooking(root, b.id); }, T.day(b.date) + ' ' + b.slot + ' · ' + b.student.name + ' · ' + b.tutor.name);
+        else if (v && v.indexOf('p:') === 0) openPerson(root, v.substring(2));
+      });
+    }).catch(function () { });
+  }
+
+  // ── Đặt thay học viên (bỏ qua hạn đặt; vẫn 1 buổi/ngày, hạn gói, slot khoá và trùng giờ) ──
+  function openBookFor(root, p) {
+    var body = T.$('#tab-body', root), v = { kind: 'bookfor', p: p, sel: {}, pick: {}, busy: false, data: null };   // sel: ngày → giờ; pick: ngày → tutor đã chọn
+    v.draw = function (b2, r2) { if (v.data) drawBookFor(b2, r2, v); else if (v.err) drawBookErr(b2, r2, v); else b2.innerHTML = T.skeleton(4); };
+    st.view = v;
+    body.innerHTML = T.skeleton(4);
+    T.authed('apiAdminSlots', p.id, '', 14).then(function (r) {
+      // Vòng 2 N8: lỗi về sau khi đổi ngôn ngữ: vẽ vào khung đang hiện, chỉ khi trang đặt thay vẫn đang mở.
+      if (!r.ok) { v.err = r; if (current(v)) drawBookErr(T.$('#tab-body', root), root, v); return; }
+      v.data = r;
+      if (st.view === v) drawBookFor(T.$('#tab-body', root), root, v);
+    }).catch(function () { });
+  }
+  function drawBookErr(body, root, v) { if (!body) return; body.innerHTML = '<div class="stack">' + backBtn(v.p.name) + alertBad(T.m(v.err) || v.err.message) + '</div>'; T.$('#back', body).onclick = function () { openPerson(root, v.p.id); }; }
+  function drawBookFor(body, root, v) {
+    var p = v.p, r = v.data, days = r.data, sel = v.sel, pick = v.pick;
+    body.innerHTML = '<div class="stack">' + backBtn(p.name) + '<h2>' + T.esc(L('bookfor_title', { name: p.name })) + '</h2>' +
+      (r.blocker ? '<div class="alert warn">' + T.esc(pairOf(r.blockerMsg, r.blocker)) + ' ' + T.esc(L('bookfor_blocked')) + '</div>' : '') +
+      '<p class="note">' + T.esc(L('bookfor_note')) + '</p>' +
+      (days.length ? days.map(function (d) {
+        return '<details class="day" open><summary><b>' + T.esc(T.day(d.date)) + '</b>' + (d.alreadyBooked ? '<span class="pill ok">' + T.esc(L('has_lesson')) + '</span>' : '<span class="muted" style="font-size:.82rem">' + T.esc(L('free_n', { n: d.slots.length })) + '</span>') + '</summary>' +
+          '<div class="slots">' + d.slots.map(function (s) { return '<button type="button" class="chip' + (sel[d.date] === s.slot ? ' on' : '') + '" data-date="' + T.esc(d.date) + '" data-slot="' + T.esc(s.slot) + '"' + (d.alreadyBooked ? ' disabled' : '') + '>' + T.esc(s.slot) + '</button>'; }).join('') + '</div></details>';
+      }).join('') : '<div class="panel">' + T.esc(L('no_free_slots')) + '</div>') +
+      '<div id="pick"></div></div>';
+    T.$('#back', body).onclick = function () { openPerson(root, p.id); };
+    var find = function (date, slot) { var d = days.filter(function (x) { return x.date === date; })[0]; return d && d.slots.filter(function (x) { return x.slot === slot; })[0]; };
+    var label = function () { return L('book_n', { n: Object.keys(sel).length }); };
+    var drawPick = function () {
+      var keys = Object.keys(sel).sort(), box = T.$('#pick', body);
+      if (!keys.length) { box.innerHTML = ''; return; }
+      box.innerHTML = '<div class="card stack"><h3>' + T.esc(L('chosen')) + '</h3>' + keys.map(function (k) {
+        var s = find(k, sel[k]), chosen = pick[k] || '';
+        var autoName = (s.tutors.filter(function (t) { return t.id === s.auto; })[0] || {}).name || s.auto;
+        return '<label class="field" for="t-' + T.esc(k) + '">' + T.esc(T.day(k)) + ' ' + T.esc(sel[k]) + '<select id="t-' + T.esc(k) + '" data-k="' + T.esc(k) + '"><option value="">' + T.esc(L('auto_pick', { name: autoName })) + '</option>' +
+          s.tutors.map(function (t) { return '<option value="' + T.esc(t.id) + '"' + (t.id === chosen ? ' selected' : '') + '>' + T.esc(L('tutor_load', { name: t.name, n: t.load })) + '</option>'; }).join('') + '</select></label>';
+      }).join('') + '<button class="btn btn-primary btn-block" type="button" id="do-book"' + (v.busy ? ' disabled' : '') + '>' + T.esc(v.busy ? L('booking_now') : label()) + '</button></div>';
+      // Nhớ tutor đã chọn: chọn thêm giờ ngày khác (vẽ lại danh sách) không làm mất lựa chọn trước.
+      T.$$('#pick select', body).forEach(function (sl) { sl.onchange = function () { pick[sl.getAttribute('data-k')] = sl.value; }; });
+      T.$('#do-book', body).onclick = function () {
+        if (v.busy) return;
+        var reqs = keys.map(function (k) { return { date: k, slot: sel[k], tutorId: T.$('#t-' + k, body).value }; }), btn = T.$('#do-book', body);
+        v.busy = true; btn.disabled = true; btn.textContent = L('booking_now');
+        T.authed('apiAdminBook', p.id, reqs).then(function (x) {
+          if (!x.ok) { v.busy = false; btn.disabled = false; btn.textContent = label(); T.toast(x.message); if (x.uncertain && current(v)) openPerson(root, p.id); return; }
+          var ok = x.data.filter(function (y) { return y.ok; }).length;
+          T.sheet('<h2>' + T.esc(ok ? L('booked_n', { n: ok }) : L('booked_none')) + '</h2>' + x.data.map(function (y) {
+            return '<div class="spread"><span>' + T.esc(T.day(y.date)) + ' ' + T.esc(y.slot) + '</span>' + (y.ok ? '<span class="pill ok">' + T.esc(y.tutorName) + '</span>' : '<small>' + T.esc(pairOf(y.msg, y.message)) + '</small>') + '</div>';
+          }).join('')).then(function () { refreshCounts(root); if (current(v)) openPerson(root, p.id); });
+        }).catch(function () { v.busy = false; });
+      };
+    };
+    T.$$('.chip[data-date]', body).forEach(function (c) {
+      c.onclick = function () {
+        if (v.busy) return;   // đang gửi: không đổi lựa chọn, không vẽ lại nút Đặt
+        var d = c.getAttribute('data-date'), s = c.getAttribute('data-slot');
+        if (sel[d] !== s) delete pick[d];   // đổi giờ trong ngày: tutor đã chọn của giờ cũ không còn đúng
+        sel[d] = sel[d] === s ? undefined : s; if (!sel[d]) delete sel[d];
+        T.$$('.chip[data-date="' + d + '"]', body).forEach(function (x) { x.classList.toggle('on', sel[d] === x.getAttribute('data-slot')); });
+        drawPick();
+      };
+    });
+    drawPick();
+  }
+
+  // ── Nhật ký: mỗi hoạt động một dòng xem trước (giờ, việc gì, ai, tóm tắt), bấm mở đọc đủ ──
+  function logPreview(l) { var head = (l.entity || '') + (l.entityId ? ' ' + l.entityId : ''); return (head.trim() + (l.detail ? (head.trim() ? ' · ' : '') + l.detail : '') + (l.more ? '…' : '')).trim(); }
+  function logRow(l) {
+    var sys = !l.actor || l.actor === 'SYSTEM';
+    return '<button type="button" class="nrow lrow' + (sys ? ' sys' : '') + '" data-log="' + l.row + '" data-ts="' + l.ts + '" data-act="' + T.esc(l.action) + '" data-h="' + T.esc(l.h || '') + '" title="' + T.esc(l.time + ' · ' + l.action) + '">' +
+      '<span class="dot" aria-hidden="true"></span><span class="ntext"><span class="nmsg"><b>' + T.esc(actLabel(l.action)) + '</b> · ' + T.esc(actorShort(l.actor)) + '</span>' +
+      '<span class="nmeta">' + T.esc(logPreview(l) || l.action) + '</span></span><time>' + T.esc(splitTime(l.time).hm) + '</time></button>';
+  }
+  /**
+   * Chữ tìm khớp nhãn đang hiện (cả hai thứ tiếng): gửi kèm mã hành động có nhãn chứa chữ đó, và cờ khi chữ đó khớp "Hệ thống",
+   * để tìm "Đặt buổi" hay "Signed in" ra đúng dòng dù cột action chỉ có mã (soát 5I B3).
+   */
+  function logQuery(q, extra) {
+    var text = String(q.text || '').trim().toLowerCase(), c = T.boot.content || {}, acts = [], sys = false, admin = false;
+    var hit = function (e) { return Array.isArray(e) && (String(e[0]).toLowerCase().indexOf(text) !== -1 || String(e[1]).toLowerCase().indexOf(text) !== -1); };
+    if (text) {
+      Object.keys(c).forEach(function (k) {
+        if (k.indexOf('ad.act.') !== 0 || /_$/.test(k)) return;
+        if (hit(c[k])) acts.push(k.substring(7));
+      });
+      // Vòng 2 N5: họ nhãn "Gói chuyển sang {x}", "Bảo trì: {x}": ghép đủ từng trạng thái rồi so như nhãn đang hiện.
+      [['PACKAGE', 'ad.pkg.'], ['MAINTENANCE', 'ad.maint.']].forEach(function (fam) {
+        var tpl = c['ad.act.' + fam[0] + '_']; if (!Array.isArray(tpl)) return;
+        Object.keys(c).forEach(function (k) {
+          if (k.indexOf(fam[1]) !== 0) return;
+          var x = c[k] || [], code = k.substring(fam[1].length);
+          if (hit([String(tpl[0]).replace('{x}', x[0] || code), String(tpl[1]).replace('{x}', x[1] || code)])) acts.push(fam[0] + '_' + code);
+        });
+      });
+      sys = hit(c['ad.system'] || []);
+      admin = hit(c['ad.admin_sheets'] || []);
+    }
+    var o = { text: q.text, who: q.who, acts: acts, sys: sys, admin: admin, limit: 150 };
+    Object.keys(extra || {}).forEach(function (k) { o[k] = extra[k]; });
+    return o;
+  }
+  function drawLog(body, root) {
+    var q = st.logQ;
+    body.innerHTML = '<div class="stack"><div class="section-head"><h2>' + T.esc(L('log_title')) + '</h2>' +
+      '<button class="btn btn-ghost btn-sm" type="button" id="log-refresh">' + T.esc(L('reload')) + '</button></div>' +
+      '<p class="note">' + T.esc(L('log_note', { days: (st.home && st.home.logDays) || 60 })) + '</p>' +
+      '<div class="feedbar">' + seg('data-who', q.who, [['', L('who_all')], ['people', L('who_people')], ['system', L('who_system')]], L('aria_who')) +
+      '<span class="grow"></span><input type="search" id="log-q" placeholder="' + T.esc(L('log_search')) + '" aria-label="' + T.esc(L('log_search')) + '" value="' + T.esc(q.text) + '"></div>' +
+      '<div id="log-list">' + T.skeleton(3) + '</div></div>';
+    var timer = null;
+    // Vẽ vào khung đang hiện (tìm lại theo root): kết quả về sau khi đổi ngôn ngữ vẫn hiện, không gọi máy chủ lần hai (vòng 2 N4).
+    var show = function () {
+      var box = T.$('#log-list', root), d = st.log;
+      if (!box || !d || st.tab !== 'log' || st.view) return;
+      box.innerHTML = d.items.length ? '<div class="card flush feed log">' + grouped(d.items, logRow, true) + '</div>' +
+        '<div class="spread wrap"><small class="muted">' + T.esc(L('log_count', { n: d.items.length, total: d.total })) + '</small>' +
+        (d.next ? '<button class="btn btn-ghost btn-sm" type="button" id="log-more">' + T.esc(L('load_more')) + '</button>'
+          : d.total > d.items.length ? '<button class="btn btn-ghost btn-sm" type="button" id="log-reload">' + T.esc(L('log_new')) + '</button>' : '') + '</div>'
+        : '<div class="panel">' + T.esc(L('no_rows')) + '</div>';
+      T.$$('[data-log]', box).forEach(function (el) { el.onclick = function () { openLogEntry(root, el.getAttribute('data-log'), el.getAttribute('data-ts'), el.getAttribute('data-act'), el.getAttribute('data-h')); }; });
+      var more = T.$('#log-more', box);
+      if (more) more.onclick = function () {
+        more.disabled = true; more.textContent = L('loading');
+        var my = st.logSeq, lq = st.logQ;
+        T.authed('apiAdminLog', logQuery(lq, { cursor: d.next })).then(function (r) {
+          var m2 = T.$('#log-more', root);
+          if (my !== st.logSeq || !r.ok) { if (!r.ok) T.toast(r.message); if (m2) { m2.disabled = false; m2.textContent = L('load_more'); } return; }
+          st.log = { q: { text: lq.text, who: lq.who }, items: d.items.concat(r.data.items), total: r.data.total, next: r.data.next };
+          show();
+        }).catch(function () { });
+      };
+      var rl = T.$('#log-reload', box); if (rl) rl.onclick = function () { load(); };
+    };
+    var load = function () {
+      var my = ++st.logSeq, lq = st.logQ;
+      st.logLoading = true;
+      T.authed('apiAdminLog', logQuery(lq)).then(function (r) {
+        if (my !== st.logSeq) return;   // kết quả của lần tìm cũ về sau: bỏ
+        st.logLoading = false;
+        if (!r.ok) { var bx = T.$('#log-list', root); if (bx && st.tab === 'log' && !st.view) bx.innerHTML = alertBad(r.message); return; }
+        st.log = { q: { text: lq.text, who: lq.who }, items: r.data.items, total: r.data.total, next: r.data.next };
+        show();
+      }).catch(function () { st.logLoading = false; });
+    };
+    T.$('#log-refresh', body).onclick = function () { st.log = null; load(); refreshCounts(root); };
+    T.$('#log-q', body).oninput = function () { q.text = T.$('#log-q', body).value; clearTimeout(timer); timer = setTimeout(load, 400); };
+    T.$$('[data-who]', body).forEach(function (b) { b.onclick = function () { q.who = b.getAttribute('data-who'); markSeg(body, 'data-who', q.who); load(); }; });
+    if (st.log && st.log.q.text === q.text && st.log.q.who === q.who) show(); else if (!st.logLoading) load();
+  }
+  /** Đọc đủ một dòng nhật ký: chi tiết đầy đủ (JSON xếp dòng cho dễ đọc), nút mở buổi, người, đúng dòng trong Sheets. */
+  function openLogEntry(root, row, ts, action, h) {
+    T.authed('apiAdminLogEntry', Number(row), Number(ts), action, h || '').then(function (r) {
+      if (!r.ok) { T.toast(r.message); return; }
+      var l = r.data, d = String(l.detail || ''), link = T.safeUrl(l.link), btns = [], ids = String(l.entityId || '').split(',').filter(Boolean);
+      try { if (/^[\[{]/.test(d.trim())) d = JSON.stringify(JSON.parse(d), null, 2); } catch (e) { }
+      if (ids.length === 1 && (l.entity === 'BOOKING' || /^BK\d+$/.test(ids[0]))) btns.push({ label: L('view_booking', { id: ids[0] }), kind: 'primary', value: 'b:' + ids[0] });
+      if (ids.length === 1 && /^[ST]\d+$/.test(ids[0])) btns.push({ label: L('view_person', { id: ids[0] }), value: 'p:' + ids[0] });
+      btns.push({ label: L('close'), value: null });
+      T.sheet('<span class="pill">' + T.esc(actLabel(l.action)) + '</span><h2>' + T.esc(L('log_entry_title')) + '</h2>' +
+        '<dl class="kv"><dt>' + T.esc(L('k_time')) + '</dt><dd class="mono">' + T.esc(l.time) + '</dd><dt>' + T.esc(L('k_actor')) + '</dt><dd>' + T.esc(!l.actor || l.actor === 'SYSTEM' ? L('system') : l.actor === 'ADMIN' ? L('admin_sheets') : l.actor) + '</dd>' +
+        '<dt>' + T.esc(L('k_action')) + '</dt><dd class="mono">' + T.esc(l.action) + '</dd>' + (l.entity || l.entityId ? '<dt>' + T.esc(L('k_entity')) + '</dt><dd class="mono">' + T.esc((l.entity + ' ' + l.entityId).trim()) + '</dd>' : '') + '</dl>' +
+        (d ? '<pre class="logdetail">' + T.esc(d) + '</pre>' : '<p class="muted">' + T.esc(L('no_detail')) + '</p>') +
+        (link ? '<p><a class="btn btn-ghost btn-block" href="' + T.esc(link) + '" target="_blank" rel="noopener">' + T.esc(L('open_row')) + ' ↗</a></p>' : ''), btns).then(function (v) {
+        if (v && v.indexOf('b:') === 0) openBooking(root, v.substring(2));
+        else if (v && v.indexOf('p:') === 0) openPerson(root, v.substring(2));
+      });
+    }).catch(function () { });
+  }
+})();
+</script>
+
+  <script>T.start();</script>
+</body>
+</html>

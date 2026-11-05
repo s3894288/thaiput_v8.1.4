@@ -1,0 +1,101 @@
+<script>
+/** Login.html · Đăng nhập bằng link email và đổi link lấy phiên (câu 32) */
+(function () {
+  var T = window.T;
+
+  var sentTo = '';   // đã gửi link cho email này: đổi ngôn ngữ vẫn hiện câu "đã gửi"
+  T.views.login = {
+    render: function (root) {
+      root.innerHTML = T.topbar('<button class="btn btn-ghost btn-sm" type="button" id="go-home">' + T.t('l.btn_home') + '</button>') +
+        '<main class="stack-lg"><section class="hero"><h1>' + T.t('l.title') + '</h1><p class="muted">' + T.t('l.intro') + '</p></section>' +
+        // Chunk 5J: admin đăng nhập Google là đường chính, nút lên đầu trang.
+        (T.safeUrl(T.boot.googleLoginUrl) ? '<section class="stack"><a class="btn btn-primary btn-block" id="l-google" href="' + T.esc(T.safeUrl(T.boot.googleLoginUrl)) + '" target="_blank" rel="noopener">' + T.t('l.google') + '</a><small class="muted">' + T.t('l.google_note') + '</small></section>' : '') +
+        '<form id="login" class="card stack" novalidate><label class="field" for="l-email">' + T.t('h.f_email') + '<input type="email" id="l-email" autocomplete="email" inputmode="email" required></label>' +
+        '<div id="l-msg" hidden></div><button type="submit" class="btn btn-primary btn-block" id="l-submit">' + T.t('l.submit') + '</button></form>' +
+        (T.store.persistent ? '' : '<div class="alert warn">' + T.t('l.storage_warn') + '</div>') +
+        '</main>';
+      T.$('#go-home', root).onclick = function () { T.go('home'); };
+      T.$('#login', root).onsubmit = function (e) {
+        e.preventDefault();
+        var email = T.$('#l-email', root).value.trim(), m = T.$('#l-msg', root), btn = T.$('#l-submit', root);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { m.className = 'alert bad'; m.textContent = T.t('a.err_email'); m.hidden = false; return; }
+        btn.disabled = true; btn.textContent = T.t('a.sending');
+        T.api('apiRequestLogin', email).then(function (r) {
+          btn.disabled = false; btn.textContent = T.t('l.submit');
+          m.hidden = false;
+          if (r.ok) { m.className = 'alert ok'; m.innerHTML = T.t('l.sent'); sentTo = email; }
+          else { m.className = 'alert bad'; m.textContent = r.message || T.t('a.err_send'); }
+        });
+      };
+    },
+    relabel: function (root) {
+      var e = T.$('#l-email', root), v = e ? e.value : '';
+      T.views.login.render(root);
+      if (v) T.$('#l-email', root).value = v;
+      if (sentTo && sentTo === v) { var m = T.$('#l-msg', root); m.className = 'alert ok'; m.innerHTML = T.t('l.sent'); m.hidden = false; }
+    }
+  };
+  /** Đang đổi link lấy phiên: đổi ngôn ngữ chỉ đổi chữ trên thanh đầu trang và tiêu đề, không gọi máy chủ lần nữa. */
+  function relabelWaiting(key) {
+    return function (root) {
+      var tb = T.$('.topbar', root); if (tb) tb.outerHTML = T.topbar();
+      var h = T.$('h1[data-k]', root); if (h) h.textContent = T.t(h.getAttribute('data-k'));
+    };
+  }
+
+  T.views.auth = {
+    render: function (root, opts) {
+      root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.signing">' + T.t('l.signing') + '</h1>' + T.skeleton(1) + '</main>';
+      T.api('apiExchangeToken', opts.linkToken || T.boot.linkToken, T.device()).then(function (r) {
+        if (!r.ok) {
+          // Link hết hạn nhưng tab này vẫn đang đăng nhập (ví dụ làm mới trang): vào thẳng cổng, không báo lỗi.
+          var s = T.session.get();
+          if (s && s.token) { T.cleanUrl(s.role); return T.go(T.portalOf(s.role)); }
+          root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.fail">' + T.t('l.fail') + '</h1><div class="alert bad">' + T.esc(r.message) + '</div>' +
+            '<button class="btn btn-primary btn-block" type="button" id="again">' + T.t('l.again') + '</button></main>';
+          T.$('#again', root).onclick = function () { T.go('login'); };
+          return;
+        }
+        T.signedIn(r.data, true);
+      });
+    },
+    relabel: relabelWaiting()
+  };
+  /**
+   * Đã có phiên: lưu, bỏ mã link khỏi địa chỉ, vào cổng. Chunk 5H: đăng nhập bằng link mà tài khoản chưa chọn ngôn ngữ
+   * (USERS.lang trống) thì hỏi một lần trước khi vào cổng; đã chọn thì dùng luôn. Chunk 5I: admin cũng được hỏi (trang quản trị song ngữ).
+   */
+  T.signedIn = function (d, ask) {
+    T.session.set({ token: d.sessionToken, role: d.role, name: d.name, lang: d.lang || '' });
+    T.cleanUrl(d.role);
+    var go = function () { T.go(T.portalOf(d.role)); };
+    if (T.langTouched) { T.setLang(T.lang, { save: true, signedIn: true }); return go(); }   // vừa bấm VI | EN trên trang này: theo lựa chọn đó
+    if (d.lang) { T.setLang(d.lang, {}); return go(); }
+    if (!ask) return go();
+    T.askLang(T.storedLang() || T.defaultLang(d.role)).then(function (l) { T.langTouched = true; T.setLang(l, { save: true, signedIn: true }); go(); });
+  };
+  // Đăng nhập bằng tài khoản Google (chunk 5D): dự án phụ chuyển sang ?page=gauth kèm email, thời điểm, chữ ký.
+  T.views.gauth = {
+    render: function (root) {
+      root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.google_wait">' + T.t('l.google_wait') + '</h1>' + T.skeleton(1) + '</main>';
+      var g = T.boot.glogin;
+      var fail = function (msg) {
+        root.innerHTML = T.topbar() + '<main class="stack-lg"><h1 data-k="l.fail">' + T.t('l.fail') + '</h1><div class="alert bad">' + T.esc(msg) + '</div>' +
+          '<button class="btn btn-primary btn-block" type="button" id="again">' + T.t('l.again') + '</button></main>';
+        T.$('#again', root).onclick = function () { T.go('login'); };
+      };
+      if (!g) return fail(T.t('l.google_bad'));
+      T.api('apiGoogleExchange', g.e, g.ts, g.sig, T.device()).then(function (r) {
+        if (!r.ok) {
+          // Làm mới trang sau khi đã vào (chữ ký đã dùng) mà tab vẫn còn phiên: vào thẳng cổng, không báo lỗi.
+          var s = T.session.get();
+          if (s && s.token && r.reason === 'GLOGIN_USED') { T.cleanUrl(s.role); return T.go(T.portalOf(s.role)); }
+          return fail(r.message);
+        }
+        T.signedIn(r.data, true);   // soát 5I B14: đăng nhập Google (đường chính của admin) cũng hỏi ngôn ngữ khi tài khoản chưa chọn
+      });
+    },
+    relabel: relabelWaiting()
+  };
+})();
+</script>

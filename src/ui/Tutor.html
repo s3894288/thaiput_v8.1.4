@@ -1,0 +1,280 @@
+<script>
+/** Tutor.html · Cổng tutor: lịch dạy, giờ rảnh, xác nhận kết quả, số buổi. Mặc định tiếng Anh, đổi được bằng nút VI | EN (chunk 5H). */
+(function () {
+  var T = window.T;
+  var ICON = {
+    schedule: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+    avail: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    user: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
+    check: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>'
+  };
+  var st = { tab: 'schedule', home: null, av: null, week: 1, dirty: {}, pick: {} };
+
+  T.views.tutor = {
+    render: function (root, opts) {
+      st.tab = (opts && opts.tab) || st.tab || 'schedule';
+      root.innerHTML = T.topbar() + T.skeleton(3);
+      T.authed('apiTutorHome').then(function (r) {
+        if (!r.ok) { root.innerHTML = T.topbar() + '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+        st.home = r.data;
+        T.adoptLang(r.data.profile && r.data.profile.lang);
+        frame(root);
+      }).catch(function () { });
+    },
+    /** Đổi ngôn ngữ: vẽ lại bằng dữ liệu đã có, giữ giờ rảnh chưa lưu và kết quả đang chọn. */
+    relabel: function (root) { if (st.home) frame(root, true); else T.views.tutor.render(root, {}); }
+  };
+  /** Trình độ lưu tiếng Việt trong Sheets (h.levels bản vi): hiện bản cùng vị trí theo ngôn ngữ đang chọn; giá trị lạ hiện nguyên văn. */
+  function levelLabel(v) {
+    var vi = T.t('h.levels', null, 'vi').split('|').map(function (x) { return x.trim(); }), i = vi.indexOf(String(v).trim());
+    var cur = T.t('h.levels').split('|'); return i !== -1 && cur[i] ? cur[i].trim() : v;
+  }
+  function whenBox(date, slot) { return '<div class="when"><span class="d">' + T.esc(T.dow(date, true)) + '</span><b>' + T.ddmm(date) + '</b>' + T.esc(slot) + '</div>'; }
+
+  function frame(root, keep) {
+    var h = st.home, n = h.schedule.toConfirm.length;
+    root.innerHTML = T.topbar('<span class="who">' + T.esc(h.profile.name) + '</span><button class="btn btn-ghost btn-sm" type="button" id="logout">' + T.t('t.logout') + '</button>') +
+      '<main class="stack-lg" id="tab-body"></main>' +
+      '<div class="actionbar" id="actionbar" hidden><div class="inner"><span id="ab-text"></span><button class="btn btn-primary btn-sm" type="button" id="ab-go">' + T.t('t.save') + '</button></div></div>' +
+      '<nav class="tabbar" aria-label="' + T.esc(T.t('t.nav_aria')) + '"><div class="inner">' +
+      tabBtn('schedule', ICON.schedule, T.t('t.tab_schedule')) + tabBtn('avail', ICON.avail, T.t('t.tab_avail')) + tabBtn('confirm', ICON.check, T.t('t.tab_confirm'), n) + tabBtn('account', ICON.user, T.t('t.tab_account')) + '</div></nav>';
+    T.$('#logout', root).onclick = T.logout;
+    T.$$('.tab', root).forEach(function (b) { b.onclick = function () { st.tab = b.getAttribute('data-tab'); st.dirty = {}; st.pick = {}; frame(root); }; });
+    T.$('#ab-go', root).onclick = function () { if (st.tab === 'confirm') reviewResults(root); else save(root); };
+    var body = T.$('#tab-body', root);
+    if (st.tab === 'schedule') drawSchedule(body);
+    else if (st.tab === 'avail') { if (keep && st.av) { renderAvail(body, root); updateBar(root); } else drawAvail(body, root); }
+    else if (st.tab === 'account') drawAccount(body, keep);
+    else drawConfirm(body, root);
+  }
+
+  // ── Account: số buổi trong tháng (căn cứ tính lương). 16/10: bỏ danh sách thiết bị ──
+  function drawAccount(body, keep) {
+    body.innerHTML = '<section class="stack" id="stats"><h2>' + T.t('t.stats_title') + '</h2>' + T.skeleton(2) + '</section>' +
+      '<button class="btn btn-ghost btn-block" type="button" id="logout2">' + T.t('t.logout') + '</button>';
+    T.$('#logout2', body).onclick = T.logout;
+    // Đổi ngôn ngữ: vẽ lại từ số đã tải, không gọi máy chủ (luật 50).
+    var got = keep && st.stats ? Promise.resolve(st.stats) : T.authed('apiTutorStats');
+    got.then(function (r) {
+      if (r.ok) st.stats = r;
+      var box = T.$('#stats', body);
+      if (!r.ok) { box.innerHTML = '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+      var rows = [['t.st_completed', 'completed'], ['t.st_absent', 'studentAbsent'], ['t.st_tech_paid', 'techPaid'], ['t.st_tech_unpaid', 'techUnpaid'], ['t.st_tutor_absent', 'tutorAbsent'], ['t.st_not_completed', 'notCompleted'], ['t.st_waiting', 'toConfirm']];
+      if (st.tab !== 'account' || !T.$('#stats', body)) return;
+      box.innerHTML = '<h2>' + T.t('t.stats_title') + '</h2>' + r.data.months.map(function (m) {
+        return '<div class="card stack stats"><div class="spread"><b class="mono">' + T.esc(m.month) + '</b><span class="pill ok">' + T.t('t.st_payable') + ': ' + m.payable + '</span></div>' +
+          rows.map(function (x) { return '<div class="spread"><span>' + T.t(x[0]) + '</span><b class="mono">' + m[x[1]] + '</b></div>'; }).join('') + '</div>';
+      }).join('') + '<small class="muted">' + T.t('t.stats_note') + '</small>';
+    }).catch(function () { });
+  }
+  function legend() {
+    var cls = ['on', 'booked', 'pending', 'blocked', ''];
+    return '<div class="legend">' + T.t('t.legend').split('|').map(function (x, i) { return '<span class="chip' + (cls[i] ? ' ' + cls[i] : '') + '" aria-hidden="true">' + T.esc(x.trim()) + '</span>'; }).join('') + '</div>';
+  }
+  function tabBtn(id, icon, label, count) { return '<button class="tab' + (st.tab === id ? ' on' : '') + '" type="button" data-tab="' + id + '"' + (st.tab === id ? ' aria-current="page"' : '') + '>' + icon + '<span>' + label + (count ? '<span class="count">' + count + '</span>' : '') + '</span></button>'; }
+
+  function lessonRow(l, extra) {
+    var s = l.student || {};
+    // Chunk 5J: quá hạn chọn kết quả thì tô đỏ, ghi giờ sẽ thành Không hoàn thành.
+    if (l.overdue) extra = '<div class="alert bad overdue">' + T.t('t.overdue', { at: T.esc(l.expireAt) }) + '</div>' + (extra || '');
+    return '<div class="lesson' + (l.overdue ? ' is-overdue' : '') + '">' + whenBox(l.date, l.slot) + '<div class="body">' +
+      '<div class="spread"><b>' + T.esc(s.name) + '</b>' + (s.level ? '<span class="pill">' + T.esc(levelLabel(s.level)) + '</span>' : '') + '</div>' +
+      (s.note ? '<small>' + T.esc(s.note) + '</small>' : '') + (extra || '') + '</div></div>';
+  }
+
+  function drawSchedule(body) {
+    var up = st.home.schedule.upcoming, late = st.home.schedule.toConfirm.filter(function (l) { return l.overdue; }).length;
+    body.innerHTML = (late ? '<div class="alert bad" id="overdue-top">' + T.t('t.overdue_top', { n: late }) + ' <button class="btn btn-sm btn-primary" type="button" id="go-confirm">' + T.t('t.overdue_go') + '</button></div>' : '') +
+      '<section class="stack"><div class="spread"><h2>' + T.t('t.upcoming') + '</h2><small class="mono">' + T.esc(st.home.now) + '</small></div>' +
+      (up.length ? '<div class="card stack">' + up.map(function (l) {
+        return lessonRow(l, l.meetLink ? '<div class="row"><a class="btn btn-primary btn-sm" href="' + T.esc(T.safeUrl(l.meetLink)) + '" target="_blank" rel="noopener">' + T.t('t.open_meet') + '</a></div>' : '<small class="muted">' + (l.inviteWhen ? T.t('t.meet_pending_at', { when: T.esc(l.inviteWhen) }) : T.t('t.meet_pending')) + '</small>');
+      }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.t('t.upcoming_empty') + '</div>') +
+      '</section><section class="stack"><h3>' + T.t('t.help') + '</h3>' + T.contact(st.home.contact) + '</section>';
+    var gc = T.$('#go-confirm', body);
+    if (gc) gc.onclick = function () { var b = document.querySelector('.tab[data-tab="confirm"]'); if (b) b.click(); };
+  }
+
+  // ── Availability ──
+  function parseNow(s) { var m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/); return m ? { key: m[3] + '-' + m[2] + '-' + m[1], hm: m[4] + ':' + m[5] } : { key: '', hm: '' }; }
+  function addDaysKey(key, n) { var p = key.split('-'), d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function dowOf(key) { return T.dow(key, true); }
+
+  function drawAvail(body, root) {
+    body.innerHTML = '<h2>' + T.t('t.avail_title') + '</h2>' + T.skeleton(3);
+    T.authed('apiTutorAvailability', '', 14).then(function (r) {
+      if (!r.ok) { body.innerHTML = '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+      st.av = r.data; st.dirty = {};
+      renderAvail(body, root);
+    }).catch(function () { });
+  }
+
+  function stateOf(key) {
+    if (key in st.dirty) return st.dirty[key] ? 'on' : 'off';
+    var it = st.av.map[key];
+    if (!it) return 'off';
+    if (it.status === 'BLOCKED') return 'blocked';
+    if (it.status === 'CANCEL_PENDING') return 'pending';
+    return it.booked ? 'booked' : 'on';
+  }
+
+  function renderAvail(body, root) {
+    var av = st.av, now = parseNow(av.now);
+    av.map = {}; av.items.forEach(function (it) { av.map[it.date + '|' + it.slot] = it; });
+    var w = av.weeks[st.week] || av.weeks[0];
+    var days = []; for (var i = 0; i < 7; i++) days.push(addDaysKey(w.monday, i));
+    body.innerHTML = '<div class="stack"><div class="spread"><h2>' + T.t('t.avail_title') + '</h2><div class="row">' +
+      av.weeks.map(function (wk, i) { return '<button type="button" class="btn btn-sm ' + (i === st.week ? 'btn-primary' : 'btn-ghost') + '" data-week="' + i + '">' + T.t(i === 0 ? 't.this_week' : 't.next_week') + '</button>'; }).join('') + '</div></div>' +
+      '<p class="note">' + T.t('t.deadline', { week: T.ddmm(w.monday), deadline: T.esc(w.deadline) }) + T.t(w.deadlinePassed ? 't.deadline_passed' : 't.deadline_open') + '</p>' +
+      legend() + '<div class="week-grid">' +
+      days.map(function (k, i) {
+        var past = k < now.key;
+        return '<details class="day"' + (i < 2 && !past ? ' open' : '') + '><summary><b>' + dowOf(k) + ' ' + T.ddmm(k) + '</b><span class="muted" style="font-size:.82rem" data-count="' + k + '"></span></summary>' +
+          '<div class="slots">' + av.slots.map(function (s) {
+            var key = k + '|' + s, dis = past || (k === now.key && s <= now.hm);
+            return '<button type="button" class="chip" data-key="' + key + '"' + (dis ? ' disabled' : '') + '>' + s + '</button>';
+          }).join('') + '</div>' +
+          (past ? '' : '<div class="copy" style="padding:0 14px 14px"><button type="button" class="btn btn-ghost btn-sm" data-copy="' + k + '">' + T.t('t.copy_day') + '</button></div>') + '</details>';
+      }).join('') + '</div></div>';
+    if (T.wide()) T.$$('details.day', body).forEach(function (d) { d.open = true; });
+    paint(body);
+    T.$$('[data-week]', body).forEach(function (b) { b.onclick = function () { st.week = Number(b.getAttribute('data-week')); st.dirty = {}; updateBar(root); renderAvail(body, root); }; });
+    T.$$('.chip[data-key]', body).forEach(function (c) { c.onclick = function () { tap(c.getAttribute('data-key'), body, root); }; });
+    T.$$('[data-copy]', body).forEach(function (b) {
+      b.onclick = function () {
+        var src = b.getAttribute('data-copy'), idx = days.indexOf(src);
+        days.slice(idx + 1).forEach(function (k) {
+          av.slots.forEach(function (s) {
+            var want = ['on', 'booked', 'pending'].indexOf(stateOf(src + '|' + s)) !== -1, key = k + '|' + s, cur = stateOf(key);
+            if (cur === 'booked' || cur === 'pending' || cur === 'blocked') return;
+            setWant(key, want);
+          });
+        });
+        paint(body); updateBar(root); T.toast(T.t('t.copied'));
+      };
+    });
+  }
+
+  /** Ghi thay đổi mong muốn; nếu trùng trạng thái gốc thì bỏ khỏi danh sách thay đổi. */
+  function setWant(key, open) {
+    var it = st.av.map[key], orig = it ? (it.status === 'OPEN' || it.status === 'CANCEL_PENDING') : false;
+    if (it && it.status === 'CANCEL_PENDING' && open) { st.dirty[key] = true; return; }
+    if (open === orig) delete st.dirty[key]; else st.dirty[key] = open;
+  }
+
+  function tap(key, body, root) {
+    var cur = stateOf(key);
+    if (cur === 'blocked') { T.toast(T.t('t.blocked')); return; }
+    if (cur === 'booked' && !(key in st.dirty)) {
+      T.sheet('<h2>' + T.t('t.cancel_q', { slot: T.esc(key.replace('|', ' ')) }) + '</h2><p class="muted">' + T.t('t.cancel_note') + '</p>',
+        [{ label: T.t('t.cancel_yes'), kind: 'danger', value: true }, { label: T.t('t.cancel_no'), value: false }]).then(function (yes) {
+        if (yes) { st.dirty[key] = false; paint(body); updateBar(root); }
+      });
+      return;
+    }
+    if (key in st.dirty) delete st.dirty[key];
+    else setWant(key, cur === 'off' || cur === 'pending');
+    paint(body); updateBar(root);
+  }
+
+  function paint(body) {
+    var counts = {};
+    T.$$('.chip[data-key]', body).forEach(function (c) {
+      var key = c.getAttribute('data-key'), s = stateOf(key), orig = st.av.map[key];
+      c.className = 'chip' + (s === 'on' ? ' on' : s === 'booked' ? ' booked' : s === 'pending' ? ' pending' : s === 'blocked' ? ' blocked' : '') + (key in st.dirty ? ' dirty' : '');
+      if (orig && orig.booked && s === 'off') c.className = 'chip pending dirty';
+      c.setAttribute('aria-pressed', s === 'off' ? 'false' : 'true');
+      var d = key.split('|')[0];
+      if (s !== 'off' && s !== 'blocked') counts[d] = (counts[d] || 0) + 1;
+    });
+    T.$$('[data-count]', body).forEach(function (el) { var n = counts[el.getAttribute('data-count')] || 0; el.textContent = n ? T.t('t.count_open', { n: n }) : T.t('t.count_off'); });
+  }
+
+  function updateBar(root) {
+    var n = Object.keys(st.dirty).length, bar = T.$('#actionbar', root);
+    if (!bar) return;
+    bar.hidden = !n;
+    T.$('#ab-text', root).textContent = T.t('t.changes', { n: n });
+    T.$('#ab-go', root).textContent = T.t('t.save');
+  }
+
+  function save(root) {
+    var changes = Object.keys(st.dirty).map(function (k) { var p = k.split('|'); return { date: p[0], slot: p[1], open: st.dirty[k] }; });
+    if (!changes.length) return;
+    var btn = T.$('#ab-go', root); btn.disabled = true; btn.textContent = T.t('t.saving');
+    T.authed('apiTutorSetAvailability', changes).then(function (r) {
+      btn.disabled = false;
+      if (T.state.page !== 'tutor') return;
+      if (!r.ok) {
+        updateBar(root); T.toast(r.message || T.t('t.err_save'));
+        if (r.uncertain) { st.dirty = {}; updateBar(root); drawAvail(T.$('#tab-body', root), root); }   // tải lại để thấy đúng đã lưu chưa
+        return;
+      }
+      var c = { OPEN: 0, CANCELLED: 0, CANCEL_PENDING: 0, bad: 0 };
+      r.data.forEach(function (x) { if (!x.ok) c.bad++; else if (c[x.state] !== undefined) c[x.state]++; });
+      T.sheet('<h2>' + T.t('t.saved') + '</h2><ul style="margin:0;padding-left:18px">' +
+        (c.OPEN ? '<li>' + T.t('t.saved_open', { n: c.OPEN }) + '</li>' : '') + (c.CANCELLED ? '<li>' + T.t('t.saved_removed', { n: c.CANCELLED }) + '</li>' : '') +
+        (c.CANCEL_PENDING ? '<li>' + T.t('t.saved_pending', { n: c.CANCEL_PENDING }) + '</li>' : '') + (c.bad ? '<li>' + T.t('t.saved_bad', { n: c.bad }) + '</li>' : '') + '</ul>')
+        .then(function () { st.dirty = {}; updateBar(root); drawAvail(T.$('#tab-body', root), root); });
+    }).catch(function () { });
+  }
+
+  // ── Confirm results (chunk 5F: xác nhận 2 bước) ──
+  // Bước 1: chọn kết quả cho từng buổi (bấm lại để bỏ chọn). Bước 2: xem lại danh sách rồi mới Lưu, một lượt gọi cho cả lô.
+  // Kết quả là căn cứ tính lương; tutor không tự sửa được sau khi lưu, nên không lưu ngay khi bấm như trước.
+  var RES = [['COMPLETED', 't.res_completed'], ['STUDENT_ABSENT', 't.res_absent'], ['TECH_ISSUE', 't.res_tech']];
+  function resLabel(code) { for (var i = 0; i < RES.length; i++) if (RES[i][0] === code) return T.t(RES[i][1]); return code; }
+  function drawConfirm(body, root) {
+    var list = st.home.schedule.toConfirm;
+    body.innerHTML = '<section class="stack"><h2>' + T.t('t.confirm_title') + '</h2><p class="muted">' + T.t('t.confirm_note', st.home.rules || { notice: 24, expire: 48 }) + '</p>' +
+      (list.length ? '<div class="card stack">' + list.map(function (l) {
+        return lessonRow(l, '<div class="row" role="group">' + RES.map(function (x) {
+          return '<button class="chip" type="button" aria-pressed="false" data-res="' + x[0] + '" data-id="' + T.esc(l.bookingId) + '">' + T.t(x[1]) + '</button>';
+        }).join('') + '</div>');
+      }).join('<hr class="list-divider">') + '</div>' : '<div class="panel">' + T.t('t.confirm_empty') + '</div>') + '</section>';
+    paintPicks(body);
+    updateConfirmBar(root);
+    T.$$('[data-res]', body).forEach(function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-id'), res = b.getAttribute('data-res');
+        if (st.pick[id] === res) delete st.pick[id]; else st.pick[id] = res;
+        paintPicks(body); updateConfirmBar(root);
+      };
+    });
+  }
+  function paintPicks(body) {
+    T.$$('[data-res]', body).forEach(function (b) {
+      var on = st.pick[b.getAttribute('data-id')] === b.getAttribute('data-res');
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  function updateConfirmBar(root) {
+    var n = Object.keys(st.pick).length, bar = T.$('#actionbar', root);
+    if (!bar) return;
+    bar.hidden = !n;
+    T.$('#ab-text', root).textContent = T.t('t.chosen', { n: n });
+    T.$('#ab-go', root).textContent = T.t('t.save_results', { n: n });
+  }
+  function reviewResults(root) {
+    var byId = {}; st.home.schedule.toConfirm.forEach(function (l) { byId[l.bookingId] = l; });
+    var items = Object.keys(st.pick).filter(function (id) { return byId[id]; }).map(function (id) { return { bookingId: id, result: st.pick[id] }; });
+    if (!items.length) return;
+    T.sheet('<h2>' + T.t('t.review_title') + '</h2><p class="muted">' + T.t('t.review_note') + '</p><ul class="review" style="margin:0;padding-left:18px">' +
+      items.map(function (it) { var l = byId[it.bookingId]; return '<li><b>' + T.esc(T.day(l.date)) + ' ' + T.esc(l.slot) + '</b> · ' + T.esc(l.student.name) + ': <b>' + T.esc(resLabel(it.result)) + '</b></li>'; }).join('') + '</ul>',
+      [{ label: T.t('t.btn_save_confirm'), kind: 'primary', value: true }, { label: T.t('t.btn_back'), value: false }]).then(function (yes) {
+      if (!yes) return;
+      var btn = T.$('#ab-go', root); if (btn) { btn.disabled = true; btn.textContent = T.t('t.saving'); }
+      T.authed('apiTutorSubmitResults', items).then(function (r) {
+        if (btn) btn.disabled = false;
+        if (T.state.page !== 'tutor') return;
+        if (!r.ok) { updateConfirmBar(root); T.toast(r.message || T.t('t.err_save')); if (r.uncertain) { st.pick = {}; T.views.tutor.render(root, { tab: 'confirm' }); } return; }
+        var bad = r.data.items.filter(function (x) { return !x.ok; });
+        st.pick = {};
+        var done = function () { T.views.tutor.render(root, { tab: 'confirm' }); };
+        if (!bad.length) { T.toast(T.t('t.saved_results', { n: r.data.saved })); done(); return; }
+        T.sheet('<h2>' + T.t('t.saved_results', { n: r.data.saved }) + '</h2><p>' + T.t('t.saved_some_bad', { n: bad.length }) + '</p><ul style="margin:0;padding-left:18px">' +
+          bad.map(function (x) { var l = byId[x.bookingId] || {}; return '<li>' + T.esc((l.date ? T.day(l.date) : x.bookingId) + ' ' + (l.slot || '')) + ': ' + T.esc(T.m(x) || x.reason) + '</li>'; }).join('') + '</ul>').then(done);
+      }).catch(function () { });
+    });
+  }
+})();
+</script>

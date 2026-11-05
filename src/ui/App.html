@@ -1,0 +1,451 @@
+<script>
+/**
+ * App.html · Lõi phía trình duyệt (v8)
+ * Router theo "page", gọi server qua google.script.run, giữ token phiên, các tiện ích hiển thị.
+ * Không dùng alert/confirm/prompt của trình duyệt (bị chặn khi nhúng trong Google Sites): dùng T.sheet().
+ */
+(function () {
+  var T = window.T = { views: {}, state: {} };
+  T.boot = window.BOOT || { page: 'home', linkToken: '', version: '' };
+  T.lang = 'vi';
+  /**
+   * Chữ trên trang lấy từ tab CONTENT của Sheets (BOOT.content: key → [tiếng Việt, tiếng Anh], chunk 5H).
+   * Hiện theo ngôn ngữ đang chọn (T.lang, nút VI | EN). {bien} được thay bằng vars. Thiếu key thì hiện chính key.
+   */
+  T.t = function (key, vars, lang) {
+    var c = T.boot.content || {}, e = c[key], s = Array.isArray(e) ? e[(lang || T.lang) === 'en' ? 1 : 0] : e;
+    if (s === undefined || s === null) s = key;
+    return String(s).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] !== undefined ? String(vars[k]) : m; });
+  };
+
+  // ── Phiên đăng nhập: mỗi tab giữ phiên riêng (sessionStorage), để một tab đăng nhập admin, tab khác đăng nhập tutor.
+  //    Phiên gần nhất cũng lưu chung (localStorage) để tab mới mở hoặc mở lại trình duyệt vẫn còn đăng nhập.
+  //    Trình duyệt chặn bộ nhớ (nhúng Google Sites) thì giữ trong trang. ──
+  function usableStore(get) { try { var s = get(); var k = '__tp'; s.setItem(k, '1'); s.removeItem(k); return s; } catch (e) { return null; } }
+  T.store = (function () {
+    var mem = {}, tab = usableStore(function () { return window.sessionStorage; }), shared = usableStore(function () { return window.localStorage; });
+    function rd(s, k) { try { return s ? s.getItem(k) : null; } catch (e) { return null; } }
+    function wr(s, k, v) { try { if (s) { if (v === null) s.removeItem(k); else s.setItem(k, v); return true; } } catch (e) { } return false; }
+    return {
+      persistent: !!shared,
+      tab: { get: function (k) { var v = rd(tab, k); return v !== null ? v : (k in mem ? mem[k] : null); }, set: function (k, v) { if (!wr(tab, k, v)) { if (v === null) delete mem[k]; else mem[k] = v; } } },
+      shared: { get: function (k) { return rd(shared, k); }, set: function (k, v) { wr(shared, k, v); } }
+    };
+  })();
+  var TAB_KEY = 'thaiput_tab_session', SHARED_KEY = 'thaiput_session';
+  function parse(raw) { try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  T.session = {
+    get: function () {
+      var s = parse(T.store.tab.get(TAB_KEY));
+      if (s) return s;
+      s = parse(T.store.shared.get(SHARED_KEY));       // tab mới: dùng phiên gần nhất
+      if (s) T.store.tab.set(TAB_KEY, JSON.stringify(s));
+      return s;
+    },
+    set: function (o) { var v = JSON.stringify(o); T.store.tab.set(TAB_KEY, v); T.store.shared.set(SHARED_KEY, v); },
+    tabOnly: function () { return parse(T.store.tab.get(TAB_KEY)); },
+    /** Sửa phiên của tab này (ví dụ ngôn ngữ). Phiên chung chỉ sửa khi vẫn là phiên của tab này: không đè phiên tab khác vừa đăng nhập (soát 5H R15). */
+    update: function (o) {
+      var v = JSON.stringify(o), last = parse(T.store.shared.get(SHARED_KEY));
+      T.store.tab.set(TAB_KEY, v);
+      if (!last || last.token === o.token) T.store.shared.set(SHARED_KEY, v);
+    },
+    clear: function () {
+      var mine = parse(T.store.tab.get(TAB_KEY)), last = parse(T.store.shared.get(SHARED_KEY));
+      T.store.tab.set(TAB_KEY, null);
+      if (!mine || (last && last.token === mine.token)) T.store.shared.set(SHARED_KEY, null);
+    }
+  };
+  T.token = function () { var s = T.session.get(); return s ? s.token : ''; };
+
+  // ── Ngôn ngữ (chunk 5H): mỗi người tự chọn VI hoặc EN. Lưu trên máy (localStorage) và vào USERS.lang khi đã đăng nhập,
+  //    để thiết bị khác và email dùng đúng ngôn ngữ. Chưa chọn: học viên tiếng Việt, tutor tiếng Anh, khách tiếng Việt. ──
+  var LANG_KEY = 'thaiput_lang';
+  T.langTouched = false;   // người dùng đã bấm chọn trong lần mở trang này: không để giá trị trên máy chủ đè lại
+  T.storedLang = function () { var v = T.store.shared.get(LANG_KEY) || T.store.tab.get(LANG_KEY); return v === 'vi' || v === 'en' ? v : ''; };
+  T.defaultLang = function (role) {
+    if (role === 'TUTOR') return 'en';
+    if (role) return 'vi';
+    try { if (/^th/i.test(String(navigator.language || ''))) return 'en'; } catch (e) { }   // máy tiếng Thái (tutor chưa đăng nhập)
+    return 'vi';
+  };
+  /** Đổi ngôn ngữ. o.save: lưu lên máy chủ (đã đăng nhập); o.rerender: vẽ lại trang đang xem bằng dữ liệu đã có. */
+  T.setLang = function (l, o) {
+    o = o || {};
+    if (l !== 'vi' && l !== 'en') return;
+    var changed = l !== T.lang;
+    T.lang = l;
+    try { document.documentElement.lang = l; } catch (e) { }
+    if (o.local) return;   // chỉ áp dụng cho lần mở trang này (giá trị khởi đầu), không ghi lại trên máy
+    T.store.shared.set(LANG_KEY, l); T.store.tab.set(LANG_KEY, l);
+    // Trang đổi link lấy phiên: phiên trên máy có thể của người khác; chỉ lưu trên máy, T.signedIn gửi sau khi có phiên mới.
+    // Chỉ dùng phiên riêng của tab này: tab đã thoát không được mượn phiên chung của tab khác để đổi ngôn ngữ của người đó (soát 5H C3).
+    var waiting = !o.signedIn && (T.state.page === 'auth' || T.state.page === 'gauth' || T.state.page === 'login');
+    var s = waiting ? null : T.session.tabOnly();
+    if (s && s.token && s.lang !== l) { s.lang = l; T.session.update(s); }
+    // Không chờ kết quả: bảo trì hay mất mạng thì trang vẫn đổi ngôn ngữ tại chỗ (lưu trên máy).
+    // Bấm liên tục: chỉ gửi lựa chọn cuối sau một nhịp ngắn (mỗi lượt gửi là một lần ghi có khoá, soát 5H R07).
+    if (o.save && s && s.token) {
+      clearTimeout(langTimer);
+      var tok = s.token;
+      langPending = function () { langPending = null; if (langSent[tok] !== T.lang) { langSent[tok] = T.lang; return T.api('apiSetLanguage', tok, T.lang); } return Promise.resolve(); };
+      langTimer = setTimeout(function () { if (langPending) langPending(); }, T.langSaveDelay);
+    }
+    if (o.rerender && changed) T.relabel();
+  };
+  var langTimer = null, langSent = {}, langPending = null;
+  /** Gửi ngay lựa chọn ngôn ngữ đang chờ (trước khi thoát, soát 5H C7). */
+  T.flushLang = function () { clearTimeout(langTimer); return langPending ? langPending() : Promise.resolve(); };
+  T.langSaveDelay = window.__TP_RETRY_DELAYS ? 0 : 1200;
+  /** Vẽ lại trang hiện tại theo ngôn ngữ mới, giữ tab và lựa chọn đang có (không gọi lại máy chủ nếu trang hỗ trợ). */
+  T.relabel = function () {
+    var page = T.state.page, v = T.views[page];
+    if (document.body.getAttribute('data-page') === 'maint') T.maintScreen(T.state.maintRes);   // cổng đang đóng vì bảo trì: chỉ đổi chữ trang báo
+    else if (v && v.relabel) v.relabel(T.root()); else if (v) v.render(T.root(), T.state.opts || {});
+    var eff = document.body.getAttribute('data-page') === 'maint' ? 'maint' : page;
+    T.fab(eff); T.maint(page);
+    var rb = document.getElementById('tp-retry'); if (rb) rb.textContent = T.t('a.retrying');
+    var sw = document.querySelector('[data-langsw]'); if (sw) try { sw.focus(); } catch (e) { }   // bàn phím: giữ chỗ đứng
+  };
+  /** Ngôn ngữ đã lưu trên máy chủ (cổng học viên, tutor trả về): dùng nếu người dùng chưa bấm chọn trong lần mở trang này. */
+  T.adoptLang = function (l) { if ((l === 'vi' || l === 'en') && l !== T.lang && !T.langTouched) T.setLang(l, {}); };
+  /** Nút VI | EN trên thanh đầu trang (mọi trang, kể cả trang quản trị từ chunk 5I). */
+  T.langSwitch = function () {
+    return '<button type="button" class="langsw" data-langsw aria-label="' + T.esc(T.t('a.lang_aria')) + '" title="' + T.esc(T.t('a.lang_aria')) + '">' +
+      '<span' + (T.lang === 'vi' ? ' class="on"' : '') + ' lang="vi">VI</span><span' + (T.lang === 'en' ? ' class="on"' : '') + ' lang="en">EN</span></button>';
+  };
+  /** Hộp chọn ngôn ngữ lần đầu đăng nhập bằng link (tài khoản chưa chọn). Đóng hộp mà không chọn: dùng mặc định. */
+  T.askLang = function (def) {
+    var both = function (k) { var a = T.t(k, null, 'vi'), b = T.t(k, null, 'en'); return a === b ? T.esc(a) : T.esc(a) + '<br><span class="muted" lang="en">' + T.esc(b) + '</span>'; };
+    return T.sheet('<div class="langpick" data-lang-pick><h2>' + T.esc(T.t('a.lang_title', null, 'vi')) + ' · <span lang="en">' + T.esc(T.t('a.lang_title', null, 'en')) + '</span></h2>' +
+      '<p class="muted">' + both('a.lang_note') + '</p></div>',
+      [{ label: T.t('a.lang_vi', null, 'vi'), kind: def === 'en' ? 'ghost' : 'primary', value: 'vi' }, { label: T.t('a.lang_en', null, 'en'), kind: def === 'en' ? 'primary' : 'ghost', value: 'en' }])
+      .then(function (v) { return v === 'vi' || v === 'en' ? v : def; });
+  };
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-langsw]') : null;
+    if (!b) return;
+    // Đang gửi (đặt, huỷ, lưu, đăng ký) hoặc đang mở hộp thoại: không vẽ lại trang, tránh nút gửi bật lại và gửi 2 lần (soát 5H R01 đến R04).
+    if (T.inflight > 0) { T.toast(T.t('a.lang_wait')); return; }
+    if (document.querySelector('.sheet-backdrop')) return;
+    T.langTouched = true;
+    T.setLang(T.lang === 'vi' ? 'en' : 'vi', { save: true, rerender: true });
+  });
+  /** Câu báo lỗi của máy chủ theo ngôn ngữ đang chọn (máy chủ gửi cả hai thứ tiếng trong msg). */
+  T.m = function (x) { return x && x.msg && typeof x.msg === 'object' ? (x.msg[T.lang] || x.message || '') : (x && x.message) || ''; };
+
+  // ── Gọi server: luôn trả Promise với { ok, reason, message, data } ──
+  // Chunk 5F: tự thử lại khi Google từ chối lượt gọi (lỗi mạng, quá 30 lượt cùng lúc) hoặc máy chủ báo bận.
+  //   Lượt chỉ đọc: tối đa 4 lần. Lượt ghi có mã chống gửi trùng (rid): tối đa 3 lần, cùng một mã, nên không đặt hay huỷ 2 lần.
+  //   Lượt ghi khác: chỉ thử lại khi máy chủ báo bận (máy chủ báo bận nghĩa là chưa ghi gì).
+  //   Chờ tăng dần cộng ngẫu nhiên, để nhiều người cùng thử lại không dồn vào cùng một giây.
+  var READ_APIS = { apiPublicInfo: 1, apiStudentHome: 1, apiStudentSlots: 1, apiTutorHome: 1, apiTutorAvailability: 1, apiTutorStats: 1,
+    apiAdminHome: 1, apiAdminNotifications: 1, apiAdminPeople: 1, apiAdminPerson: 1, apiAdminBooking: 1, apiAdminSlots: 1, apiAdminLog: 1, apiAdminLessons: 1, apiAdminLogEntry: 1 };
+  var RID_APIS = { apiStudentBook: 1, apiStudentCancel: 1, apiTutorSetAvailability: 1, apiTutorSubmitResult: 1, apiTutorSubmitResults: 1,
+    apiAdminBook: 1, apiAdminCancel: 1, apiExchangeToken: 1, apiGoogleExchange: 1 };
+  T.retryDelays = window.__TP_RETRY_DELAYS || [600, 1200, 2400, 4800, 8000, 10000, 10000, 12000];   // test đặt 0 để khỏi chờ thật
+  T.retryJitter = window.__TP_RETRY_DELAYS ? 0 : 400;
+  T.rid = function () { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 8); };
+  function callOnce(name, args) {
+    return new Promise(function (resolve) {
+      try {
+        var runner = google.script.run
+          .withSuccessHandler(function (r) { if (r && r.msg) r.message = T.m(r); resolve(r || { ok: false, reason: 'SERVER_ERROR', message: T.t('a.no_response') }); })
+          .withFailureHandler(function () { resolve({ ok: false, reason: 'NETWORK', message: T.t('a.network_error') }); });
+        runner[name].apply(runner, args);
+      } catch (e) { resolve({ ok: false, reason: 'NETWORK', message: T.t('a.network_error') }); }
+    });
+  }
+  // Dải "đang thử lại" nằm yên tới khi xong (không phải toast tự tắt sau 3,8 giây; soát R2 T3).
+  var retryCount = 0;
+  T.retrying = function (d) {
+    retryCount = Math.max(0, retryCount + d);
+    var el = document.getElementById('tp-retry');
+    if (!el) { el = document.createElement('div'); el.id = 'tp-retry'; el.className = 'retrybar'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+    el.textContent = T.t('a.retrying'); el.hidden = !retryCount;
+  };
+  // Số lần phải thử lại và số lượt thất bại hẳn: gom, gửi một lần sau 30 giây (không thêm lượt gọi lúc đang đông).
+  var pendingReport = { retry: 0, fail: 0 }, reportTimer = null;
+  T.report = function (kind, n) {
+    pendingReport[kind] = (pendingReport[kind] || 0) + (n || 1);
+    if (reportTimer) return;
+    reportTimer = setTimeout(function () {
+      reportTimer = null;
+      Object.keys(pendingReport).forEach(function (k) { if (pendingReport[k]) { callOnce('apiClientReport', [k, Math.min(50, pendingReport[k])]); pendingReport[k] = 0; } });
+    }, 30000);
+  };
+  /** Số lượt ghi đang chờ máy chủ (không tính lượt đọc, báo số đo, lưu ngôn ngữ, thoát). */
+  T.inflight = 0;
+  /** Giữ trạng thái "đang gửi" cả trong lúc đọc ảnh trước khi gọi máy chủ. Trả hàm nhả (gọi nhiều lần cũng chỉ nhả một lần). */
+  T.hold = function () { T.inflight++; var done = false; return function () { if (!done) { done = true; T.inflight = Math.max(0, T.inflight - 1); } }; };
+  var QUIET_APIS = { apiSetLanguage: 1, apiClientReport: 1, apiLogout: 1 };
+  T.api = function (name) {
+    var write = !READ_APIS[name] && !QUIET_APIS[name];
+    if (write) T.inflight++;
+    return apiCall.apply(null, arguments).then(function (r) { if (write) T.inflight = Math.max(0, T.inflight - 1); return r; });
+  };
+  function apiCall(name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (RID_APIS[name]) args = args.concat([T.rid()]);
+    // Lượt ghi có mã: máy chủ báo IN_PROGRESS (lượt trước cùng mã còn chạy) hoặc mất mạng thì hỏi lại cùng mã tới khoảng 60 giây.
+    var netRetry = !!(READ_APIS[name] || RID_APIS[name]), max = READ_APIS[name] ? 4 : RID_APIS[name] ? 9 : 2, attempt = 0, noted = false, t0 = Date.now();
+    return new Promise(function (resolve) {
+      (function once() {
+        callOnce(name, args).then(function (r) {
+          var again = r && !r.ok && (r.reason === 'BUSY' || r.reason === 'IN_PROGRESS' || (r.reason === 'NETWORK' && netRetry));
+          if (RID_APIS[name] && again && r.reason === 'BUSY' && attempt >= 2) again = false;   // bận thật (chưa ghi gì): 3 lần là đủ
+          if (again && attempt < max - 1 && Date.now() - t0 < 60000) {
+            attempt++;
+            if (!noted) { noted = true; T.retrying(1); }
+            var d = T.retryDelays[attempt - 1]; setTimeout(once, (typeof d === 'number' ? d : 4800) + Math.floor(Math.random() * T.retryJitter));   /* 0 hợp lệ: không dùng || */
+            return;
+          }
+          if (noted) T.retrying(-1);
+          if (attempt) T.report('retry', attempt);
+          if (r && !r.ok && (r.reason === 'NETWORK' || r.reason === 'BUSY')) T.report('fail', 1);
+          // Lượt ghi mất mạng cả sau khi thử lại: không biết máy chủ đã lưu chưa. Trang gọi phải tải lại để hiện đúng sự thật.
+          // Lượt ghi có mã: trang gọi tải lại để hiện sự thật. Lượt ghi khác (đăng ký, hồ sơ): không tự tải lại, chỉ nói thật (soát R2 T3).
+          if (r && !r.ok && (r.reason === 'NETWORK' || r.reason === 'IN_PROGRESS') && RID_APIS[name]) { r.uncertain = true; r.message = T.t('a.write_unknown'); }
+          else if (r && !r.ok && r.reason === 'NETWORK' && !READ_APIS[name]) r.message = T.t('a.write_maybe');
+          resolve(r);
+        });
+      })();
+    });
+  }
+  /** Gọi API cần đăng nhập; phiên hết hạn thì đưa về trang đăng nhập. */
+  T.authed = function (name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return T.api.apply(null, [name, T.token()].concat(args)).then(function (r) {
+      if (!r.ok && r.reason === 'SESSION_INVALID') { T.session.clear(); T.toast(r.message || T.t('a.session_expired')); T.go('login'); throw new Error('SESSION'); }
+      // Chunk 5G: máy chủ báo bảo trì (CONFIG đổi sau khi mở trang): hiện thanh báo; đóng hẳn thì thay cả trang.
+      // Máy chủ gắn r.maint khi đang bảo trì; lượt thành công không có r.maint nghĩa là đã tắt: thanh báo tự tắt.
+      var cur = (T.boot.maint && T.boot.maint.mode) || 'OFF';
+      if (!r.ok && (r.reason === 'MAINT_READONLY' || r.reason === 'MAINT_CLOSED')) {
+        T.boot.maint = { mode: r.reason === 'MAINT_CLOSED' ? 'CLOSED' : 'READONLY', until: (r.maint && r.maint.until) || (T.boot.maint && T.boot.maint.until) || '' };
+        if (r.reason === 'MAINT_CLOSED') { T.maintScreen(r); throw new Error('MAINT'); }
+        T.maint(T.state.page);
+      } else if (r.ok && (r.maint ? r.maint.mode : 'OFF') !== cur) {
+        T.boot.maint = r.maint || { mode: 'OFF', until: '' };
+        T.maint(T.state.page);
+      }
+      return r;
+    });
+  };
+
+  // ── Tiện ích hiển thị ──
+  /** Link lấy từ CONFIG (Zalo, website, đăng nhập Google): chỉ nhận https, chặn javascript: và kiểu lạ. */
+  /** Màn hình rộng (máy tính): bố cục 2 cột, mở sẵn mọi ngày (chunk 5F). */
+  T.wide = function () { try { return window.matchMedia('(min-width: 900px)').matches; } catch (e) { return false; } };
+  T.safeUrl = function (u) { u = String(u || '').trim(); return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : ''; };
+  T.esc = function (s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  /**
+   * Ô chọn trình độ (h.levels): hiện theo ngôn ngữ đang chọn, giá trị luôn là bản tiếng Việt cùng vị trí (Sheets lưu một thứ tiếng).
+   * cur: giá trị đang lưu; không thuộc danh sách (admin gõ tay) thì vẫn có một lựa chọn giữ nguyên chữ đó (soát 5I B13).
+   */
+  T.levelOptions = function (cur) {
+    var vi = T.t('h.levels', null, 'vi').split('|'), shown = T.t('h.levels').split('|'), found = false, c = String(cur || '').trim();
+    var html = shown.map(function (v, i) { v = v.trim(); var val = (vi[i] || v).trim(); if (!v) return ''; var on = c && val === c; if (on) found = true; return '<option value="' + T.esc(val) + '"' + (on ? ' selected' : '') + '>' + T.esc(v) + '</option>'; }).join('');
+    return (c && !found ? '<option value="' + T.esc(c) + '" selected>' + T.esc(c) + '</option>' : (!c ? '<option value="" selected></option>' : '')) + html;
+  };
+  /** Tên gói theo ngôn ngữ đang chọn (PACKAGES.name_en, chunk 5I); chưa có tên tiếng Anh thì dùng tên tiếng Việt. */
+  T.pkgName = function (p) { return p ? (T.lang === 'en' && p.nameEn ? p.nameEn : p.name) : ''; };
+  T.money = function (n) { return Number(n || 0).toLocaleString('vi-VN') + 'đ'; };
+  T.$ = function (sel, root) { return (root || document).querySelector(sel); };
+  T.$$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+  T.root = function () { return document.getElementById('app'); };
+  T.skeleton = function (n) { var h = ''; for (var i = 0; i < (n || 3); i++) h += '<div class="skeleton"></div>'; return '<div class="stack">' + h + '</div>'; };
+  T.ddmm = function (key) { var p = String(key || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] : key; };
+  T.ddmmyyyy = function (key) { var p = String(key || '').split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : key; };
+  /** Tên thứ của ngày yyyy-mm-dd theo ngôn ngữ đang chọn (a.dow, a.dow_short). Tính theo lịch, không theo múi giờ máy. */
+  T.dow = function (key, short, lang) {
+    var p = String(key || '').split('-'); if (p.length !== 3) return '';
+    var i = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]))).getUTCDay();
+    return (T.t(short ? 'a.dow_short' : 'a.dow', null, lang).split('|')[i] || '').trim();
+  };
+  /** Nhãn ngày "Thứ 4 14/10" hoặc "Wed 14/10". */
+  T.day = function (key, short, lang) { var d = T.dow(key, short, lang); return (d ? d + ' ' : '') + T.ddmm(key); };
+
+  var toastTimer = null;
+  T.toast = function (msg) {
+    var el = document.getElementById('tp-toast');
+    if (!el) { el = document.createElement('div'); el.id = 'tp-toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+    el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 3800);
+  };
+
+  /** Hộp thoại dưới đáy màn hình. buttons: [{ label, kind, value }]. Trả Promise với value nút được bấm. */
+  T.sheet = function (html, buttons) {
+    return new Promise(function (resolve) {
+      var bd = document.createElement('div'); bd.className = 'sheet-backdrop';
+      var btns = (buttons || [{ label: T.t('a.close'), kind: 'primary', value: true }]).map(function (b, i) {
+        return '<button type="button" class="btn btn-' + (b.kind || 'ghost') + ' btn-block" data-i="' + i + '">' + T.esc(b.label) + '</button>';
+      }).join('');
+      bd.innerHTML = '<div class="sheet" role="dialog" aria-modal="true">' + html + '<div class="stack">' + btns + '</div></div>';
+      document.body.appendChild(bd);
+      // Vòng 2 N6: hộp có tên (tiêu đề đầu tiên) cho trình đọc màn hình; phím Tab chỉ đi trong hộp.
+      var dlg = bd.querySelector('.sheet'), ttl = dlg.querySelector('h1, h2, h3');
+      if (ttl) { ttl.id = ttl.id || 'tp-sheet-title'; dlg.setAttribute('aria-labelledby', ttl.id); }
+      // Soát 5I B15: đóng hộp thì trả chỗ đứng bàn phím về nút đã mở hộp (nếu nút còn trên trang); phím Esc đóng hộp.
+      var opener = document.activeElement, done = false;
+      var onKey = function (e) {
+        if (e.key === 'Escape' || e.key === 'Esc') { close(null); return; }
+        if (e.key !== 'Tab') return;
+        var f = Array.prototype.slice.call(dlg.querySelectorAll('button, a[href], input, select, textarea')).filter(function (x) { return !x.disabled; });
+        if (!f.length) return;
+        var i = f.indexOf(document.activeElement);
+        if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+      };
+      var close = function (v) {
+        if (done) return; done = true;
+        document.removeEventListener('keydown', onKey); bd.remove(); resolve(v);
+        try { if (opener && opener.focus && document.body.contains(opener)) opener.focus(); } catch (e) { }
+      };
+      document.addEventListener('keydown', onKey);
+      bd.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-i]');
+        if (b) close((buttons || [{ value: true }])[Number(b.getAttribute('data-i'))].value);
+        else if (e.target === bd) close(null);
+      });
+      var first = bd.querySelector('button'); if (first) first.focus();
+    });
+  };
+
+  /** Nút liên hệ admin (Zalo, gọi). Số điện thoại luôn hiện thành chữ để chép được nếu link không mở. */
+  /** Liên hệ admin: chỉ Zalo và website (không có nút gọi điện, chunk 5A). */
+  T.contact = function (c) {
+    if (!c || (!c.zalo && !c.site)) return '';
+    var zalo = T.safeUrl(c.zalo), site = T.safeUrl(c.site);
+    if (!zalo && !site) return '';
+    return '<div class="contact">' +
+      (zalo ? '<a class="btn btn-ghost zalo" href="' + T.esc(zalo) + '" target="_blank" rel="noopener">' + T.t('a.zalo') + '</a>' : '') +
+      (site ? '<a class="btn btn-ghost" href="' + T.esc(site) + '" target="_blank" rel="noopener">' + T.t('a.website') + '</a>' : '') + '</div>';
+  };
+
+  /** 5K (BL06): gói giá 0 không chọn được trên web; hiện thẻ gói kèm nút Zalo admin. */
+  T.pkgContact = function (p) {
+    var zalo = T.safeUrl(T.boot.zalo);
+    return '<div class="pkg pkg-contact"><span><b>' + T.esc(T.pkgName(p)) + '</b><br><span class="meta">' + T.t('a.pkg_contact_note') + '</span></span>' +
+      (zalo ? '<a class="btn btn-ghost zalo" href="' + T.esc(zalo) + '" target="_blank" rel="noopener">' + T.t('a.pkg_contact_btn') + '</a>' : '<span class="price">' + T.t('a.price_contact') + '</span>') + '</div>';
+  };
+
+  /** 5K: số điện thoại tự do (không cần định dạng, không bắt buộc), như server (Phone.gs). Trả chuỗi đã gọn, trống trả null. */
+  T.phone = function (input) {
+    var s = String(input || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return s && s.length <= 40 ? s : null;   // quá 40 ký tự: báo ngay (server cắt còn 40 nếu lọt qua)
+  };
+
+  /** Đọc ảnh chụp chuyển khoản, thu nhỏ còn cạnh dài 1600px để gửi nhanh. PDF và ảnh không đọc được thì gửi nguyên. */
+  T.readUpload = function (file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return reject(new Error(T.t('a.file_none')));
+      if (file.size > 12 * 1024 * 1024) return reject(new Error(T.t('a.file_big')));
+      var fr = new FileReader();
+      fr.onerror = function () { reject(new Error(T.t('a.file_read'))); };
+      fr.onload = function () {
+        var dataUrl = String(fr.result), raw = { name: file.name, mimeType: file.type || 'application/octet-stream', base64: dataUrl.split(',')[1] };
+        if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) return resolve(raw);
+        var img = new Image(), done = false;
+        // Dự phòng: trình duyệt không báo onload/onerror trong 8 giây thì gửi file gốc, không treo nút Gửi.
+        var guard = setTimeout(function () { if (!done) { done = true; resolve(raw); } }, 8000);
+        img.onload = function () {
+          if (done) return; done = true; clearTimeout(guard);
+          try {
+            var scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+            var c = document.createElement('canvas'); c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+            c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+            var out = c.toDataURL('image/jpeg', 0.82);
+            resolve({ name: file.name.replace(/\.[^.]+$/, '') + '.jpg', mimeType: 'image/jpeg', base64: out.split(',')[1] });
+          } catch (e) { resolve(raw); }
+        };
+        img.onerror = function () { if (!done) { done = true; clearTimeout(guard); resolve(raw); } };
+        img.src = dataUrl;
+      };
+      fr.readAsDataURL(file);
+    });
+  };
+
+  // ── Router ──
+  // Chunk 5I: trang quản trị song ngữ như mọi trang (bỏ việc ép tiếng Việt của 5H).
+  T.go = function (page, opts) {
+    T.state.page = page; T.state.opts = opts || {};
+    try { document.body.setAttribute('data-page', page); } catch (e) { }
+    window.scrollTo(0, 0);
+    var v = T.views[page] || T.views.home;
+    v.render(T.root(), opts || {});
+    T.fab(page);
+    T.maint(page);
+  };
+
+  /** Thanh báo bảo trì (chunk 5G) trên mọi trang trừ admin: CONFIG MAINTENANCE_MODE READONLY hoặc CLOSED. Theo ngôn ngữ đang chọn. */
+  T.maint = function (page) {
+    var m = T.boot.maint || {}, el = document.getElementById('tp-maint');
+    if (!m.mode || m.mode === 'OFF' || page === 'admin') { if (el) el.hidden = true; document.body.classList.remove('has-maint'); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'tp-maint'; el.className = 'maintbar'; el.setAttribute('role', 'status'); document.body.insertBefore(el, document.body.firstChild); }
+    var k = m.mode === 'CLOSED' ? 'a.maint_closed' : 'a.maint_readonly', v = { until: m.until ? ' (' + m.until + ')' : '' };
+    var mv = T.safeUrl(m.movedTo || '');   // 5L: hệ thống đã chuyển: chỉ báo link mới
+    if (mv) el.innerHTML = T.esc(T.t('a.moved')) + ' <a href="' + T.esc(mv) + '">' + T.esc(mv) + '</a>'; else el.textContent = T.t(k, v);
+    el.hidden = false; document.body.classList.add('has-maint');
+  };
+  /** Cổng đóng vì bảo trì: một trang báo, nút Zalo, nút đăng xuất. */
+  T.maintScreen = function (res) {
+    T.state.maintRes = res;
+    var msg = res && typeof res === 'object' ? T.m(res) : res;
+    var page = T.state.page, tutor = page === 'tutor';
+    // Bố cục một cột như trang chủ (không chừa chỗ thanh tab bên trái trên máy tính, nút Zalo không nâng lên trên thanh tab).
+    try { document.body.setAttribute('data-page', 'maint'); } catch (e) { }
+    T.fab('maint');
+    T.root().innerHTML = T.topbar('<button class="btn btn-ghost btn-sm" type="button" id="logout">' + T.t(tutor ? 't.logout' : 's.logout_full') + '</button>') +
+      '<main class="stack-lg" id="maint-screen"><h1>' + T.t('a.maint_title') + '</h1><div class="alert warn">' + T.esc(msg || '') + '</div>' +
+      (T.safeUrl((T.boot.maint || {}).movedTo || '') ? '<div class="alert">' + T.esc(T.t('a.moved')) + ' <a id="moved-link" href="' + T.esc(T.boot.maint.movedTo) + '">' + T.esc(T.boot.maint.movedTo) + '</a></div>' : '') +
+      T.contact({ zalo: T.boot.zalo }) + '</main>';
+    var b = document.getElementById('logout'); if (b) b.onclick = T.logout;
+    T.maint(page);
+  };
+
+  /** Nút Zalo nổi ở góc dưới phải mọi trang (khi CONFIG có ADMIN_ZALO_URL). Nằm trên thanh tab ở cổng học viên và tutor. */
+  T.fab = function (page) {
+    var el = document.getElementById('tp-fab');
+    var zalo = T.safeUrl(T.boot.zalo);
+    if (!zalo || page === 'admin') { if (el) el.hidden = true; return; }   // admin không cần nút nhắn admin
+    if (!el) { el = document.createElement('a'); el.id = 'tp-fab'; el.className = 'fab-zalo'; el.target = '_blank'; el.rel = 'noopener'; document.body.appendChild(el); }
+    el.hidden = false; el.href = zalo; el.textContent = T.t('a.zalo_fab');
+    el.setAttribute('aria-label', T.t('a.zalo'));
+    el.classList.toggle('above-tabs', page === 'student' || page === 'tutor');
+  };
+
+  T.topbar = function (right) {
+    // Bấm logo về trang chủ (vẫn giữ đăng nhập; trang chủ có nút "Vào lịch của tôi").
+    return '<header class="topbar"><button type="button" class="brand" onclick="T.go(\'home\')" aria-label="' + T.esc(T.t('a.home_aria')) + '"><span class="mark" aria-hidden="true">พ</span><span>thaiput</span></button>' +
+      '<div class="row topbar-right">' + T.langSwitch() + (right || '') + '</div></header>';
+  };
+
+  T.logout = function () {
+    var tok = T.token();
+    var pending = T.flushLang();   // lựa chọn ngôn ngữ vừa bấm tới máy chủ trước khi phiên bị huỷ
+    T.session.clear();
+    if (tok) pending.then(function () { T.api('apiLogout', tok); });
+    T.go('login');
+  };
+
+  T.portalOf = function (role) { return role === 'TUTOR' ? 'tutor' : role === 'ADMIN' ? 'admin' : 'student'; };
+  /** Chuỗi trình duyệt gửi lên khi đăng nhập, để máy chủ ghi tên thiết bị (Chrome · Windows) vào nhật ký và trang quản trị. */
+  T.device = function () { try { return String(navigator.userAgent || '').substring(0, 400); } catch (e) { return ''; } };
+  /** Bỏ mã link khỏi địa chỉ trang sau khi đăng nhập, để làm mới trang không đổi mã lần nữa (google.script.history của Apps Script). */
+  T.cleanUrl = function (role) {
+    try { if (window.google && google.script && google.script.history) google.script.history.replace(null, { page: T.portalOf(role) }, ''); } catch (e) { }
+  };
+
+  T.start = function () {
+    var page = T.boot.page || 'home', s = T.session.get();
+    // Ngôn ngữ ban đầu: lựa chọn đã lưu trên máy, rồi ngôn ngữ của phiên, rồi mặc định theo vai trò.
+    T.setLang(T.storedLang() || (s && s.lang) || T.defaultLang(s && s.role), { local: true });
+    if (page === 'auth' && T.boot.linkToken) return T.go('auth', { linkToken: T.boot.linkToken });
+    if (page === 'gauth') return T.go('gauth');
+    if ((page === 'student' || page === 'tutor' || page === 'admin' || page === 'login') && s && s.token) return T.go(T.portalOf(s.role));
+    if ((page === 'student' || page === 'tutor' || page === 'admin' || page === 'renew') && !(s && s.token)) return T.go('login');
+    if (page === 'renew') return T.go('student', { tab: 'account', renew: true });
+    T.go(T.views[page] ? page : 'home');
+  };
+})();
+</script>

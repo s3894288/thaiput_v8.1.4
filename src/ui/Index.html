@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light only">
+  <title>thaiput · Đặt lịch luyện nói · Speaking lessons</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans+Thai:wght@600&family=Noto+Sans+Thai+Looped:wght@600&display=swap">
+  <?!= include_('ui/Styles'); ?>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // Giá trị do doGet (Api.gs, bootJson_) truyền vào: trang cần mở, token link đăng nhập (nếu có), phiên bản.
+    var BOOT = <?!= bootJson ?>;
+  </script>
+  <?!= include_('ui/App'); ?>
+  <?!= include_('ui/Home'); ?>
+  <?!= include_('ui/Login'); ?>
+  <?!= include_('ui/Student'); ?>
+  <?!= include_('ui/Tutor'); ?>
+  <?!= include_('ui/Admin'); ?>
+  <script>T.start();</script>
+</body>
+</html>

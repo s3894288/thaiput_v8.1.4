@@ -1,0 +1,152 @@
+<script>
+/** Home.html · Trang chủ và form đăng ký (câu 33, 39, 40, 50) */
+(function () {
+  var T = window.T;
+
+  function pkgMeta(p) {
+    if (p.code === 'TRIAL') return T.t('h.pkg_trial', { n: p.sessions, d: p.days });
+    if (p.type === 'DAYS') return T.t('h.pkg_days', { d: p.days });
+    return p.sessions ? T.t('h.pkg_sessions', { n: p.sessions }) : '';
+  }
+
+  function topBtn(s) {
+    return s && s.token
+      ? '<button class="btn btn-ghost btn-sm" type="button" id="go-portal">' + T.t('h.btn_portal') + '</button>'
+      : '<button class="btn btn-ghost btn-sm" type="button" id="go-login">' + T.t('h.btn_login') + '</button>';
+  }
+
+  /** Trình độ: hiện theo ngôn ngữ đang chọn, giá trị gửi lên luôn là bản tiếng Việt cùng vị trí (Sheets lưu một thứ tiếng). */
+  function levelOptions() {
+    var vi = T.t('h.levels', null, 'vi').split('|');
+    return T.t('h.levels').split('|').map(function (v, i) { v = v.trim(); var val = (vi[i] || v).trim(); return v ? '<option value="' + T.esc(val) + '">' + T.esc(v) + '</option>' : ''; }).join('');
+  }
+  var chosenFile = null;   // ảnh chuyển khoản đã chọn; giữ lại khi đổi ngôn ngữ (ô chọn file không đặt lại được bằng code)
+
+  T.views.home = {
+    render: function (root) {
+      var s = T.session.get();
+      chosenFile = null;
+      root.innerHTML = T.topbar(topBtn(s)) + T.skeleton(4);
+      // Nút Đăng nhập, Vào cổng bấm được ngay cả khi trang chủ còn đang tải (soát 20/10).
+      var gl0 = T.$('#go-login', root); if (gl0) gl0.onclick = function () { T.go('login'); };
+      var gp0 = T.$('#go-portal', root); if (gp0) gp0.onclick = function () { var s2 = T.session.get(); T.go(s2 && s2.role === 'TUTOR' ? 'tutor' : 'student'); };
+      T.api('apiPublicInfo').then(function (r) {
+        if (T.state.page !== 'home') return;   // đã sang trang khác (bấm Đăng nhập) trước khi có kết quả: không vẽ đè (soát 20/10)
+        if (!r.ok) { root.innerHTML = T.topbar() + '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
+        T.state.info = r.data;
+        draw(root, r.data, s);
+      });
+    },
+    /** Đổi ngôn ngữ: vẽ lại bằng dữ liệu đã có, giữ chữ đã nhập trong form. */
+    relabel: function (root) {
+      if (!T.state.info || !T.$('#reg', root)) return T.views.home.render(root);
+      var keep = {}, ids = ['f-name', 'f-email', 'f-phone'];
+      ids.forEach(function (id) { var el = T.$('#' + id, root); if (el) keep[id] = el.value; });
+      var lv = T.$('#f-level', root), pk = T.$('input[name=pkg]:checked', root), cs = T.$('#f-consent', root);
+      var lvIdx = lv ? lv.selectedIndex : 0, pkVal = pk ? pk.value : '', csOn = cs ? cs.checked : false;
+      draw(root, T.state.info, T.session.get());
+      ids.forEach(function (id) { var el = T.$('#' + id, root); if (el && keep[id]) el.value = keep[id]; });
+      if (T.$('#f-level', root)) T.$('#f-level', root).selectedIndex = Math.max(0, lvIdx);
+      var p2 = pkVal && T.$('#pkg-' + pkVal, root); if (p2) { p2.checked = true; T.$$('.pkg', root).forEach(function (l) { l.classList.toggle('on', l.contains(p2)); }); }
+      if (T.$('#f-consent', root)) T.$('#f-consent', root).checked = csOn;
+      if (chosenFile) { T.$('#f-file-label', root).textContent = T.t('a.file_chosen', { name: chosenFile.name }); T.$('#f-file-box', root).classList.add('has'); }
+      var ph = T.$('#f-phone', root); if (ph && ph.value) ph.oninput();
+    }
+  };
+
+  function draw(root, info, s) {
+    // 5K (BL06): gói giá 0 không chọn được, chỉ có nút Zalo admin.
+    var paid = info.packages.filter(function (p) { return p.price > 0; }), contact = info.packages.filter(function (p) { return !(p.price > 0); });
+    var pk = paid.map(function (p, i) {
+      return '<label class="pkg' + (i === 0 ? ' on' : '') + '" for="pkg-' + p.code + '"><span class="row" style="flex-wrap:nowrap;gap:12px">' +
+        '<input type="radio" name="pkg" id="pkg-' + p.code + '" value="' + T.esc(p.code) + '"' + (i === 0 ? ' checked' : '') + '>' +
+        '<span><b>' + T.esc(T.pkgName(p)) + '</b><br><span class="meta">' + T.esc(pkgMeta(p)) + '</span></span></span>' +
+        '<span class="price">' + T.money(p.price) + '</span></label>';
+    }).join('') + contact.map(T.pkgContact).join('') + (paid.length ? '' : '<div class="alert warn">' + T.t('a.pkg_none') + '</div>');
+    var bank = info.bank && info.bank.account
+      ? '<div class="panel stack"><span class="eyebrow">' + T.t('h.bank_title') + '</span><div class="mono">' + T.esc(info.bank.name) + ' · ' + T.esc(info.bank.account) + '<br>' + T.esc(info.bank.holder) + '</div>' +
+        '<small>' + T.t('h.bank_note') + '</small></div>'
+      : '';
+    root.innerHTML = T.topbar(topBtn(s)) +
+      '<main class="stack-lg">' +
+      '<section class="hero"><span class="th-word" lang="th">' + T.t('h.hero_th') + '</span><h1>' + T.t('h.hero_title') + '</h1>' +
+      '<p class="muted">' + T.t('h.hero_sub') + '</p></section>' +
+      '<div class="facts"><div><b>' + T.t('h.fact1_big') + '</b><span>' + T.t('h.fact1') + '</span></div><div><b>' + T.t('h.fact2_big') + '</b><span>' + T.t('h.fact2') + '</span></div>' + (info.bookingLeadHours >= 0 ? '<div><b>' + (info.bookingLeadHours ? info.bookingLeadHours + 'h' : T.t('h.fact3_lead_zero')) + '</b><span>' + T.t('h.fact3_lead') + '</span></div>' : '<div><b>15:00</b><span>' + T.t('h.fact3_deadline') + '</span></div>') + '</div>' +
+      '<form id="reg" class="card stack" novalidate>' +
+      '<h2>' + T.t('h.form_title') + '</h2>' +
+      '<div class="pkg-list" role="radiogroup" aria-label="' + T.esc(T.t('h.pkg_aria')) + '">' + pk + '</div>' +
+      '<label class="field" for="f-name">' + T.t('h.f_name') + '<input type="text" id="f-name" autocomplete="name" required></label>' +
+      '<label class="field" for="f-email">' + T.t('h.f_email') + '<input type="email" id="f-email" autocomplete="email" inputmode="email" required><span class="hint">' + T.t('h.f_email_hint') + '</span></label>' +
+      '<label class="field" for="f-phone">' + T.t('h.f_phone') + '<input type="text" id="f-phone" autocomplete="tel" inputmode="text" placeholder="' + T.esc(T.t('h.f_phone_ph')) + '"><span class="hint" id="f-phone-hint">' + T.t('h.f_phone_hint') + '</span></label>' +
+      '<label class="field" for="f-level">' + T.t('h.f_level') + '<select id="f-level">' + levelOptions() + '</select></label>' +
+      bank +
+      '<label class="file" id="f-file-box" for="f-file"><input type="file" id="f-file" accept="image/*,application/pdf"><span id="f-file-label">' + T.t('a.file_label') + '</span></label>' +
+      '<label class="check" for="f-consent"><input type="checkbox" id="f-consent"><span>' + T.t('h.f_consent') + '' +
+      (T.safeUrl(info.policyUrl) ? ' (<a href="' + T.esc(T.safeUrl(info.policyUrl)) + '" target="_blank" rel="noopener">' + T.t('h.f_policy') + '</a>)' : '') + '.</span></label>' +
+      '<div class="hp" aria-hidden="true"><label for="f-website">Website</label><input type="text" id="f-website" tabindex="-1" autocomplete="off"></div>' +
+      '<div id="reg-msg" hidden></div>' +
+      '<button type="submit" class="btn btn-primary btn-block" id="reg-submit">' + T.t('h.f_submit') + '</button>' +
+      '</form>' +
+      '<section class="stack"><h3>' + T.t('h.help') + '</h3>' + T.contact(info.contact) + '</section>' +
+      '</main>';
+    bind(root);
+    // Chunk 5G (soát R2 T13): đang bảo trì thì báo ngay trên form và khoá nút Gửi, không để khách điền rồi mới biết.
+    var mm = T.boot.maint || {};
+    if (mm.mode && mm.mode !== 'OFF') {
+      showMsg(root, 'warn', T.esc(T.t(mm.mode === 'CLOSED' ? 'a.maint_closed' : 'a.maint_readonly', { until: mm.until ? ' (' + mm.until + ')' : '' })));
+      T.$('#reg-submit', root).disabled = true;
+    }
+  }
+
+  function bind(root) {
+    var gl = T.$('#go-login', root); if (gl) gl.onclick = function () { T.go('login'); };
+    var gp = T.$('#go-portal', root); if (gp) gp.onclick = function () { var s = T.session.get(); T.go(s && s.role === 'TUTOR' ? 'tutor' : 'student'); };
+    T.$$('.pkg input', root).forEach(function (r) { r.onchange = function () { T.$$('.pkg', root).forEach(function (l) { l.classList.toggle('on', l.contains(T.$('input:checked', l))); }); }; });
+    var phone = T.$('#f-phone', root), hint = T.$('#f-phone-hint', root);
+    phone.oninput = function () {
+      var ok = !phone.value || T.phone(phone.value);
+      phone.classList.toggle('invalid', !ok);
+      hint.className = 'hint' + (ok ? '' : ' bad');
+      hint.innerHTML = ok ? T.t('h.f_phone_hint') : T.t('h.f_phone_bad');
+    };
+    var file = T.$('#f-file', root);
+    file.onchange = function () {
+      var f = file.files[0];
+      chosenFile = f || null;
+      T.$('#f-file-label', root).textContent = f ? T.t('a.file_chosen', { name: f.name }) : T.t('a.file_label');
+      T.$('#f-file-box', root).classList.toggle('has', !!f);
+    };
+    T.$('#reg', root).onsubmit = function (e) { e.preventDefault(); submit(root); };
+  }
+
+  function showMsg(root, kind, html) { var m = T.$('#reg-msg', root); m.className = 'alert ' + kind; m.innerHTML = html; m.hidden = false; }
+
+  function submit(root) {
+    var errs = [];
+    var name = T.$('#f-name', root).value.trim(), email = T.$('#f-email', root).value.trim(), phoneRaw = T.$('#f-phone', root).value;
+    if (!name) errs.push(T.t('h.err_name'));
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errs.push(T.t('a.err_email'));
+    if (phoneRaw.trim() && !T.phone(phoneRaw)) errs.push(T.t('a.err_phone'));
+    var f = T.$('#f-file', root).files[0] || chosenFile;
+    if (!f) errs.push(T.t('a.err_file'));
+    if (!T.$('#f-consent', root).checked) errs.push(T.t('h.err_consent'));
+    if (!T.$('input[name=pkg]:checked', root)) errs.push(T.t('a.pkg_none'));
+    if (errs.length) return showMsg(root, 'bad', errs.map(T.esc).join('<br>'));
+    var btn = T.$('#reg-submit', root); btn.disabled = true; btn.textContent = T.t('a.sending');
+    var release = T.hold();
+    T.readUpload(f).then(function (shot) {
+      return T.api('apiSubmitRegistration', {
+        name: name, email: email, phone: phoneRaw, level_self: T.$('#f-level', root).value,
+        package_code: T.$('input[name=pkg]:checked', root).value, consent: true, screenshot: shot, website: T.$('#f-website', root).value
+      });
+    }).then(function (r) {
+      btn.disabled = false; btn.textContent = T.t('h.f_submit');
+      if (!r.ok) return showMsg(root, 'bad', T.esc(r.message || T.t('a.err_send')));
+      T.sheet('<h2>' + T.t('h.done_title') + '</h2><p>' + T.t('h.done_code') + '</p><p class="mono" style="font-size:1.2rem;font-weight:600">' + T.esc(r.data.transferCode) + '</p>' +
+        '<p class="muted">' + T.t('h.done_note', { email: T.esc(email) }) + '</p>');
+      T.$('#reg', root).reset(); chosenFile = null;
+      T.$('#f-file-label', root).textContent = T.t('a.file_label'); T.$('#f-file-box', root).classList.remove('has');
+    }).catch(function (e) { btn.disabled = false; btn.textContent = T.t('h.f_submit'); showMsg(root, 'bad', T.esc(e.message)); }).then(release, release);
+  }
+})();
+</script>

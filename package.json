@@ -1,0 +1,23 @@
+{
+  "name": "thaiput-v8",
+  "version": "8.1.4",
+  "private": true,
+  "description": "Thaiput v8: Apps Script + Google Sheets + web portal đặt lịch học nói 1:1",
+  "scripts": {
+    "test": "TZ=Asia/Ho_Chi_Minh node test/harness.js",
+    "unit": "TZ=Asia/Ho_Chi_Minh node test/unit.js",
+    "integration": "TZ=Asia/Ho_Chi_Minh node test/integration.js",
+    "ui": "TZ=Asia/Ho_Chi_Minh node test/ui.js",
+    "build": "node test/build_dist.js",
+    "build:prod": "node test/build_dist.js --production",
+    "clasp:login": "npx @google/clasp@2.4.2 login",
+    "clasp:push": "npx @google/clasp@2.4.2 push",
+    "clasp:status": "npx @google/clasp@2.4.2 status"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
