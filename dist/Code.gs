@@ -1,5 +1,5 @@
 /**
- * THAIPUT v8.1.4 · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)
+ * THAIPUT v8.1.5 · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)
  * Gộp từ 38 file trong src/: Config.gs, Schema.gs, Time.gs, Admin.gs, AdminApi.gs, AdminOps.gs, Api.gs, Archive.gs, Assign.gs, Auth.gs, Availability.gs, Backup.gs, Booking.gs, CalendarQueue.gs, CalendarSync.gs, Compensation.gs, Content.gs, Db.gs, EmailTemplates.gs, Jobs.gs, LoadTest.gs, Log.gs, MailTransport.gs, Maintenance.gs, Marketing.gs, Metrics.gs, Notifications.gs, Notify.gs, Packages.gs, Phone.gs, Registration.gs, Release.gs, Report.gs, Reset.gs, Sessions.gs, Setup.gs, SystemMove.gs, TutorLock.gs
  * Không sửa file này: sửa src/ rồi chạy node test/build_dist.js. Hướng dẫn cập nhật: HUONG_DAN_PHAT_HANH.md.
  * Gửi email cố định từ 8.1.4 (MailTransport.gs, GmailApp): KHÔNG cần file MailFix, KHÔNG tìm và thay. Có file MailFix.gs cũ thì xoá.
@@ -21,7 +21,7 @@
  */
 
 var APP = {
-  VERSION: '8.1.4',
+  VERSION: '8.1.5',
   NAME: 'thaiput',
   TIMEZONE: 'Asia/Ho_Chi_Minh'
 };

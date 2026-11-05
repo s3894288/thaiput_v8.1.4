@@ -14,7 +14,7 @@
  */
 
 var APP = {
-  VERSION: '8.1.4',
+  VERSION: '8.1.5',
   NAME: 'thaiput',
   TIMEZONE: 'Asia/Ho_Chi_Minh'
 };
