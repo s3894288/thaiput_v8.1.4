@@ -2,6 +2,8 @@
 
 *Lập 05/11/2026, bám `plan/KE_HOACH_SAU_GO_LIVE.md` (anh đã duyệt 01/11, BL12). File này không thay file đó: nó chi tiết hoá từng sprint, thêm một bước làm NGAY trong v8 (email bên thứ ba) và liệt kê từng điểm nghẽn của Apps Script cùng cách gỡ. Mọi mục cần anh chốt ghi ở mục 12 và BACKLOG BL70 đến BL78. Giá và hạn mức kiểm tháng 10 và 11/2026, phải kiểm lại khi bắt đầu từng sprint.*
 
+> **Bản 2 (05/11/2026 chiều): `KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` sửa 3 chỗ trả đắt của file này** (hosting Cloudflare Workers thay Vercel, email Amazon SES thay Resend ngay từ 5R, bỏ Google AI Pro dùng Gemini CLI miễn phí: hạ tầng 65 → 35 USD mỗi tháng) **và thêm kế hoạch tổng P0 đến P5, điều phối Claude, Codex, Gemini.** Mục 2, 3, 10 và BL70 của file này đọc theo bản 2; phần còn lại giữ nguyên.
+
 ## Thay đổi so với bản 01/11 (`KE_HOACH_SAU_GO_LIVE.md`)
 
 * Thêm **bước 0 làm ngay trong v8, trước v9:** gửi email qua dịch vụ bên thứ ba (Resend) để có hơn 1.500 thư mỗi ngày mà không phải chờ Workspace qua 60 ngày trả phí. Đây là sub chunk 5R (bản 8.1.5), đi qua đúng chỗ `MailTransport.gs` đã chừa (BL31, luật 19).

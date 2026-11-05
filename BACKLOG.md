@@ -1,6 +1,10 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 05/11/2026 (lần 9). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 05/11/2026 chiều (lần 10). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 05/11 lần 9
+
+* Thêm BL79 đến BL84 theo bản 2 kế hoạch v9 (`plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md`): mức hạ tầng, SES thay Resend (thay đề xuất BL70), bỏ Google AI Pro, Max 2 tháng, tách Worker jobs, làm P0 trong tháng 11.
 
 ## Thay đổi so với bản 02/11 lần 8
 
@@ -48,6 +52,12 @@
 
 | Mã | Câu hỏi | Đề xuất | Chặn |
 |---|---|---|---|
+| BL79 | Mức hạ tầng v9: (a) Pro gọn 35 USD mỗi tháng (Cloudflare Workers 5 + Supabase Pro 25 + SES 5); (b) An toàn 65 USD (Vercel Pro mỗi ghế + Supabase Pro + Resend Pro); (c) Tột cùng 10 USD (Workers + D1 + SES, tự viết đăng nhập) | (a), thử nghiệm S0 đỏ thì web về Vercel | v9 S0 |
+| BL80 | Email: (a) Amazon SES ngay từ 5R (0,10 USD mỗi 1.000 thư, một lần cài, dùng tới hết v9; thay đề xuất Resend ở BL70); (b) Resend Pro 20 USD ở 5R rồi đổi SES ở v9. Kèm: thêm `REMINDER_MODE` giảm khoảng 40% thư ở v9 | (a); `REMINDER_MODE` làm ở v9 | 5R |
+| BL81 | Công cụ AI: (a) bỏ Google AI Pro, dùng Gemini CLI miễn phí 1.000 lượt mỗi ngày cho vai đọc dài và viết chữ; (b) giữ AI Pro | (a) trừ khi anh dùng AI Pro cho việc khác | v9 S0 |
+| BL82 | Nâng Claude Max 5x chỉ trong 2 tháng nặng nhất của v9 (P2, P3), khoảng +160 USD một lần | Có | v9 P2 |
+| BL83 | Tách Worker "jobs" (Hono, TypeScript thuần: cron, outbox, webhook SES) khỏi Worker "web" (Next.js qua vinext hoặc OpenNext) | Có | v9 S0 |
+| BL84 | Làm P0 ngay trong tháng 11 xen kẽ chunk 6, 7: lấy lại `test/unit.js`, `.gitignore`, GitHub Actions, `AGENTS.md` dùng chung, 5R email | Có | P0 |
 | BL70 | Dịch vụ email bên thứ ba cho bước 0 (5R, trước v9) để có hơn 1.500 thư mỗi ngày không chờ Workspace qua 60 ngày: (a) Resend Pro 20 USD, 50.000 thư mỗi tháng, không trần ngày; (b) Postmark; (c) Amazon SES | (a) | 5R |
 | BL71 | Làm 5R khi nào: (a) ngay sau 5N, 5O, trước chunk 6 để go live đã có hạn mức rộng; (b) sau chunk 7 | (a) | 5R |
 | BL72 | Đăng nhập v9: (a) Supabase Auth (link email hạn chung, ví dụ 15 phút; Google cho admin), bỏ hạn link theo vai trò của luật 36; (b) giữ bảng link tự viết như v8 | (a) | v9 S4 |
