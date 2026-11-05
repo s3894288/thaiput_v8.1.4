@@ -234,7 +234,7 @@ function renderBody_(text, vars, lang) {
 function emailWrapBi_(titleVi, htmlVi, titleEn, htmlEn, enFirst) {
   var first = enFirst && htmlEn ? [titleEn, htmlEn, titleVi, htmlVi, 'Tiếng Việt'] : [titleVi, htmlVi, titleEn, htmlEn, 'English'];
   var second = first[3] ? '<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #d6d6d1">' +
-    '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">' + first[4] + '</div>' +
+    '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#63635d;margin-bottom:8px">' + first[4] + '</div>' +
     '<h2 style="margin:0 0 14px;font-size:19px;color:#141414">' + esc_(first[2]) + '</h2>' + first[3] + '</div>' : '';
   return emailWrap_(first[0], first[1] + second, 'bi');
 }

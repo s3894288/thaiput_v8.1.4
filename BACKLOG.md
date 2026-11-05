@@ -1,6 +1,11 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 05/11/2026 (lần 9). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 05/11/2026 tối (lần 10). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 05/11 lần 9
+
+* 5O xong cả khung email (bản 8.1.6): BL09 phần code đã làm (khung mới vẫn kèm bản chữ thuần cho ứng dụng không hỗ trợ); còn bước gửi thử tới Gmail web, Gmail điện thoại, Outlook là việc của admin trên STAGING.
+* Thêm BL71 (chữ trong ảnh banner trang chủ).
 
 ## Thay đổi so với bản 02/11 lần 8
 
@@ -75,6 +80,7 @@
 | BL06 | Gói giá 0: (a) vẫn chọn được trong form, kèm nút Zalo; (b) không chọn được, chỉ nút Zalo | (b) | 5K (đã làm theo đề xuất ở 5K, chờ duyệt ở 5Q) |
 | BL08 | Thiết kế đen trắng, có đổ bóng, đảo quyết định 19/10. Gửi lại ảnh tham chiếu nếu cần | Đổi theo yêu cầu 29/10 | 5O (phần web đã làm 05/11 theo ảnh thương hiệu, bản 8.1.5, chờ anh duyệt trên STAGING) |
 | BL70 | `THIET_KE_GIAO_DIEN.md` viết lại theo bản 5O (file gốc tả bản 19/10 không còn đúng; hơi ngoài phạm vi "chỉ Styles.html" của kế hoạch). (a) giữ file đã cập nhật; (b) bỏ file, chỉ giữ chú thích đầu Styles.html | (a) | Tuần này (rà) |
+| BL71 | Ảnh banner trang chủ (anh đưa 05/11) có chữ "THAIPUT LUYỆN NÓI TIẾNG THÁI 1-1 với người Thái Lan" tiếng Việt cố định, đứng ngay trên h1 cùng ý; người xem tiếng Anh (nút EN) vẫn thấy chữ Việt trong ảnh. (a) giữ nguyên (ảnh là nhận diện); (b) cắt ảnh chỉ lấy phần minh hoạ, bỏ khối chữ, h1 lo thông điệp; (c) 2 bản ảnh VI và EN (nặng thêm ~80KB) | (a), đã làm | Tuần này (rà) |
 | BL09 | Email hiện bản phẳng ở Outlook và ứng dụng không hỗ trợ màu chuyển, đổ bóng | Chấp nhận | 5O |
 | BL13 | Màu vàng "Vắng học viên": (a) bỏ; (b) giữ tới khi admin chọn "Đã xử lý" | (b) | 5N |
 

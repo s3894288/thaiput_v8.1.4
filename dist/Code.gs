@@ -6440,7 +6440,7 @@ function renderBody_(text, vars, lang) {
 function emailWrapBi_(titleVi, htmlVi, titleEn, htmlEn, enFirst) {
   var first = enFirst && htmlEn ? [titleEn, htmlEn, titleVi, htmlVi, 'Tiếng Việt'] : [titleVi, htmlVi, titleEn, htmlEn, 'English'];
   var second = first[3] ? '<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #d6d6d1">' +
-    '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">' + first[4] + '</div>' +
+    '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#63635d;margin-bottom:8px">' + first[4] + '</div>' +
     '<h2 style="margin:0 0 14px;font-size:19px;color:#141414">' + esc_(first[2]) + '</h2>' + first[3] + '</div>' : '';
   return emailWrap_(first[0], first[1] + second, 'bi');
 }
@@ -7378,7 +7378,7 @@ function marketingRender_(row, u, testTag) {
     var txt = foot && foot.active && String(foot['body_' + lang] || '').trim() ? foot['body_' + lang] : fd[lang === 'en' ? 6 : 3];
     var h = renderBody_(txt, vars, lang);
     if (!h.replace(/<[^>]*>/g, '').trim()) h = renderBody_(fd[lang === 'en' ? 6 : 3], vars, lang);   // chữ admin sửa ra rỗng: dùng chữ gốc (soát 5H B6)
-    return h ? '<div style="margin-top:18px;font-size:12px;color:#6b7280">' + h + '</div>' : '';
+    return h ? '<div style="margin-top:18px;font-size:12px;color:#63635d">' + h + '</div>' : '';
   };
   var bVi = marketingCell_(row, 'body_vi'), bEn = marketingCell_(row, 'body_en');
   var htmlVi = bVi ? renderBody_(bVi, vars, 'vi') + footHtml('vi') : '', htmlEn = bEn ? renderBody_(bEn, vars, 'en') + footHtml('en') : '';
@@ -7791,7 +7791,7 @@ function sendDailyDigestInLock_(now) {
   rows.forEach(function (n) { count[n.event] = (count[n.event] || 0) + 1; });
   var summary = Object.keys(count).map(function (k) { return '<li>' + esc_(k) + ': <b>' + count[k] + '</b></li>'; }).join('');
   var list = rows.slice(0, 200).map(function (n) {
-    return '<tr><td style="padding:4px 8px;white-space:nowrap">' + esc_(fmtDateTime_(new Date(n.time))) + '</td><td style="padding:4px 8px">' + esc_(n.level) + '</td><td style="padding:4px 8px">' + esc_(n.message) + (n.message_en ? '<br><span style="color:#6b7280">' + esc_(n.message_en) + '</span>' : '') + '</td></tr>';   // chunk 5I: kèm câu tiếng Anh
+    return '<tr><td style="padding:4px 8px;white-space:nowrap">' + esc_(fmtDateTime_(new Date(n.time))) + '</td><td style="padding:4px 8px">' + esc_(n.level) + '</td><td style="padding:4px 8px">' + esc_(n.message) + (n.message_en ? '<br><span style="color:#63635d">' + esc_(n.message_en) + '</span>' : '') + '</td></tr>';   // chunk 5I: kèm câu tiếng Anh
   }).join('');
   var ok = sendTpl_('ADMIN_DIGEST', adminEmails_().join(','), { date: fmtDate_(now), count: rows.length, summary_html: '<ul>' + summary + '</ul>',
     table_html: '<table style="border-collapse:collapse;font-size:13px">' + list + '</table>' + (rows.length > 200 ? '<p>Còn ' + (rows.length - 200) + ' dòng, xem tab NOTIFICATIONS.</p>' : ''),
@@ -7872,7 +7872,7 @@ function emailWrap_(title, inner, lang) {
   var contact = [];
   if (zalo) contact.push('<a href="' + esc_(zalo) + '" style="color:#0068ff;text-decoration:none;font-weight:600">' + (lang === 'bi' ? 'Nhắn Zalo admin · Message admin on Zalo' : en ? 'Message admin on Zalo' : 'Nhắn Zalo admin') + '</a>');
   // Thiết kế 5O (05/11): đen trắng, gạch vàng thương hiệu #ffc933 dưới đầu trang; ứng dụng thư không hỗ trợ CSS thì vẫn là bản phẳng đọc được.
-  return '<div style="background:#f6f6f3;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#1f2937">' +
+  return '<div style="background:#f6f6f3;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#141414">' +
     '<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #ececea">' +
     '<div style="background:#141414;color:#fff;padding:18px 22px;font-size:18px;font-weight:700;letter-spacing:.3px;border-bottom:3px solid #ffc933">' + esc_(cfg_('SCHOOL_NAME')) + '</div>' +
     '<div style="padding:22px">' +

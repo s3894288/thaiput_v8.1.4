@@ -1,5 +1,7 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**Trạng thái 05/11/2026 tối: 5O XONG CẢ WEB LẪN KHUNG EMAIL, bản 8.1.6.** Thêm so với 8.1.5: ảnh banner thương hiệu nhúng base64 vào trang chủ (đã cắt lề trắng, ~78KB); viên chữ Thái đổi nền trắng, chữ đen, viền vàng (yêu cầu anh 05/11); khung email `emailWrap_`, `btn_`, `emailWrapBi_` theo thiết kế 5O (đầu trang đen gạch vàng `#ffc933`, nút viên thuốc đen, đồng bộ xám `#63635d`); test mới U49 (49/49 web). Soát chéo 2 agent: 0 HIGH, 0 MEDIUM về code, các LOW đã dọn. CHƯA gửi thử email tới Gmail web, Gmail điện thoại, Outlook (việc của admin trên STAGING, BL09); chữ trong ảnh banner là tiếng Việt cố định — BL71 chờ anh chọn. BACKLOG còn **34 câu chờ anh** (mục A 30, mục B 4).
+
 **Trạng thái 05/11/2026 chiều: 5O PHẦN GIAO DIỆN WEB xong, bản 8.1.5** (đen trắng theo ảnh thương hiệu, chỉ `src/ui/Styles.html` + token màu; phần email của 5O chưa làm). Đồng thời khôi phục 5 file bị sót khi upload repo GitHub (`test/unit.js`, `.gitignore`, workflow CI, `.clasp.json.example`, `THIET_KE_GIAO_DIEN.md`) lấy từ zip còn trong lịch sử git — trước đó `npm test` không chạy được vì thiếu `test/unit.js`. BACKLOG còn **33 câu chờ anh** (mục A 29, mục B 4). Chi tiết: mục "Chunk 5O phần giao diện" dưới đây.
 
 ## Chunk 5O phần giao diện web (05/11/2026, bản 8.1.5)

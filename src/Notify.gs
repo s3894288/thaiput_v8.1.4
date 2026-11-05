@@ -69,7 +69,7 @@ function emailWrap_(title, inner, lang) {
   var contact = [];
   if (zalo) contact.push('<a href="' + esc_(zalo) + '" style="color:#0068ff;text-decoration:none;font-weight:600">' + (lang === 'bi' ? 'Nhắn Zalo admin · Message admin on Zalo' : en ? 'Message admin on Zalo' : 'Nhắn Zalo admin') + '</a>');
   // Thiết kế 5O (05/11): đen trắng, gạch vàng thương hiệu #ffc933 dưới đầu trang; ứng dụng thư không hỗ trợ CSS thì vẫn là bản phẳng đọc được.
-  return '<div style="background:#f6f6f3;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#1f2937">' +
+  return '<div style="background:#f6f6f3;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#141414">' +
     '<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #ececea">' +
     '<div style="background:#141414;color:#fff;padding:18px 22px;font-size:18px;font-weight:700;letter-spacing:.3px;border-bottom:3px solid #ffc933">' + esc_(cfg_('SCHOOL_NAME')) + '</div>' +
     '<div style="padding:22px">' +

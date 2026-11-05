@@ -141,7 +141,7 @@ function sendDailyDigestInLock_(now) {
   rows.forEach(function (n) { count[n.event] = (count[n.event] || 0) + 1; });
   var summary = Object.keys(count).map(function (k) { return '<li>' + esc_(k) + ': <b>' + count[k] + '</b></li>'; }).join('');
   var list = rows.slice(0, 200).map(function (n) {
-    return '<tr><td style="padding:4px 8px;white-space:nowrap">' + esc_(fmtDateTime_(new Date(n.time))) + '</td><td style="padding:4px 8px">' + esc_(n.level) + '</td><td style="padding:4px 8px">' + esc_(n.message) + (n.message_en ? '<br><span style="color:#6b7280">' + esc_(n.message_en) + '</span>' : '') + '</td></tr>';   // chunk 5I: kèm câu tiếng Anh
+    return '<tr><td style="padding:4px 8px;white-space:nowrap">' + esc_(fmtDateTime_(new Date(n.time))) + '</td><td style="padding:4px 8px">' + esc_(n.level) + '</td><td style="padding:4px 8px">' + esc_(n.message) + (n.message_en ? '<br><span style="color:#63635d">' + esc_(n.message_en) + '</span>' : '') + '</td></tr>';   // chunk 5I: kèm câu tiếng Anh
   }).join('');
   var ok = sendTpl_('ADMIN_DIGEST', adminEmails_().join(','), { date: fmtDate_(now), count: rows.length, summary_html: '<ul>' + summary + '</ul>',
     table_html: '<table style="border-collapse:collapse;font-size:13px">' + list + '</table>' + (rows.length > 200 ? '<p>Còn ' + (rows.length - 200) + ' dòng, xem tab NOTIFICATIONS.</p>' : ''),
