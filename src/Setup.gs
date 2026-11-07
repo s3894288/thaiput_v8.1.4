@@ -221,7 +221,8 @@ function setupCore_(ss) {
  *     "Chưa xử lý" = admin_done_at trống hoặc cũ hơn result_at (kết quả đổi sau lần admin xử lý trước thì hiện lại).
  *   STUDENT_PACKAGES (5N): đỏ = còn thông báo COMP_ON_EXPIRED chưa đọc (chờ admin cộng tay comp_days_admin); xám = hết hạn;
  *     vàng = còn EXPIRY_NOTICE_DAYS ngày; tím = admin đã cộng tay; xanh dương = có ngày bù.
- * Vùng tô màu phủ từ hàng 2 tới hết tab; tab tự thêm hàng (Db.gs ensureRows_) thì gọi lại applyHighlightsFor_ cho tab đó.
+ * Vùng tô màu phủ từ hàng 2 tới hết tab; tab tự thêm hàng (Db.gs ensureRows_) thì nới vùng các luật đang có (extendHighlightRanges_),
+ * không thay luật: luật admin tự thêm vẫn giữ. Đổi EXPIRY_NOTICE_DAYS trong CONFIG: chạy lại menu 1 để màu vàng đổi theo.
  */
 var HL_ = { RED: '#ea9999', ORANGE: '#f6b26b', PINK: '#f9d2e4', YELLOW: '#fff3cd', LIGHT_BLUE: '#cfe2f3', BLUE: '#9fc5e8',
   PURPLE: '#d9d2e9', GREEN: '#d1e7dd', GREY: '#e9ecef', SOFT_RED: '#f8d7da' };
@@ -262,7 +263,8 @@ function highlightSpecs_(ss, name) {
   if (name === 'STUDENT_PACKAGES') {
     var nt = ss.getSheetByName('NOTIFICATIONS'), canNotif = nt && hlColLetter_(nt, 'entity_id') && hlColLetter_(nt, 'event') && hlColLetter_(nt, 'read');
     return [
-      canNotif ? ['=COUNTIFS([[NOTIFICATIONS.entity_id]],{sp_id},[[NOTIFICATIONS.event]],"COMP_ON_EXPIRED",[[NOTIFICATIONS.read]],"<>TRUE")>0', HL_.RED] : null,
+      // IF: hàng trống không chạy COUNTIFS trên cả cột NOTIFICATIONS (Sheets bỏ qua nhánh không dùng).
+      canNotif ? ['=IF({sp_id}="",FALSE,COUNTIFS([[NOTIFICATIONS.entity_id]],{sp_id},[[NOTIFICATIONS.event]],"COMP_ON_EXPIRED",[[NOTIFICATIONS.read]],"<>TRUE")>0)', HL_.RED] : null,
       ['={status}="' + PKG_STATUS.EXPIRED + '"', HL_.GREY],
       ['=AND({status}="' + PKG_STATUS.ACTIVE + '",{end_date}<>"",{end_date}>=TODAY(),{end_date}-TODAY()<=' + Number(cfg_('EXPIRY_NOTICE_DAYS')) + ')', HL_.YELLOW],
       has('comp_days_admin') ? ['=N({comp_days_admin})<>0', HL_.PURPLE] : null,
@@ -284,6 +286,28 @@ function applyHighlightsFor_(ss, name) {
   });
   sh.setConditionalFormatRules(rules);
   return rules.length;
+}
+
+/**
+ * Tab vừa thêm hàng (oldMax → newMax): mọi luật tô màu (của hệ thống và của admin) có vùng chạm hàng cuối cũ được nới tới hàng cuối mới.
+ * Không đổi công thức, màu hay thứ tự luật. Trả số luật đã nới.
+ */
+function extendHighlightRanges_(sheet, oldMax, newMax) {
+  var rules = sheet.getConditionalFormatRules(), n = 0;
+  if (!rules || !rules.length) return 0;
+  var out = rules.map(function (r) {
+    var changed = false;
+    var rs = r.getRanges().map(function (g) {
+      if (g.getRow() + g.getNumRows() - 1 < oldMax) return g;
+      changed = true;
+      return sheet.getRange(g.getRow(), g.getColumn(), newMax - g.getRow() + 1, g.getNumColumns());
+    });
+    if (!changed) return r;
+    n++;
+    return r.copy().setRanges(rs).build();
+  });
+  if (n) sheet.setConditionalFormatRules(out);
+  return n;
 }
 
 function applyHighlights_(ss) {

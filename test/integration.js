@@ -4211,7 +4211,7 @@ function cfColor(c, table, rowNum, today) {
     let i = 0;
     const peek = () => toks[i], next = () => toks[i++];
     const fns = {
-      AND: (a) => a.every(Boolean), OR: (a) => a.some(Boolean),
+      AND: (a) => a.every(Boolean), OR: (a) => a.some(Boolean), IF: (a) => (a[0] ? a[1] : a[2]),
       N: (a) => { const v = norm(a[0]); return typeof v === 'number' ? v : 0; },
       TODAY: () => Math.floor(serial(today)),   // Sheets: TODAY() chỉ là ngày, không có giờ
       INDIRECT: (a) => { const m = a[0].match(/^(\w+)!\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)$/); const vals = ss.sheets[m[1]].values, out = []; for (let k = Number(m[3]); k <= vals.length; k++) out.push(cell(m[1], k, m[2])); return out; },
@@ -4355,64 +4355,94 @@ t('I137', '5N STUDENT_PACKAGES: đỏ khi còn thông báo COMP_ON_EXPIRED chưa
   assert.strictEqual(color(p3), HL5N.GREY, 'đọc rồi: hết đỏ');
 });
 
-t('I138', '5N hourlyJob báo buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: đúng một lần (email Khẩn cho admin, nhật ký), không báo trước hạn, buổi ra khỏi trạng thái thì xoá dấu và kẹt lại được báo lại; đổi giờ trong CONFIG', () => {
+t('I138', '5N hourlyJob báo buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: một lần mỗi lần kẹt (email Khẩn, nhật ký), chịu lệch nhịp trigger vài phút, nhiều buổi kẹt cùng lượt chỉ một email, buổi ra khỏi trạng thái thì xoá mốc và kẹt lại được báo lại; đổi giờ trong CONFIG, -1 tắt', () => {
   const c = mk('2026-10-12 10:00'), { api, env } = c;
-  c.onlyOpen('2026-10-20', '19:00', ['T001']);
-  const [r] = c.book('S001', [['2026-10-20', '19:00']]);
+  c.onlyOpen('2026-10-20', '19:00', ['T001']); c.onlyOpen('2026-10-21', '19:00', ['T002']); c.onlyOpen('2026-10-22', '19:00', ['T003']);
+  const [r] = c.book('S001', [['2026-10-20', '19:00']]), [r2] = c.book('S002', [['2026-10-21', '19:00']]), [r3] = c.book('S003', [['2026-10-22', '19:00']]);
   const id = r.bookingId;
-  const stuckN = () => c.rows('NOTIFICATIONS').filter(x => x.event === 'REASSIGN_STUCK' && x.entity_id === id);
+  const stuckN = () => c.rows('NOTIFICATIONS').filter(x => x.event === 'REASSIGN_STUCK');
+  const has = (n, bid) => String(n.entity_id).split(',').includes(bid);
+  const adminMails = () => c.mailsTo(EMAIL.ADMIN).filter(m => /kẹt ở Chờ đổi tutor/.test(JSON.stringify(m))).length;
   bkSet(c, id, { status: 'PENDING_REASSIGN' });
   c.at('2026-10-13 08:05'); api.hourlyJob();
   assert.strictEqual(stuckN().length, 0, 'lần đầu thấy: chưa báo');
-  assert.ok(env.state.props['STUCK_' + id], 'ghi mốc lần đầu thấy');
+  assert.ok(Number(env.state.props['STUCK_' + id]) > 0, 'ghi mốc lần đầu thấy');
+  c.at('2026-10-13 08:45'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 0, 'chưa đủ 1 giờ (trừ 15 phút lệch nhịp)');
+  // Trigger mỗi giờ của Google lệch: lượt sau chạy sau 59 phút vẫn báo
   c.at('2026-10-13 09:04'); api.hourlyJob();
-  assert.strictEqual(stuckN().length, 0, 'chưa đủ 1 giờ');
-  c.at('2026-10-13 09:05'); api.hourlyJob();
-  const ns = stuckN();
-  assert.strictEqual(ns.length, 1, 'đủ 1 giờ: báo');
-  assert.strictEqual(ns[0].level, 'CRITICAL'); assert.ok(ns[0].message_en && /stuck/.test(ns[0].message_en));
-  assert.ok(/kẹt ở Chờ đổi tutor quá 1 giờ/.test(ns[0].message), ns[0].message);
-  assert.ok(c.mailsTo(EMAIL.ADMIN).some(m => /kẹt ở Chờ đổi tutor/.test(JSON.stringify(m))), 'email admin');
+  let ns = stuckN();
+  assert.strictEqual(ns.length, 1, 'lượt sau 59 phút: báo');
+  assert.ok(has(ns[0], id)); assert.strictEqual(ns[0].level, 'CRITICAL'); assert.ok(ns[0].message_en && /stuck/.test(ns[0].message_en));
+  assert.ok(/1 buổi kẹt ở Chờ đổi tutor quá 1 giờ/.test(ns[0].message) && /Đổi tutor hoặc Huỷ bởi admin/.test(ns[0].message) && /Vắng tutor/.test(ns[0].message), ns[0].message);
+  assert.strictEqual(adminMails(), 1, 'email admin');
   assert.ok(c.rows('ACTIVITY_LOG').some(l => l.action === 'REASSIGN_STUCK' && l.entity_id === id));
-  assert.strictEqual(env.state.props['STUCK_' + id], 'SENT');
-  ['12:05', '13:05', '14:05', '17:05'].forEach(h => { c.at('2026-10-13 ' + h); api.hourlyJob(); });
+  ['10:05', '11:05', '14:05', '17:05'].forEach(h => { c.at('2026-10-13 ' + h); api.hourlyJob(); });
   assert.strictEqual(stuckN().length, 1, 'còn kẹt nhiều giờ sau: không báo trùng');
-  // Admin đổi tutor xong (về CONFIRMED): xoá dấu
-  bkSet(c, id, { status: 'CONFIRMED' });
+  // Thông báo bị mất (khoá lỗi, dòng không ghi được): giờ sau báo lại, vì "đã báo" chính là dòng thông báo
+  api.withLock_(() => { const t = api.table_('NOTIFICATIONS'); t.update(t.byId(stuckN()[0].notif_id), { event: 'X_LOST' }); });
   c.at('2026-10-13 18:05'); api.hourlyJob();
-  assert.ok(!env.state.props['STUCK_' + id], 'xoá dấu khi ra khỏi trạng thái');
-  // Kẹt lại, CONFIG 3 giờ: báo lại sau đủ 3 giờ
-  cfgSet(c, 'REASSIGN_STUCK_HOURS', 3);
-  bkSet(c, id, { status: 'PENDING_REASSIGN' });
-  c.at('2026-10-13 19:05'); api.hourlyJob();
-  c.at('2026-10-13 21:05'); api.hourlyJob();
-  assert.strictEqual(stuckN().length, 1, 'CONFIG 3 giờ: 2 giờ chưa báo');
-  c.at('2026-10-13 22:05'); api.hourlyJob();
-  assert.strictEqual(stuckN().length, 2, 'kẹt lại: báo lần nữa');
-  // Không có buổi nào kẹt thì không ghi dấu nào
+  assert.strictEqual(stuckN().length, 1, 'thiếu dòng thông báo: báo lại');
+  // Ra khỏi trạng thái: xoá mốc
   bkSet(c, id, { status: 'CONFIRMED' });
-  c.at('2026-10-13 23:05'); api.hourlyJob();
-  assert.ok(!Object.keys(env.state.props).some(k => /^STUCK_/.test(k)));
+  c.at('2026-10-13 19:05'); api.hourlyJob();
+  assert.ok(!env.state.props['STUCK_' + id], 'xoá mốc khi ra khỏi trạng thái');
+  // Ba buổi kẹt cùng lúc (ví dụ khoá tutor lỗi giữa chừng): một email liệt kê cả ba
+  const before = adminMails();
+  [id, r2.bookingId, r3.bookingId].forEach(x => bkSet(c, x, { status: 'PENDING_REASSIGN' }));
+  c.at('2026-10-13 20:05'); api.hourlyJob();
+  c.at('2026-10-13 21:05'); api.hourlyJob();
+  ns = stuckN();
+  assert.strictEqual(ns.length, 2);
+  const last = ns[ns.length - 1];
+  assert.ok([id, r2.bookingId, r3.bookingId].every(x => has(last, x)), last.entity_id);
+  assert.ok(/^3 buổi kẹt/.test(last.message), last.message);
+  assert.strictEqual(adminMails() - before, 1, 'một email cho cả ba buổi');
+  // CONFIG 3 giờ: buổi kẹt lại sau đó chờ đủ 3 giờ
+  cfgSet(c, 'REASSIGN_STUCK_HOURS', 3);
+  [r2.bookingId, r3.bookingId].forEach(x => bkSet(c, x, { status: 'CONFIRMED' }));
+  bkSet(c, id, { status: 'CONFIRMED' }); c.at('2026-10-13 22:05'); api.hourlyJob();
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-14 08:05'); api.hourlyJob();
+  c.at('2026-10-14 10:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 2, 'CONFIG 3 giờ: 2 giờ chưa báo');
+  c.at('2026-10-14 11:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 3, 'kẹt lại: báo lần nữa');
+  // -1 tắt: không báo, không giữ mốc
+  cfgSet(c, 'REASSIGN_STUCK_HOURS', -1);
+  bkSet(c, id, { status: 'CONFIRMED' }); c.at('2026-10-14 12:05'); api.hourlyJob();
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  ['13:05', '15:05', '19:05'].forEach(h => { c.at('2026-10-14 ' + h); api.hourlyJob(); });
+  assert.strictEqual(stuckN().length, 3, '-1: tắt');
+  assert.ok(!Object.keys(env.state.props).some(k => /^STUCK_/.test(k)), '-1: không giữ mốc');
 });
 
-t('I139', '5N vùng tô màu phủ tới hết tab: tab tự thêm hàng (ensureRows_) thì luật tô màu được đặt lại phủ cả hàng mới, không nhân đôi; lỗi tô màu không làm hỏng lượt ghi; tab chưa chạy menu 1 (thiếu cột mới) không có công thức trỏ cột không tồn tại', () => {
+t('I139', '5N vùng tô màu phủ tới hết tab: tab tự thêm hàng (ensureRows_) thì nới vùng mọi luật đang chạm hàng cuối (cả luật admin tự thêm), không thay, không nhân đôi; luật vùng nhỏ không đổi; lỗi tô màu không làm hỏng lượt ghi; thiếu cột mới (chưa chạy menu 1) không có công thức trỏ cột không tồn tại', () => {
   const c = mk('2026-10-12 10:00'), { api, env } = c;
-  api.applyHighlights_(api.dbSpreadsheet_());
   const sh = env.state.spreadsheets.DB_STAGING_TEST.sheets.BOOKINGS;
   const sheet = api.dbSpreadsheet_().getSheetByName('BOOKINGS');
+  sheet.insertRowsAfter(sheet.getMaxRows(), 37);   // tab không tròn 1.000 hàng: menu 1 phủ đúng tới hàng cuối thật
+  api.applyHighlights_(api.dbSpreadsheet_());
   const max0 = sheet.getMaxRows();
   assert.strictEqual(sh.cfRules[0].ranges[0].getNumRows(), max0 - 1);
+  // Admin tự thêm 2 luật: một phủ tới hết tab, một chỉ vài hàng đầu
+  const own = env.globals.SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$B2="S001"').setBackground('#000001').setRanges([sheet.getRange(2, 2, max0 - 1, 1)]).build();
+  const small = env.globals.SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$B2="S002"').setBackground('#000002').setRanges([sheet.getRange(2, 2, 10, 1)]).build();
+  sheet.setConditionalFormatRules(sheet.getConditionalFormatRules().concat([own, small]));
+  const formulas0 = sh.cfRules.map(r => r.formula + r.bg).join('|');
   api.ensureRows_(sheet, 'BOOKINGS', max0 + 1);
   const max1 = sheet.getMaxRows();
   assert.ok(max1 > max0);
-  assert.strictEqual(sh.cfRules.length, 6, 'không nhân đôi');
-  assert.ok(sh.cfRules.every(r => r.ranges[0].getNumRows() === max1 - 1 && r.ranges[0].getRow() === 2), 'phủ tới hàng cuối mới');
+  assert.strictEqual(sh.cfRules.length, 8, 'không thay, không nhân đôi');
+  assert.strictEqual(sh.cfRules.map(r => r.formula + r.bg).join('|'), formulas0, 'giữ nguyên công thức, màu, thứ tự (cả luật của admin)');
+  assert.ok(sh.cfRules.slice(0, 7).every(r => r.ranges[0].getNumRows() === max1 - 1 && r.ranges[0].getRow() === 2), 'phủ tới hàng cuối mới');
+  assert.strictEqual(sh.cfRules[7].ranges[0].getNumRows(), 10, 'luật vùng nhỏ không đổi');
   // Tô màu lỗi: lượt ghi vẫn thành công
-  const orig = env.globals.SpreadsheetApp.newConditionalFormatRule;
-  env.globals.SpreadsheetApp.newConditionalFormatRule = () => { throw new Error('giả lập lỗi tô màu'); };
-  try { api.ensureRows_(sheet, 'BOOKINGS', sheet.getMaxRows() + 1); } finally { env.globals.SpreadsheetApp.newConditionalFormatRule = orig; }
+  sh.cfRules.push({ formula: '=1', bg: '#x', getRanges: () => { throw new Error('giả lập lỗi tô màu'); } });
+  api.ensureRows_(sheet, 'BOOKINGS', sheet.getMaxRows() + 1);
   assert.ok(sheet.getMaxRows() > max1, 'vẫn thêm hàng');
-  // Tab không thuộc danh sách tô màu: không đặt luật
+  sh.cfRules.pop();
+  // Tab không có luật: không đặt luật
   const us = api.dbSpreadsheet_().getSheetByName('USERS');
   api.ensureRows_(us, 'USERS', us.getMaxRows() + 1);
   assert.ok(!(env.state.spreadsheets.DB_STAGING_TEST.sheets.USERS.cfRules || []).length);
@@ -4422,6 +4452,56 @@ t('I139', '5N vùng tô màu phủ tới hết tab: tab tự thêm hàng (ensure
   api.applyHighlights_(api.dbSpreadsheet_());
   assert.ok(sh.cfRules.every(r => !/null|undefined/.test(r.formula)), sh.cfRules.map(r => r.formula).join(' | '));
   assert.strictEqual(sh.cfRules.length, 5, 'bỏ luật xanh dương nhạt khi thiếu comp_days');
+});
+
+t('I140', 'Soát 5N (hồi quy): buổi kẹt Chờ đổi tutor xử lý được đúng như thư báo: Đổi tutor ra CONFIRMED với tutor khác; chỉ định tutor bận thì vẫn kẹt (không thành CONFIRMED với tutor cũ); Huỷ bởi admin sau mốc huỷ muộn vẫn là Huỷ bởi admin (lỗi phía trường, không trừ lượt), không phải Huỷ muộn; trang quản trị bỏ buổi Không hoàn thành đã "Đã xử lý" khỏi danh sách chờ', () => {
+  const c = mk('2026-10-12 10:00'), { api } = c;
+  c.onlyOpen('2026-10-20', '19:00', ['T001', 'T002']);
+  c.onlyOpen('2026-10-21', '19:00', ['T001']);
+  const [r] = c.book('S001', [['2026-10-20', '19:00']]);
+  const [r2] = c.book('S002', [['2026-10-21', '19:00']]);
+  const t0 = c.row('BOOKINGS', r.bookingId).tutor_id;
+  bkSet(c, r.bookingId, { status: 'PENDING_REASSIGN' });
+  // Chỉ định tutor không rảnh: vẫn kẹt
+  bkSet(c, r.bookingId, { admin_note: 'T004' });
+  const f = pickAdmin(c, r.bookingId, 'Đổi tutor');
+  assert.ok(!f.ok, JSON.stringify(f));
+  let b = c.row('BOOKINGS', r.bookingId);
+  assert.strictEqual(b.status, 'PENDING_REASSIGN', 'chỉ định hỏng: vẫn kẹt, không thành CONFIRMED');
+  assert.strictEqual(b.tutor_id, t0);
+  // Để trống: hệ thống tự chọn tutor khác
+  bkSet(c, r.bookingId, { admin_note: '' });
+  const ok = pickAdmin(c, r.bookingId, 'Đổi tutor');
+  assert.ok(ok.ok, JSON.stringify(ok));
+  b = c.row('BOOKINGS', r.bookingId);
+  assert.strictEqual(b.status, 'CONFIRMED'); assert.notStrictEqual(b.tutor_id, t0);
+  assert.ok(b.admin_done_at instanceof Date);
+  // Huỷ bởi admin sau mốc huỷ muộn (16:00 hôm trước): buổi kẹt vẫn là Huỷ bởi admin
+  bkSet(c, r2.bookingId, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-20 16:30');
+  const cx = pickAdmin(c, r2.bookingId, 'Huỷ bởi admin');
+  assert.ok(cx.ok, JSON.stringify(cx));
+  assert.strictEqual(c.row('BOOKINGS', r2.bookingId).status, 'CANCELLED_ADMIN');
+  // Buổi bình thường (CONFIRMED) huỷ sau mốc vẫn là Huỷ muộn như cũ
+  c.at('2026-10-12 10:00');
+  c.onlyOpen('2026-10-23', '19:00', ['T001']);
+  const [r3] = c.book('S003', [['2026-10-23', '19:00']]);
+  c.at('2026-10-22 16:30');
+  assert.ok(pickAdmin(c, r3.bookingId, 'Huỷ bởi admin').ok);
+  assert.strictEqual(c.row('BOOKINGS', r3.bookingId).status, 'CANCELLED_LATE');
+  // Trang quản trị: Không hoàn thành đã xử lý không còn trong danh sách chờ (cùng nghĩa với ô Sheets hết đỏ)
+  bkSet(c, r.bookingId, { status: 'NOT_COMPLETED', result_at: new Date(2026, 9, 21, 20, 0), result_by: 'SYSTEM' });
+  const waiting = () => api.adminLessonsWaiting_(c.rows('BOOKINGS'), api.getNow_()).map(x => x.booking_id);
+  assert.ok(waiting().includes(r.bookingId));
+  assert.ok(pickAdmin(c, r.bookingId, 'Đã xử lý (giữ nguyên)').ok);
+  assert.ok(!waiting().includes(r.bookingId), 'đã xử lý: bỏ khỏi danh sách chờ');
+  assert.strictEqual(bkColor(c, r.bookingId), '', 'ô Sheets cũng hết đỏ');
+  // Hàm thuần dùng chung
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2), result_at: new Date(2026, 1, 1) }), true);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 1), result_at: new Date(2026, 1, 2) }), false);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: '', result_at: new Date(2026, 1, 2) }), false);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2), result_at: '' }), true);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2, 9), result_at: new Date(2026, 1, 2, 9) }), true, 'admin tự chọn kết quả (cùng lúc): đã xử lý');
 });
 
 module.exports = { results };

@@ -145,7 +145,12 @@ function createGasEnv(opts) {
       };
     },
     newDataValidation: () => { const b = { requireValueInList: () => b, requireCheckbox: () => b, setAllowInvalid: () => b, build: () => ({}) }; return b; },
-    newConditionalFormatRule: () => { const r = {}; const b = { whenFormulaSatisfied: (f) => { r.formula = f; return b; }, setBackground: (c) => { r.bg = c; return b; }, setRanges: (x) => { r.ranges = x; return b; }, build: () => r }; return b; }
+    // Google thật: build() trả ConditionalFormatRule (getRanges, copy() ra builder mới để đổi vùng); rule đã build không sửa tại chỗ được.
+    newConditionalFormatRule: () => {
+      const mkb = (init) => { const r = Object.assign({}, init || {}); const b = { whenFormulaSatisfied: (f) => { r.formula = f; return b; }, setBackground: (c) => { r.bg = c; return b; }, setRanges: (x) => { r.ranges = x; return b; },
+        build: () => { const rule = { formula: r.formula, bg: r.bg, ranges: r.ranges }; rule.getRanges = () => (rule.ranges || []).slice(); rule.copy = () => mkb({ formula: rule.formula, bg: rule.bg, ranges: rule.ranges }); return rule; } }; return b; };
+      return mkb();
+    }
   };
 
   // ── Properties, Lock, Cache ──

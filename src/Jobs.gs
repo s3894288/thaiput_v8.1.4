@@ -249,34 +249,45 @@ function reconcileInLock_(now) {
 /**
  * Chunk 5N: buổi kẹt ở Chờ đổi tutor (PENDING_REASSIGN). Bình thường trạng thái này chỉ có trong một khoá (đổi tutor xong thì về
  * CONFIRMED hoặc huỷ); còn lại sau khoá là do lượt đổi tutor lỗi giữa chừng hoặc sửa tay, và buổi không có tutor dạy.
- * BOOKINGS không có cột "lúc vào trạng thái này", nên job ghi lần đầu thấy (Script Property STUCK_<mã>, mốc ms) và báo REASSIGN_STUCK
- * đúng một lần khi đã thấy đủ REASSIGN_STUCK_HOURS giờ. Dấu đã báo (SENT) chỉ ghi sau khi khoá ghi xong dòng thông báo.
- * Buổi ra khỏi trạng thái (đổi tutor, huỷ) thì xoá dấu: kẹt lại lần sau được báo lại. Trả số buổi vừa báo.
+ * BOOKINGS không có cột "lúc vào trạng thái này", nên job ghi lần đầu thấy (Script Property STUCK_<mã>, mốc ms) và báo khi đã thấy
+ * đủ REASSIGN_STUCK_HOURS giờ (trừ STUCK_TOLERANCE_MS_ vì trigger mỗi giờ của Google lệch vài phút). -1 = tắt.
+ * Đã báo hay chưa tra chính tab NOTIFICATIONS (thông báo REASSIGN_STUCK có mã buổi, ghi sau lần đầu thấy): dòng thông báo và dấu
+ * "đã báo" là một, khoá lỗi thì cả hai cùng mất và giờ sau báo lại. Mỗi lượt một thông báo (một email) liệt kê mọi buổi, không dồn thư.
+ * Buổi ra khỏi trạng thái thì xoá mốc: kẹt lại lần sau được báo lại. Trả số buổi vừa báo.
  */
+var STUCK_TOLERANCE_MS_ = 15 * 60000;
 function reassignStuckInLock_(now) {
   var hours = Number(cfg_('REASSIGN_STUCK_HOURS'));
-  if (!(hours >= 0)) hours = DEFAULTS_.REASSIGN_STUCK_HOURS;
-  var p = props_(), all = p.getProperties(), seen = {}, stuck = [];
-  table_('BOOKINGS').filter(function (b) { return b.status === BOOKING_STATUS.PENDING_REASSIGN; }).forEach(function (b) {
-    var k = 'STUCK_' + b.booking_id, v = all[k];
+  if (isNaN(hours)) hours = DEFAULTS_.REASSIGN_STUCK_HOURS;
+  var p = props_(), all = p.getProperties(), seen = {}, due = [];
+  var list = hours < 0 ? [] : table_('BOOKINGS').filter(function (b) { return b.status === BOOKING_STATUS.PENDING_REASSIGN; });
+  var told = {};
+  if (list.length) table_('NOTIFICATIONS').filter(function (n) { return n.event === 'REASSIGN_STUCK'; }).forEach(function (n) {
+    var t = new Date(n.time).getTime();
+    String(n.entity_id || '').split(',').forEach(function (id) { if (!isNaN(t) && !(told[id] >= t)) told[id] = t; });
+  });
+  list.forEach(function (b) {
+    var k = 'STUCK_' + b.booking_id, since = Number(all[k]);
     seen[k] = true;
-    if (v === 'SENT') return;
-    var since = Number(v);
-    if (!v || isNaN(since)) { since = now.getTime(); p.setProperty(k, String(since)); }
-    if (now.getTime() - since >= hours * 3600000) stuck.push(b);
+    if (!all[k] || isNaN(since)) { since = now.getTime(); p.setProperty(k, String(since)); }
+    if (told[b.booking_id] >= since) return;
+    if (now.getTime() - since >= hours * 3600000 - STUCK_TOLERANCE_MS_) due.push(b);
   });
   Object.keys(all).forEach(function (k) { if (/^STUCK_/.test(k) && !seen[k]) p.deleteProperty(k); });
-  if (!stuck.length) return 0;
+  if (!due.length) return 0;
   var names = {}; table_('USERS').all().forEach(function (u) { names[u.user_id] = u.name; });
-  stuck.forEach(function (b) {
-    var who = (names[b.student_id] || b.student_id) + ', ' + (names[b.tutor_id] || b.tutor_id);
-    logActivity_('SYSTEM', 'REASSIGN_STUCK', 'BOOKING', b.booking_id, { tutor: b.tutor_id, hours: hours });
-    notify_('REASSIGN_STUCK', { student_id: b.student_id, tutor_id: b.tutor_id, entity: 'BOOKING', entity_id: b.booking_id, link: rowLink_('BOOKINGS', b._row),
-      message: 'Buổi ' + b.booking_id + ' (' + fmtDayVi_(b.date) + ' ' + b.slot + ', ' + who + ') kẹt ở Chờ đổi tutor quá ' + hours + ' giờ: chưa có tutor dạy. Chọn Đổi tutor hoặc Huỷ bởi admin ở cột admin_action.',
-      message_en: 'Lesson ' + b.booking_id + ' (' + fmtDayEn_(b.date) + ' ' + b.slot + ', ' + who + ') has been stuck waiting for a new tutor for over ' + hours + ' hour(s): no tutor will teach it. Pick Đổi tutor (reassign) or Huỷ bởi admin (cancel) in the admin_action column.' });
-    afterLock_(function () { props_().setProperty('STUCK_' + b.booking_id, 'SENT'); });
-  });
-  return stuck.length;
+  var line = function (b, en) {
+    return b.booking_id + ' (' + (en ? fmtDayEn_(b.date) : fmtDayVi_(b.date)) + ' ' + b.slot + ', ' + (names[b.student_id] || b.student_id) + ', ' + (names[b.tutor_id] || b.tutor_id) + ')';
+  };
+  due.forEach(function (b) { logActivity_('SYSTEM', 'REASSIGN_STUCK', 'BOOKING', b.booking_id, { tutor: b.tutor_id, hours: hours }); });
+  notify_('REASSIGN_STUCK', { entity: 'BOOKING', entity_id: due.map(function (b) { return b.booking_id; }).join(','),
+    student_id: due.length === 1 ? due[0].student_id : '', tutor_id: due.length === 1 ? due[0].tutor_id : '',
+    link: due.length === 1 ? rowLink_('BOOKINGS', due[0]._row) : rowLink_('BOOKINGS'),
+    message: due.length + ' buổi kẹt ở Chờ đổi tutor quá ' + hours + ' giờ, chưa có tutor dạy: ' + due.map(function (b) { return line(b, false); }).join('; ') +
+      '. Chưa tới giờ học: chọn Đổi tutor hoặc Huỷ bởi admin ở cột admin_action (huỷ không trừ lượt, học viên được bù). Đã qua giờ học: chọn Vắng tutor.',
+    message_en: due.length + ' lesson(s) stuck waiting for a new tutor for over ' + hours + ' hour(s), no tutor will teach: ' + due.map(function (b) { return line(b, true); }).join('; ') +
+      '. Before the lesson: pick Đổi tutor (reassign) or Huỷ bởi admin (cancel, not deducted, compensated) in the admin_action column. After the lesson time: pick Vắng tutor (tutor absent).' });
+  return due.length;
 }
 
 /** Mỗi giờ: tự từ chối yêu cầu huỷ quá hạn duyệt (câu 20), tự hoàn thành buổi quá 24 giờ (câu 29). */
@@ -303,7 +314,7 @@ function hourlyJob(e) { requireOperator_(e);
     // Bảo trì: tutor không xác nhận được, nên tạm dừng bước chuyển Không hoàn thành (vẫn báo).
     var completed = resultOverdueInLock_(now, maintMode_() === 'OFF');
     // Chunk 5N: buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: báo admin một lần.
-    var stuck = 0; try { stuck = reassignStuckInLock_(now); } catch (se) { Logger.log('Báo buổi kẹt lỗi: ' + se.message); }
+    var stuck = 0; try { stuck = reassignStuckInLock_(now); } catch (se) { Logger.log('Báo buổi kẹt lỗi: ' + se.message); mailAdminError_('Báo buổi kẹt (hourlyJob)', (se && se.stack) || String(se)); }
     // Chunk 5M: tính lại gói còn chạy (khoá ngày bắt đầu khi buổi kỹ thuật quá TECH_DECIDE_HOURS, tự lành ô bị sửa ngoài hệ thống).
     var heal = null; try { heal = pkgHealAllInLock_(now); } catch (he) { Logger.log('Tính lại gói lỗi: ' + he.message); mailAdminError_('Tính lại gói (hourlyJob)', (he && he.stack) || String(he)); }
     // Việc theo giờ trong ngày (chunk 5B), mỗi việc tối đa 1 lần mỗi ngày hoặc mỗi tuần:

@@ -299,7 +299,7 @@ function handleAdminEdit_(sheetName, header, id, value, actor, opts) {
         if (out.ok) props_().deleteProperty(ck);
       } else if (value === ADMIN_MARK_DONE_ACTION_) {
         out = adminMarkDone_(id, actor);
-        if (out.block === 'OPEN') note = ' (buổi đang ' + (BOOKING_STATUS_VI[out.status] || out.status) + ': chưa có gì để giữ nguyên, chọn việc cần làm như Đổi tutor hoặc Huỷ bởi admin)';
+        if (out.block === 'OPEN') note = ' (buổi đang ' + (BOOKING_STATUS_VI[out.status] || out.status) + ': chưa có gì để giữ nguyên. ' + (out.status === BOOKING_STATUS.PENDING_REASSIGN ? 'Chưa tới giờ học: chọn Đổi tutor hoặc Huỷ bởi admin (không trừ lượt); đã qua giờ học: chọn Vắng tutor' : 'Chờ tutor chọn kết quả, hoặc chọn kết quả thay tutor') + ')';
         if (out.block === 'TECH') note = ' (buổi kỹ thuật chưa chọn lỗi: chọn 1 trong 3 lựa chọn lỗi kỹ thuật)';
       } else if (ADMIN_RESULT_ACTIONS_[value]) out = adminSetResult_(id, actor, ADMIN_RESULT_ACTIONS_[value]);
       else out = adminSetTechFault_(id, actor, TECH_FAULT_ACTIONS_[value]);

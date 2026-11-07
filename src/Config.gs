@@ -78,7 +78,7 @@ var DEFAULTS_ = {
   RESULT_NOTICE_AFTER_HOURS: 24,
   RESULT_EXPIRE_AFTER_HOURS: 48,
   RESULT_EXPIRE_AFTER_NOTICE_HOURS: 24,
-  // Chunk 5N: buổi ở trạng thái Chờ đổi tutor (PENDING_REASSIGN) quá số giờ này thì job mỗi giờ báo admin (REASSIGN_STUCK).
+  // Chunk 5N: buổi ở trạng thái Chờ đổi tutor (PENDING_REASSIGN) quá số giờ này thì job mỗi giờ báo admin (REASSIGN_STUCK). -1 = tắt.
   REASSIGN_STUCK_HOURS: 1,
 
   // Đăng nhập (câu 32, đổi 01/11 chunk 5J): theo vai trò. MAX_USES 0 = bấm không giới hạn trong hạn link.

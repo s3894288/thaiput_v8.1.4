@@ -85,7 +85,7 @@ var DEFAULTS_ = {
   RESULT_NOTICE_AFTER_HOURS: 24,
   RESULT_EXPIRE_AFTER_HOURS: 48,
   RESULT_EXPIRE_AFTER_NOTICE_HOURS: 24,
-  // Chunk 5N: buổi ở trạng thái Chờ đổi tutor (PENDING_REASSIGN) quá số giờ này thì job mỗi giờ báo admin (REASSIGN_STUCK).
+  // Chunk 5N: buổi ở trạng thái Chờ đổi tutor (PENDING_REASSIGN) quá số giờ này thì job mỗi giờ báo admin (REASSIGN_STUCK). -1 = tắt.
   REASSIGN_STUCK_HOURS: 1,
 
   // Đăng nhập (câu 32, đổi 01/11 chunk 5J): theo vai trò. MAX_USES 0 = bấm không giới hạn trong hạn link.
@@ -1057,7 +1057,7 @@ function handleAdminEdit_(sheetName, header, id, value, actor, opts) {
         if (out.ok) props_().deleteProperty(ck);
       } else if (value === ADMIN_MARK_DONE_ACTION_) {
         out = adminMarkDone_(id, actor);
-        if (out.block === 'OPEN') note = ' (buổi đang ' + (BOOKING_STATUS_VI[out.status] || out.status) + ': chưa có gì để giữ nguyên, chọn việc cần làm như Đổi tutor hoặc Huỷ bởi admin)';
+        if (out.block === 'OPEN') note = ' (buổi đang ' + (BOOKING_STATUS_VI[out.status] || out.status) + ': chưa có gì để giữ nguyên. ' + (out.status === BOOKING_STATUS.PENDING_REASSIGN ? 'Chưa tới giờ học: chọn Đổi tutor hoặc Huỷ bởi admin (không trừ lượt); đã qua giờ học: chọn Vắng tutor' : 'Chờ tutor chọn kết quả, hoặc chọn kết quả thay tutor') + ')';
         if (out.block === 'TECH') note = ' (buổi kỹ thuật chưa chọn lỗi: chọn 1 trong 3 lựa chọn lỗi kỹ thuật)';
       } else if (ADMIN_RESULT_ACTIONS_[value]) out = adminSetResult_(id, actor, ADMIN_RESULT_ACTIONS_[value]);
       else out = adminSetTechFault_(id, actor, TECH_FAULT_ACTIONS_[value]);
@@ -1392,7 +1392,8 @@ function adminLessonsWaiting_(bks, now) {
   return bks.filter(function (b) {
     if (!(b.date instanceof Date)) return false;
     if (b.status === BOOKING_STATUS.CONFIRMED) return slotStart_(b.date, b.slot) <= now;
-    return b.status === BOOKING_STATUS.NOT_COMPLETED && b.date >= from;
+    // 5N: Không hoàn thành mà admin đã chọn "Đã xử lý (giữ nguyên)" (hoặc kết quả khác) thì không còn chờ, như ô Sheets hết đỏ.
+    return b.status === BOOKING_STATUS.NOT_COMPLETED && b.date >= from && !adminHandled_(b);
   });
 }
 
@@ -1784,17 +1785,21 @@ function adminCancelBooking_(bookingId, actor, reason, at) {
     var b = table_('BOOKINGS').byId(bookingId);
     if (!b) return { ok: false, reason: REASONS.NOT_FOUND };
     if (b.status !== BOOKING_STATUS.CONFIRMED && b.status !== BOOKING_STATUS.PENDING_REASSIGN) return { ok: false, reason: REASONS.INVALID_INPUT };
-    var late = !(when < cancelDeadline_(b.date)), st = late ? BOOKING_STATUS.CANCELLED_LATE : BOOKING_STATUS.CANCELLED_ADMIN;
+    // 5N (soát): buổi kẹt Chờ đổi tutor là lỗi phía trường (chưa có tutor dạy): luôn CANCELLED_ADMIN (được bù), không xét mốc huỷ muộn.
+    var late = b.status !== BOOKING_STATUS.PENDING_REASSIGN && !(when < cancelDeadline_(b.date)), st = late ? BOOKING_STATUS.CANCELLED_LATE : BOOKING_STATUS.CANCELLED_ADMIN;
     cancelBookingInternal_(b, st, actor, reason || 'Admin huỷ', 'ADMIN');
     return { ok: true, status: st, late: late };
   });
 }
 
-/** Admin đổi tutor. tutorId trống: hệ thống tự chọn theo luật; có tutorId: dùng đúng người đó nếu rảnh. Chặn sau giờ bắt đầu (5M). */
+/**
+ * Admin đổi tutor. tutorId trống: hệ thống tự chọn theo luật; có tutorId: dùng đúng người đó nếu rảnh. Chặn sau giờ bắt đầu (5M).
+ * 5N (soát): nhận cả buổi kẹt Chờ đổi tutor (PENDING_REASSIGN), đúng việc thư báo REASSIGN_STUCK bảo admin làm.
+ */
 function adminReassignBooking_(bookingId, actor, tutorId) {
   return withLock_(function () {
     var b = table_('BOOKINGS').byId(bookingId);
-    if (!b || b.status !== BOOKING_STATUS.CONFIRMED) return { ok: false, reason: b ? REASONS.INVALID_INPUT : REASONS.NOT_FOUND };
+    if (!b || (b.status !== BOOKING_STATUS.CONFIRMED && b.status !== BOOKING_STATUS.PENDING_REASSIGN)) return { ok: false, reason: b ? REASONS.INVALID_INPUT : REASONS.NOT_FOUND };
     if (!(getNow_() < slotStart_(b.date, b.slot))) return { ok: false, reason: REASONS.SLOT_STARTED };
     return reassignBookingInLock_(b, [b.tutor_id], actor, 'ADMIN', tutorId || null);
   });
@@ -3369,13 +3374,14 @@ function decideTutorCancelInLock_(availId, decision, actor) {
  * Không có ai thay: huỷ booking với trạng thái CANCELLED_TUTOR, hoàn buổi nếu là Trial hoặc gói cũ (câu 19).
  */
 function reassignBookingInLock_(booking, excludeIds, actor, cause, forcedTutorId) {
-  var tb = table_('BOOKINGS'), oldTutor = userById_(booking.tutor_id), student = userById_(booking.student_id);
+  var tb = table_('BOOKINGS'), oldTutor = userById_(booking.tutor_id), student = userById_(booking.student_id), prevStatus = booking.status;
   tb.update(booking, { status: BOOKING_STATUS.PENDING_REASSIGN });
   var cands = buildTutorCandidates_(booking.date, booking.slot, activeTutors_(), table_('AVAILABILITY').all(),
     tb.all().filter(function (b) { return b.booking_id !== booking.booking_id; }), excludeIds);
   var newId = forcedTutorId ? (cands.some(function (c) { return c.tutor_id === forcedTutorId; }) ? forcedTutorId : null) : pickTutor_(cands);
   if (!newId) {
-    if (forcedTutorId) { tb.update(booking, { status: BOOKING_STATUS.CONFIRMED }); return { ok: false, reason: REASONS.NO_TUTOR }; }
+    // 5N (soát): trả về đúng trạng thái trước đó. Buổi đang kẹt Chờ đổi tutor không được thành CONFIRMED với tutor cũ (người đã không dạy).
+    if (forcedTutorId) { tb.update(booking, { status: prevStatus }); return { ok: false, reason: REASONS.NO_TUTOR }; }
     // 5L (soát): khoá tutor: lý do riêng, không gửi thư huỷ cho tutor bị khoá.
     if (cause === 'LOCK') cancelBookingInternal_(booking, BOOKING_STATUS.CANCELLED_TUTOR, actor, 'Tutor nghỉ, không có tutor thay', 'TUTOR_LOCK');
     else cancelBookingInternal_(booking, BOOKING_STATUS.CANCELLED_TUTOR, actor, 'Tutor huỷ, không có tutor thay', 'TUTOR');
@@ -5786,11 +5792,9 @@ function ensureRows_(sheet, tableName, lastNeeded) {
   var add = Math.max(DB_GROW_ROWS_, lastNeeded - max);
   sheet.insertRowsAfter(max, add);
   applyDropdowns_(sheet, tableName, max + 1, add);
-  // Chunk 5N: luật tô màu có vùng cố định (hàng 2 tới hết tab lúc đặt): đặt lại để phủ cả hàng vừa thêm. Lỗi tô màu không được
-  // làm hỏng lượt ghi dữ liệu (luật 39): chỉ ghi log.
-  if (HIGHLIGHT_TABLES_.indexOf(tableName) !== -1) {
-    try { applyHighlightsFor_(sheet.getParent(), tableName); } catch (e) { Logger.log('Tô màu lại ' + tableName + ' lỗi: ' + e.message); }
-  }
+  // Chunk 5N: luật tô màu có vùng cố định (hàng 2 tới hết tab lúc đặt): nới vùng để phủ cả hàng vừa thêm (giữ luật admin tự thêm).
+  // Lỗi tô màu không được làm hỏng lượt ghi dữ liệu (luật 39): chỉ ghi log.
+  try { extendHighlightRanges_(sheet, max, max + add); } catch (e) { Logger.log('Nới vùng tô màu ' + tableName + ' lỗi: ' + e.message); }
 }
 
 /** Chữ bắt đầu bằng = + - @ ở cột không phải dạng chữ: thêm dấu nháy đơn để Sheets lưu nguyên văn, không chạy công thức. */
@@ -6773,34 +6777,45 @@ function reconcileInLock_(now) {
 /**
  * Chunk 5N: buổi kẹt ở Chờ đổi tutor (PENDING_REASSIGN). Bình thường trạng thái này chỉ có trong một khoá (đổi tutor xong thì về
  * CONFIRMED hoặc huỷ); còn lại sau khoá là do lượt đổi tutor lỗi giữa chừng hoặc sửa tay, và buổi không có tutor dạy.
- * BOOKINGS không có cột "lúc vào trạng thái này", nên job ghi lần đầu thấy (Script Property STUCK_<mã>, mốc ms) và báo REASSIGN_STUCK
- * đúng một lần khi đã thấy đủ REASSIGN_STUCK_HOURS giờ. Dấu đã báo (SENT) chỉ ghi sau khi khoá ghi xong dòng thông báo.
- * Buổi ra khỏi trạng thái (đổi tutor, huỷ) thì xoá dấu: kẹt lại lần sau được báo lại. Trả số buổi vừa báo.
+ * BOOKINGS không có cột "lúc vào trạng thái này", nên job ghi lần đầu thấy (Script Property STUCK_<mã>, mốc ms) và báo khi đã thấy
+ * đủ REASSIGN_STUCK_HOURS giờ (trừ STUCK_TOLERANCE_MS_ vì trigger mỗi giờ của Google lệch vài phút). -1 = tắt.
+ * Đã báo hay chưa tra chính tab NOTIFICATIONS (thông báo REASSIGN_STUCK có mã buổi, ghi sau lần đầu thấy): dòng thông báo và dấu
+ * "đã báo" là một, khoá lỗi thì cả hai cùng mất và giờ sau báo lại. Mỗi lượt một thông báo (một email) liệt kê mọi buổi, không dồn thư.
+ * Buổi ra khỏi trạng thái thì xoá mốc: kẹt lại lần sau được báo lại. Trả số buổi vừa báo.
  */
+var STUCK_TOLERANCE_MS_ = 15 * 60000;
 function reassignStuckInLock_(now) {
   var hours = Number(cfg_('REASSIGN_STUCK_HOURS'));
-  if (!(hours >= 0)) hours = DEFAULTS_.REASSIGN_STUCK_HOURS;
-  var p = props_(), all = p.getProperties(), seen = {}, stuck = [];
-  table_('BOOKINGS').filter(function (b) { return b.status === BOOKING_STATUS.PENDING_REASSIGN; }).forEach(function (b) {
-    var k = 'STUCK_' + b.booking_id, v = all[k];
+  if (isNaN(hours)) hours = DEFAULTS_.REASSIGN_STUCK_HOURS;
+  var p = props_(), all = p.getProperties(), seen = {}, due = [];
+  var list = hours < 0 ? [] : table_('BOOKINGS').filter(function (b) { return b.status === BOOKING_STATUS.PENDING_REASSIGN; });
+  var told = {};
+  if (list.length) table_('NOTIFICATIONS').filter(function (n) { return n.event === 'REASSIGN_STUCK'; }).forEach(function (n) {
+    var t = new Date(n.time).getTime();
+    String(n.entity_id || '').split(',').forEach(function (id) { if (!isNaN(t) && !(told[id] >= t)) told[id] = t; });
+  });
+  list.forEach(function (b) {
+    var k = 'STUCK_' + b.booking_id, since = Number(all[k]);
     seen[k] = true;
-    if (v === 'SENT') return;
-    var since = Number(v);
-    if (!v || isNaN(since)) { since = now.getTime(); p.setProperty(k, String(since)); }
-    if (now.getTime() - since >= hours * 3600000) stuck.push(b);
+    if (!all[k] || isNaN(since)) { since = now.getTime(); p.setProperty(k, String(since)); }
+    if (told[b.booking_id] >= since) return;
+    if (now.getTime() - since >= hours * 3600000 - STUCK_TOLERANCE_MS_) due.push(b);
   });
   Object.keys(all).forEach(function (k) { if (/^STUCK_/.test(k) && !seen[k]) p.deleteProperty(k); });
-  if (!stuck.length) return 0;
+  if (!due.length) return 0;
   var names = {}; table_('USERS').all().forEach(function (u) { names[u.user_id] = u.name; });
-  stuck.forEach(function (b) {
-    var who = (names[b.student_id] || b.student_id) + ', ' + (names[b.tutor_id] || b.tutor_id);
-    logActivity_('SYSTEM', 'REASSIGN_STUCK', 'BOOKING', b.booking_id, { tutor: b.tutor_id, hours: hours });
-    notify_('REASSIGN_STUCK', { student_id: b.student_id, tutor_id: b.tutor_id, entity: 'BOOKING', entity_id: b.booking_id, link: rowLink_('BOOKINGS', b._row),
-      message: 'Buổi ' + b.booking_id + ' (' + fmtDayVi_(b.date) + ' ' + b.slot + ', ' + who + ') kẹt ở Chờ đổi tutor quá ' + hours + ' giờ: chưa có tutor dạy. Chọn Đổi tutor hoặc Huỷ bởi admin ở cột admin_action.',
-      message_en: 'Lesson ' + b.booking_id + ' (' + fmtDayEn_(b.date) + ' ' + b.slot + ', ' + who + ') has been stuck waiting for a new tutor for over ' + hours + ' hour(s): no tutor will teach it. Pick Đổi tutor (reassign) or Huỷ bởi admin (cancel) in the admin_action column.' });
-    afterLock_(function () { props_().setProperty('STUCK_' + b.booking_id, 'SENT'); });
-  });
-  return stuck.length;
+  var line = function (b, en) {
+    return b.booking_id + ' (' + (en ? fmtDayEn_(b.date) : fmtDayVi_(b.date)) + ' ' + b.slot + ', ' + (names[b.student_id] || b.student_id) + ', ' + (names[b.tutor_id] || b.tutor_id) + ')';
+  };
+  due.forEach(function (b) { logActivity_('SYSTEM', 'REASSIGN_STUCK', 'BOOKING', b.booking_id, { tutor: b.tutor_id, hours: hours }); });
+  notify_('REASSIGN_STUCK', { entity: 'BOOKING', entity_id: due.map(function (b) { return b.booking_id; }).join(','),
+    student_id: due.length === 1 ? due[0].student_id : '', tutor_id: due.length === 1 ? due[0].tutor_id : '',
+    link: due.length === 1 ? rowLink_('BOOKINGS', due[0]._row) : rowLink_('BOOKINGS'),
+    message: due.length + ' buổi kẹt ở Chờ đổi tutor quá ' + hours + ' giờ, chưa có tutor dạy: ' + due.map(function (b) { return line(b, false); }).join('; ') +
+      '. Chưa tới giờ học: chọn Đổi tutor hoặc Huỷ bởi admin ở cột admin_action (huỷ không trừ lượt, học viên được bù). Đã qua giờ học: chọn Vắng tutor.',
+    message_en: due.length + ' lesson(s) stuck waiting for a new tutor for over ' + hours + ' hour(s), no tutor will teach: ' + due.map(function (b) { return line(b, true); }).join('; ') +
+      '. Before the lesson: pick Đổi tutor (reassign) or Huỷ bởi admin (cancel, not deducted, compensated) in the admin_action column. After the lesson time: pick Vắng tutor (tutor absent).' });
+  return due.length;
 }
 
 /** Mỗi giờ: tự từ chối yêu cầu huỷ quá hạn duyệt (câu 20), tự hoàn thành buổi quá 24 giờ (câu 29). */
@@ -6827,7 +6842,7 @@ function hourlyJob(e) { requireOperator_(e);
     // Bảo trì: tutor không xác nhận được, nên tạm dừng bước chuyển Không hoàn thành (vẫn báo).
     var completed = resultOverdueInLock_(now, maintMode_() === 'OFF');
     // Chunk 5N: buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: báo admin một lần.
-    var stuck = 0; try { stuck = reassignStuckInLock_(now); } catch (se) { Logger.log('Báo buổi kẹt lỗi: ' + se.message); }
+    var stuck = 0; try { stuck = reassignStuckInLock_(now); } catch (se) { Logger.log('Báo buổi kẹt lỗi: ' + se.message); mailAdminError_('Báo buổi kẹt (hourlyJob)', (se && se.stack) || String(se)); }
     // Chunk 5M: tính lại gói còn chạy (khoá ngày bắt đầu khi buổi kỹ thuật quá TECH_DECIDE_HOURS, tự lành ô bị sửa ngoài hệ thống).
     var heal = null; try { heal = pkgHealAllInLock_(now); } catch (he) { Logger.log('Tính lại gói lỗi: ' + he.message); mailAdminError_('Tính lại gói (hourlyJob)', (he && he.stack) || String(he)); }
     // Việc theo giờ trong ngày (chunk 5B), mỗi việc tối đa 1 lần mỗi ngày hoặc mỗi tuần:
@@ -8406,6 +8421,19 @@ function techFault_(b) {
   return (b.payroll_override === true || String(b.payroll_override).toUpperCase() === 'TRUE') ? TECH_FAULT.OBJECTIVE : TECH_FAULT.TUTOR;
 }
 /** Buổi trừ lượt và giữ ngày bắt đầu tạm tính: CONSUMING_STATUSES, huỷ muộn, kỹ thuật lỗi học viên. */
+/**
+ * Chunk 5N: admin đã xử lý buổi sau kết quả cuối: admin_done_at có và không cũ hơn result_at. Cùng nghĩa với luật tô màu BOOKINGS
+ * (Setup.gs highlightSpecs_: chưa xử lý = admin_done_at trống hoặc < result_at) và danh sách chờ kết quả của trang quản trị.
+ */
+function adminHandled_(b) {
+  if (!b || !b.admin_done_at) return false;
+  var d = new Date(b.admin_done_at).getTime();
+  if (isNaN(d)) return false;
+  if (!b.result_at) return true;
+  var r = new Date(b.result_at).getTime();
+  return isNaN(r) || d >= r;
+}
+
 function bookingDeducts_(b) {
   if (isConsuming_(b.status) || b.status === BOOKING_STATUS.CANCELLED_LATE) return true;
   return b.status === BOOKING_STATUS.TECH_ISSUE && techFault_(b) === TECH_FAULT.STUDENT;
@@ -9517,7 +9545,8 @@ function setupCore_(ss) {
  *     "Chưa xử lý" = admin_done_at trống hoặc cũ hơn result_at (kết quả đổi sau lần admin xử lý trước thì hiện lại).
  *   STUDENT_PACKAGES (5N): đỏ = còn thông báo COMP_ON_EXPIRED chưa đọc (chờ admin cộng tay comp_days_admin); xám = hết hạn;
  *     vàng = còn EXPIRY_NOTICE_DAYS ngày; tím = admin đã cộng tay; xanh dương = có ngày bù.
- * Vùng tô màu phủ từ hàng 2 tới hết tab; tab tự thêm hàng (Db.gs ensureRows_) thì gọi lại applyHighlightsFor_ cho tab đó.
+ * Vùng tô màu phủ từ hàng 2 tới hết tab; tab tự thêm hàng (Db.gs ensureRows_) thì nới vùng các luật đang có (extendHighlightRanges_),
+ * không thay luật: luật admin tự thêm vẫn giữ. Đổi EXPIRY_NOTICE_DAYS trong CONFIG: chạy lại menu 1 để màu vàng đổi theo.
  */
 var HL_ = { RED: '#ea9999', ORANGE: '#f6b26b', PINK: '#f9d2e4', YELLOW: '#fff3cd', LIGHT_BLUE: '#cfe2f3', BLUE: '#9fc5e8',
   PURPLE: '#d9d2e9', GREEN: '#d1e7dd', GREY: '#e9ecef', SOFT_RED: '#f8d7da' };
@@ -9558,7 +9587,8 @@ function highlightSpecs_(ss, name) {
   if (name === 'STUDENT_PACKAGES') {
     var nt = ss.getSheetByName('NOTIFICATIONS'), canNotif = nt && hlColLetter_(nt, 'entity_id') && hlColLetter_(nt, 'event') && hlColLetter_(nt, 'read');
     return [
-      canNotif ? ['=COUNTIFS([[NOTIFICATIONS.entity_id]],{sp_id},[[NOTIFICATIONS.event]],"COMP_ON_EXPIRED",[[NOTIFICATIONS.read]],"<>TRUE")>0', HL_.RED] : null,
+      // IF: hàng trống không chạy COUNTIFS trên cả cột NOTIFICATIONS (Sheets bỏ qua nhánh không dùng).
+      canNotif ? ['=IF({sp_id}="",FALSE,COUNTIFS([[NOTIFICATIONS.entity_id]],{sp_id},[[NOTIFICATIONS.event]],"COMP_ON_EXPIRED",[[NOTIFICATIONS.read]],"<>TRUE")>0)', HL_.RED] : null,
       ['={status}="' + PKG_STATUS.EXPIRED + '"', HL_.GREY],
       ['=AND({status}="' + PKG_STATUS.ACTIVE + '",{end_date}<>"",{end_date}>=TODAY(),{end_date}-TODAY()<=' + Number(cfg_('EXPIRY_NOTICE_DAYS')) + ')', HL_.YELLOW],
       has('comp_days_admin') ? ['=N({comp_days_admin})<>0', HL_.PURPLE] : null,
@@ -9580,6 +9610,28 @@ function applyHighlightsFor_(ss, name) {
   });
   sh.setConditionalFormatRules(rules);
   return rules.length;
+}
+
+/**
+ * Tab vừa thêm hàng (oldMax → newMax): mọi luật tô màu (của hệ thống và của admin) có vùng chạm hàng cuối cũ được nới tới hàng cuối mới.
+ * Không đổi công thức, màu hay thứ tự luật. Trả số luật đã nới.
+ */
+function extendHighlightRanges_(sheet, oldMax, newMax) {
+  var rules = sheet.getConditionalFormatRules(), n = 0;
+  if (!rules || !rules.length) return 0;
+  var out = rules.map(function (r) {
+    var changed = false;
+    var rs = r.getRanges().map(function (g) {
+      if (g.getRow() + g.getNumRows() - 1 < oldMax) return g;
+      changed = true;
+      return sheet.getRange(g.getRow(), g.getColumn(), newMax - g.getRow() + 1, g.getNumColumns());
+    });
+    if (!changed) return r;
+    n++;
+    return r.copy().setRanges(rs).build();
+  });
+  if (n) sheet.setConditionalFormatRules(out);
+  return n;
 }
 
 function applyHighlights_(ss) {

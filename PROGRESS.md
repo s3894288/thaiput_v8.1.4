@@ -1,6 +1,6 @@
 # Thaiput v8 · Tiến độ theo chunk
 
-**Trạng thái 07/11/2026: 5N XONG, bản 8.1.7** (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt Chờ đổi tutor). Chi tiết: mục "Chunk 5N" dưới đây. Chunk 5 còn 5P (hợp nhất, chốt v8). **Đến lượt anh rà BACKLOG** (đã hẹn sau 5N, 5O).
+**Trạng thái 07/11/2026: 5N XONG, bản 8.1.7** (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt Chờ đổi tutor; soát chéo 2 agent tìm ra và đã sửa lỗi buổi kẹt không xử lý được). Chi tiết: mục "Chunk 5N" dưới đây. Chunk 5 còn 5P (hợp nhất, chốt v8). BACKLOG còn **38 câu chờ anh** (mục A 34, mục B 4). **Đến lượt anh rà BACKLOG** (đã hẹn sau 5N, 5O).
 
 ## Chunk 5N: tô màu Sheets (07/11/2026, bản 8.1.7)
 
@@ -10,7 +10,8 @@
 * **Lựa chọn mới "Đã xử lý (giữ nguyên)"** ở dropdown `admin_action` của BOOKINGS: không đổi trạng thái, lương hay gói; chỉ ghi `admin_done_at` và nhật ký `ADMIN_MARK_DONE`. Không cho chọn khi màu chỉ hết bằng việc thật: buổi chưa có kết quả (CONFIRMED), Chờ đổi tutor, Vấn đề kỹ thuật chưa chọn lỗi; ô báo rõ việc cần làm.
 * **"Chưa xử lý"** = `admin_done_at` trống HOẶC cũ hơn `result_at`: kết quả đổi sau lần admin xử lý trước (tutor sửa lại) thì màu hiện lại.
 * **Màu mới** (luật đầu tiên khớp thắng, theo thứ tự trong bảng dưới). Vùng tô màu phủ tới hết tab; tab tự thêm hàng thì đặt lại (trước đây hàng thêm sau không có màu).
-* **Báo buổi kẹt Chờ đổi tutor:** job mỗi giờ thấy buổi ở PENDING_REASSIGN quá `REASSIGN_STUCK_HOURS` giờ (CONFIG mới, mặc định 1) thì báo Khẩn qua email (REASSIGN_STUCK), một lần mỗi lần kẹt.
+* **Báo buổi kẹt Chờ đổi tutor:** job mỗi giờ thấy buổi ở PENDING_REASSIGN quá `REASSIGN_STUCK_HOURS` giờ (CONFIG mới, mặc định 1, -1 = tắt) thì báo Khẩn qua email (REASSIGN_STUCK), một lần mỗi lần kẹt. Nhiều buổi kẹt cùng lượt: MỘT email liệt kê hết. Chịu lệch nhịp trigger 15 phút.
+* **Sửa theo soát chéo (cả 2 agent cùng thấy, HIGH):** buổi kẹt trước đây KHÔNG xử lý được như thư báo bảo: "Đổi tutor" luôn lỗi, "Huỷ bởi admin" sau 15:00 hôm trước thành Huỷ muộn (học viên mất lượt cho lỗi phía trường). Nay "Đổi tutor" nhận buổi kẹt; chỉ định tutor bận thì buổi vẫn kẹt (trước đây thành CONFIRMED với tutor cũ, người không dạy); "Huỷ bởi admin" buổi kẹt luôn là Huỷ bởi admin, được bù (BL74). Trang quản trị bỏ buổi Không hoàn thành đã "Đã xử lý" khỏi danh sách chờ (cùng một hàm `adminHandled_` với màu Sheets). Tab tự thêm hàng thì chỉ nới vùng tô màu, giữ luật admin tự thêm.
 
 ### Màu nghĩa là gì, làm gì để hết màu
 
@@ -34,10 +35,11 @@
 |---|---|
 | Hàm thuần và Db | 34/34 |
 | 40 kịch bản | 46/46 |
-| Tích hợp | 138/138 (mới I136 màu BOOKINGS và "Đã xử lý", I137 màu STUDENT_PACKAGES, I138 báo buổi kẹt, I139 vùng tô màu khi thêm hàng và khi thiếu cột; I34 đổi số luật). Test chạy CÔNG THỨC THẬT trên dữ liệu thật qua bộ tính công thức trong test (AND, OR, N, TODAY, COUNTIFS, INDIRECT, so sánh), không chỉ so chuỗi |
+| Tích hợp | 139/139 (mới I136 màu BOOKINGS và "Đã xử lý", I137 màu STUDENT_PACKAGES, I138 báo buổi kẹt, I139 vùng tô màu khi thêm hàng và khi thiếu cột, I140 hồi quy xử lý buổi kẹt; I34 đổi số luật). Test chạy CÔNG THỨC THẬT trên dữ liệu thật qua bộ tính công thức trong test (AND, OR, N, TODAY, COUNTIFS, INDIRECT, so sánh), không chỉ so chuỗi |
 | Giao diện web | 49/49 |
 | Thử tải | 2/2 |
-| Thử phá | 31 đột biến: 30 bắt, 1 tương đương (đảo thứ tự luật đỏ và cam: không dòng nào khớp cả hai). Lần đầu 2 đột biến sống lộ 2 lỗ test (admin tự chọn kết quả cùng lúc; báo trùng sau nhiều giờ), đã thêm test |
+| Thử phá | 39 đột biến (sau vòng sửa): 38 bắt, 1 tương đương (đảo thứ tự luật đỏ và cam: không dòng nào khớp cả hai). Đặt lại 2 lỗi gốc của soát chéo thì I140 bắt cả hai. Các vòng trước lộ 4 lỗ test (admin tự chọn kết quả cùng lúc; báo trùng sau nhiều giờ; tab không tròn 1.000 hàng; mốc bằng nhau ở adminHandled_), đã thêm test |
+| Soát chéo | 2 agent độc lập (code và luật; vận hành, nâng cấp, dữ liệu): 1 HIGH (cả hai cùng thấy: buổi kẹt không xử lý được), 6 MEDIUM, 12 LOW. Đã sửa HIGH và mọi MEDIUM sửa được trong phạm vi (thư báo kẹt gộp, lệch nhịp trigger, web khớp màu Sheets, chống mất thông báo); 4 câu cần anh quyết ghi BACKLOG BL72 đến BL75 |
 
 ### Việc của admin (STAGING, theo thứ tự luật 38)
 
@@ -50,6 +52,9 @@
 ### Giới hạn còn lại (nói thẳng)
 
 * Bảng màu ở trên chưa đưa vào `HUONG_DAN_VAN_HANH.md` (hướng dẫn chỉ xuất khi anh yêu cầu, quy ước 1); sẽ gộp ở 5P.
+* Màu đỏ gói "chờ cộng tay" hết khi thông báo được đánh dấu đã đọc (kể cả "Đã đọc hết"): cộng ngày xong rồi mới đánh dấu (BL73).
+* Buổi Vắng học viên, Không hoàn thành có từ trước vẫn tô màu tới khi chọn "Đã xử lý" từng dòng (BL72).
+* Đổi `EXPIRY_NOTICE_DAYS`: chạy lại menu 1 để màu vàng đổi theo (BL75).
 * Công thức tô màu được kiểm bằng bộ tính trong test, chưa kiểm trên Google Sheets thật: sau menu 1 trên STAGING, xem đúng màu ở vài dòng mẫu.
 * Phần còn lại của 5Q (BL69: bảng hạn mức 5 dòng, kiểm thư 5 loại hộp thư) chưa làm.
 

@@ -51,11 +51,9 @@ function ensureRows_(sheet, tableName, lastNeeded) {
   var add = Math.max(DB_GROW_ROWS_, lastNeeded - max);
   sheet.insertRowsAfter(max, add);
   applyDropdowns_(sheet, tableName, max + 1, add);
-  // Chunk 5N: luật tô màu có vùng cố định (hàng 2 tới hết tab lúc đặt): đặt lại để phủ cả hàng vừa thêm. Lỗi tô màu không được
-  // làm hỏng lượt ghi dữ liệu (luật 39): chỉ ghi log.
-  if (HIGHLIGHT_TABLES_.indexOf(tableName) !== -1) {
-    try { applyHighlightsFor_(sheet.getParent(), tableName); } catch (e) { Logger.log('Tô màu lại ' + tableName + ' lỗi: ' + e.message); }
-  }
+  // Chunk 5N: luật tô màu có vùng cố định (hàng 2 tới hết tab lúc đặt): nới vùng để phủ cả hàng vừa thêm (giữ luật admin tự thêm).
+  // Lỗi tô màu không được làm hỏng lượt ghi dữ liệu (luật 39): chỉ ghi log.
+  try { extendHighlightRanges_(sheet, max, max + add); } catch (e) { Logger.log('Nới vùng tô màu ' + tableName + ' lỗi: ' + e.message); }
 }
 
 /** Chữ bắt đầu bằng = + - @ ở cột không phải dạng chữ: thêm dấu nháy đơn để Sheets lưu nguyên văn, không chạy công thức. */
