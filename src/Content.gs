@@ -471,6 +471,7 @@ var DEFAULT_CONTENT_ = {
   'ad.ev.BOOKING_OUT_OF_RANGE': ['Buổi nằm ngoài hạn gói', 'Lesson outside package dates', 'Dòng nhỏ dưới thông báo', 'Sự kiện BOOKING_OUT_OF_RANGE'],
   'ad.ev.TRIAL_OVER_LIMIT': ['Trial quá số lượt', 'Trial over limit', 'Dòng nhỏ dưới thông báo', 'Sự kiện TRIAL_OVER_LIMIT'],
   'ad.ev.RESULT_OVERDUE': ['Tutor quá hạn chọn kết quả', 'Tutor result overdue', 'Dòng nhỏ dưới thông báo', 'Sự kiện RESULT_OVERDUE'],
+  'ad.ev.REASSIGN_STUCK': ['Buổi kẹt chờ đổi tutor', 'Lesson stuck waiting for a tutor', 'Dòng nhỏ dưới thông báo', 'Sự kiện REASSIGN_STUCK'],
   'ad.ev.RESULT_NOT_COMPLETED': ['Buổi Không hoàn thành', 'Lesson not completed', 'Dòng nhỏ dưới thông báo', 'Sự kiện RESULT_NOT_COMPLETED'],
   'ad.ev.TECH_MIGRATED': ['Chuyển buổi kỹ thuật cũ', 'Old technical lessons moved', 'Dòng nhỏ dưới thông báo', 'Sự kiện TECH_MIGRATED'],
   // Tên hành động trong nhật ký (chữ đậm ở mỗi dòng). Mã gốc là cột action của ACTIVITY_LOG.
@@ -522,6 +523,8 @@ var DEFAULT_CONTENT_ = {
   'ad.act.COMP_TO_NEXT': ['Bù ngày vào gói sau', 'Make up days moved to next package', 'Chữ đậm ở dòng nhật ký', 'Hành động COMP_TO_NEXT'],
   'ad.act.BOOKING_OUT_OF_RANGE': ['Buổi nằm ngoài hạn gói', 'Lesson outside package dates', 'Chữ đậm ở dòng nhật ký', 'Hành động BOOKING_OUT_OF_RANGE'],
   'ad.act.RESULT_OVERDUE': ['Báo tutor quá hạn chọn kết quả', 'Result overdue alert', 'Chữ đậm ở dòng nhật ký', 'Hành động RESULT_OVERDUE'],
+  'ad.act.REASSIGN_STUCK': ['Báo buổi kẹt chờ đổi tutor', 'Stuck reassignment alert', 'Chữ đậm ở dòng nhật ký', 'Hành động REASSIGN_STUCK'],
+  'ad.act.ADMIN_MARK_DONE': ['Admin đánh dấu đã xử lý', 'Admin marked as handled', 'Chữ đậm ở dòng nhật ký', 'Hành động ADMIN_MARK_DONE (cột admin_action: Đã xử lý (giữ nguyên))'],
   'ad.act.RESULT_NOT_COMPLETED': ['Buổi thành Không hoàn thành', 'Lesson became Not completed', 'Chữ đậm ở dòng nhật ký', 'Hành động RESULT_NOT_COMPLETED'],
   'ad.act.ADMIN_RESULT': ['Admin chọn kết quả buổi', 'Admin set lesson result', 'Chữ đậm ở dòng nhật ký', 'Hành động ADMIN_RESULT'],
   'ad.act.COMP_DRY_RUN': ['Xem trước luật bù buổi', 'Make up rules preview', 'Chữ đậm ở dòng nhật ký', 'Hành động COMP_DRY_RUN'],

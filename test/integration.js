@@ -583,7 +583,9 @@ t('I34', 'Cài đặt tạo NOTIFY_RULES, tô màu 4 tab, ô tick read; link m�
   api.clearDbCache_(); api.clearConfigCache_();
   assert.strictEqual(api.table_('NOTIFY_RULES').all().length, Object.keys(api.DEFAULT_NOTIFY_RULES_).length);
   const sh = env.state.spreadsheets.NEW_DB.sheets;
-  assert.ok(sh.NOTIFICATIONS.cfRules.length === 3 && sh.REGISTRATIONS.cfRules.length === 1 && sh.AVAILABILITY.cfRules.length === 2 && sh.BOOKINGS.cfRules.length === 3);
+  // 5N: BOOKINGS 6 màu (đỏ, cam đậm, hồng, vàng, xanh dương nhạt, xám), STUDENT_PACKAGES 5 màu (đỏ, xám, vàng, tím, xanh dương).
+  assert.ok(sh.NOTIFICATIONS.cfRules.length === 3 && sh.REGISTRATIONS.cfRules.length === 1 && sh.AVAILABILITY.cfRules.length === 2 && sh.BOOKINGS.cfRules.length === 6 && sh.STUDENT_PACKAGES.cfRules.length === 5,
+    [sh.NOTIFICATIONS, sh.REGISTRATIONS, sh.AVAILABILITY, sh.BOOKINGS, sh.STUDENT_PACKAGES].map(x => x.cfRules.length).join(','));
   assert.ok(/^=AND\(\$C2="CRITICAL",\$P2<>TRUE\)$/.test(sh.NOTIFICATIONS.cfRules[1].formula), sh.NOTIFICATIONS.cfRules[1].formula);
   assert.ok(/#gid=REGISTRATIONS&range=A5$/.test(api.rowLink_('REGISTRATIONS', 5)));
   // Chạy lại không thêm trùng luật
@@ -4176,6 +4178,330 @@ t('I135', 'Soát tài liệu 5Q (hồi quy): chọn Từ chối sau khi đã Duy
   api.clearDbCache_();
   const after = api.table_('BOOKINGS').byId(bk.bookingId);
   assert.ok(after.tutor_id !== 'T001' || after.status !== 'CONFIRMED', JSON.stringify({ t: after.tutor_id, s: after.status, n: after.admin_note }));
+});
+
+// ══ Chunk 5N: tô màu Sheets, "Đã xử lý (giữ nguyên)", buổi kẹt Chờ đổi tutor ══
+
+/**
+ * Tính công thức tô màu như Google Sheets cho đúng phần cú pháp mà applyHighlights_ dùng (AND, OR, N, TODAY, COUNTIFS, INDIRECT,
+ * so sánh, trừ), trên dữ liệu thật của tab giả lập. Luật 14: ô trống so với "" là bằng, so với số là 0; chữ so không phân biệt hoa thường;
+ * ngày là số ngày kiểu Sheets. Trả màu của luật ĐẦU TIÊN khớp (Sheets chỉ áp một luật), hoặc '' nếu không luật nào khớp.
+ */
+function cfColor(c, table, rowNum, today) {
+  const ss = c.env.state.spreadsheets.DB_STAGING_TEST, sh = ss.sheets[table];
+  const serial = (d) => (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000 + (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()) / 86400;
+  const blank = (v) => v === '' || v === null || v === undefined;
+  const norm = (v) => v instanceof Date ? serial(v) : v;
+  const colIdx = (L) => { let n = 0; for (const ch of L) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+  const cell = (tab, r, L) => { const line = ss.sheets[tab].values[r - 1] || []; const v = line[colIdx(L)]; return v === undefined ? '' : v; };
+  const cmp = (a, b, op) => {
+    a = norm(a); b = norm(b);
+    let x = a, y = b;
+    if (blank(x) && typeof y === 'number') x = 0; if (blank(y) && typeof x === 'number') y = 0;
+    if (blank(x) && typeof y === 'string') x = ''; if (blank(y) && typeof x === 'string') y = '';
+    if (blank(x) && typeof y === 'boolean') x = false; if (blank(y) && typeof x === 'boolean') y = false;
+    if (typeof x === 'string' && typeof y === 'string') { x = x.toLowerCase(); y = y.toLowerCase(); }
+    const eq = typeof x === typeof y ? x === y : false;
+    switch (op) { case '=': return eq; case '<>': return !eq; case '<': return typeof x === typeof y && x < y; case '>': return typeof x === typeof y && x > y; case '<=': return typeof x === typeof y && x <= y; case '>=': return typeof x === typeof y && x >= y; }
+    throw new Error('op ' + op);
+  };
+  const crit = (v, cr) => { const m = typeof cr === 'string' && cr.match(/^(<>|>=|<=|=|<|>)(.*)$/); if (!m) return cmp(v, cr, '='); let rhs = m[2]; if (/^true$/i.test(rhs)) rhs = true; else if (/^false$/i.test(rhs)) rhs = false; else if (rhs !== '' && !isNaN(Number(rhs))) rhs = Number(rhs); return cmp(v, rhs, m[1]); };
+  const evalAt = (formula, r) => {
+    const toks = formula.replace(/^=/, '').match(/"[^"]*"|\$?[A-Z]+\$?\d+|[A-Z]+(?=\()|TRUE|FALSE|\d+(?:\.\d+)?|<>|<=|>=|[=<>+\-(),]/g);
+    let i = 0;
+    const peek = () => toks[i], next = () => toks[i++];
+    const fns = {
+      AND: (a) => a.every(Boolean), OR: (a) => a.some(Boolean), IF: (a) => (a[0] ? a[1] : a[2]),
+      N: (a) => { const v = norm(a[0]); return typeof v === 'number' ? v : 0; },
+      TODAY: () => Math.floor(serial(today)),   // Sheets: TODAY() chỉ là ngày, không có giờ
+      INDIRECT: (a) => { const m = a[0].match(/^(\w+)!\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)$/); const vals = ss.sheets[m[1]].values, out = []; for (let k = Number(m[3]); k <= vals.length; k++) out.push(cell(m[1], k, m[2])); return out; },
+      COUNTIFS: (a) => { let n = 0; for (let k = 0; k < a[0].length; k++) { let ok = true; for (let p = 0; p < a.length; p += 2) if (!crit(a[p][k], a[p + 1])) { ok = false; break; } if (ok) n++; } return n; }
+    };
+    const primary = () => {
+      const t = next();
+      if (t === '(') { const v = expr(); next(); return v; }
+      if (t[0] === '"') return t.slice(1, -1);
+      if (t === 'TRUE') return true; if (t === 'FALSE') return false;
+      if (/^\d/.test(t)) return Number(t);
+      const ref = t.match(/^\$?([A-Z]+)\$?(\d+)$/);
+      if (ref && peek() !== '(') return cell(table, r + Number(ref[2]) - 2, ref[1]);
+      if (!fns[t]) throw new Error('Hàm chưa hỗ trợ trong bộ tính: ' + t);
+      next(); const args = [];
+      if (peek() !== ')') { args.push(expr()); while (peek() === ',') { next(); args.push(expr()); } }
+      next(); return fns[t](args);
+    };
+    const add = () => { let v = primary(); while (peek() === '+' || peek() === '-') { const op = next(), w = primary(); const a = norm(v), b = norm(w); v = (blank(a) ? 0 : a) + (op === '+' ? 1 : -1) * (blank(b) ? 0 : b); } return v; };
+    const expr = () => { const a = add(); if (['=', '<>', '<', '>', '<=', '>='].includes(peek())) { const op = next(); return cmp(a, add(), op); } return a; };
+    const v = expr();
+    if (i !== toks.length) throw new Error('Còn token chưa đọc: ' + toks.slice(i).join(' ') + ' trong ' + formula);
+    return v;
+  };
+  for (const rule of sh.cfRules || []) { if (evalAt(rule.formula, rowNum) === true) return rule.bg; }
+  return '';
+}
+const HL5N = { RED: '#ea9999', ORANGE: '#f6b26b', PINK: '#f9d2e4', YELLOW: '#fff3cd', LIGHT_BLUE: '#cfe2f3', BLUE: '#9fc5e8', PURPLE: '#d9d2e9', GREY: '#e9ecef' };
+const bkSet = (c, id, patch) => c.api.withLock_(() => { const t = c.api.table_('BOOKINGS'); t.update(t.byId(id), patch); });
+const bkColor = (c, id) => { const b = c.row('BOOKINGS', id); return cfColor(c, 'BOOKINGS', b._row, c.api.getNow_()); };
+
+t('I136', '5N BOOKINGS: đúng 6 màu theo thứ tự ưu tiên; "Đã xử lý (giữ nguyên)" ghi admin_done_at, hết vàng Vắng học viên và đỏ Không hoàn thành, hiện lại khi kết quả đổi sau đó; không cho chọn ở buổi chưa có kết quả, chờ đổi tutor, kỹ thuật chưa chọn lỗi; lựa chọn khác chạy được cũng ghi admin_done_at', () => {
+  const c = mk('2026-10-12 10:00'), { api } = c;
+  api.applyHighlights_(api.dbSpreadsheet_());
+  const days = ['13', '14', '15', '16', '17', '19', '20', '21'];
+  days.forEach(d => c.onlyOpen('2026-10-' + d, '19:00', ['T001']));
+  const ids = days.map((d) => { const r = c.book('S003', [['2026-10-' + d, '19:00']]); assert.ok(r[0].ok, d + ' ' + JSON.stringify(r)); return r[0].bookingId; });
+  const [bConf, bOver, bNot, bPend, bTech, bAbs, bComp, bLate] = ids;
+  c.onlyOpen('2026-10-22', '19:00', ['T001']);
+  const [rx] = c.book('S003', [['2026-10-22', '19:00']]);
+  assert.ok(rx.ok, JSON.stringify(rx));
+  c.at('2026-10-25 10:00');
+  const at = (s) => { const [d, h] = s.split(' '); const [y, m, dd] = d.split('-').map(Number); const [hh, mm] = h.split(':').map(Number); return new Date(y, m - 1, dd, hh, mm); };
+  bkSet(c, bConf, { date: new Date(2026, 10, 30) });
+  bkSet(c, bOver, { result_notice_at: at('2026-10-15 20:00') });
+  bkSet(c, bNot, { status: 'NOT_COMPLETED', result_at: at('2026-10-18 20:00'), result_by: 'SYSTEM' });
+  bkSet(c, bPend, { status: 'PENDING_REASSIGN', admin_done_at: at('2026-10-20 10:00') });
+  bkSet(c, bTech, { status: 'TECH_ISSUE', result_at: at('2026-10-17 20:00') });
+  bkSet(c, bAbs, { status: 'STUDENT_ABSENT', result_at: at('2026-10-19 20:00') });
+  bkSet(c, bComp, { status: 'TUTOR_ABSENT', result_at: at('2026-10-20 20:00'), comp_days: 3 });
+  bkSet(c, bLate, { status: 'CANCELLED_LATE' });
+  assert.deepStrictEqual(ids.map(id => bkColor(c, id)), ['', HL5N.RED, HL5N.RED, HL5N.ORANGE, HL5N.PINK, HL5N.YELLOW, HL5N.LIGHT_BLUE, HL5N.GREY]);
+  // Ưu tiên: buổi được bù mà đang Chờ đổi tutor vẫn cam đậm; kỹ thuật chưa chọn lỗi có ngày bù vẫn hồng.
+  bkSet(c, bPend, { comp_days: 2 }); bkSet(c, bTech, { comp_days: 2 });
+  assert.strictEqual(bkColor(c, bPend), HL5N.ORANGE); assert.strictEqual(bkColor(c, bTech), HL5N.PINK);
+  bkSet(c, bTech, { comp_days: '' });
+
+  // Đã xử lý (giữ nguyên): Vắng học viên hết vàng, không đổi trạng thái, có nhật ký
+  const r1 = pickAdmin(c, bAbs, 'Đã xử lý (giữ nguyên)');
+  assert.ok(r1.ok, JSON.stringify(r1));
+  let b = c.row('BOOKINGS', bAbs);
+  assert.strictEqual(b.status, 'STUDENT_ABSENT'); assert.ok(b.admin_done_at instanceof Date); assert.strictEqual(b.admin_action, '');
+  assert.ok(/^Đã: Đã xử lý \(giữ nguyên\)/.test(b.admin_note), b.admin_note);
+  assert.strictEqual(bkColor(c, bAbs), '');
+  assert.ok(c.rows('ACTIVITY_LOG').some(l => l.action === 'ADMIN_MARK_DONE' && l.entity_id === bAbs));
+  // Kết quả đổi sau lần xử lý (tutor sửa lại, result_at mới hơn): vàng lại
+  c.at('2026-10-25 12:00');
+  bkSet(c, bAbs, { result_at: api.getNow_() });
+  assert.strictEqual(bkColor(c, bAbs), HL5N.YELLOW, 'result_at mới hơn admin_done_at: hiện lại');
+  // Không hoàn thành: Đã xử lý hết đỏ (giữ Không hoàn thành, không lương)
+  assert.ok(pickAdmin(c, bNot, 'Đã xử lý (giữ nguyên)').ok);
+  assert.strictEqual(c.row('BOOKINGS', bNot).status, 'NOT_COMPLETED'); assert.strictEqual(bkColor(c, bNot), '');
+
+  // Không cho: buổi chưa có kết quả (đỏ quá hạn giữ nguyên), Chờ đổi tutor, kỹ thuật chưa chọn lỗi. Không ghi admin_done_at.
+  [[bOver, /chưa có gì để giữ nguyên/], [bPend, /chưa có gì để giữ nguyên/], [bTech, /chưa chọn lỗi/]].forEach(([id, re]) => {
+    const before = c.row('BOOKINGS', id).admin_done_at;
+    const r = pickAdmin(c, id, 'Đã xử lý (giữ nguyên)');
+    assert.ok(!r.ok && re.test(r.message), id + ': ' + JSON.stringify(r));
+    const after = c.row('BOOKINGS', id);
+    assert.strictEqual(String(after.admin_done_at), String(before), id + ' không ghi admin_done_at');
+    assert.ok(/^Lỗi: Đã xử lý \(giữ nguyên\)/.test(after.admin_note), after.admin_note);
+  });
+  assert.strictEqual(bkColor(c, bOver), HL5N.RED); assert.strictEqual(bkColor(c, bPend), HL5N.ORANGE); assert.strictEqual(bkColor(c, bTech), HL5N.PINK);
+  assert.ok(!c.rows('ACTIVITY_LOG').some(l => l.action === 'ADMIN_MARK_DONE' && [bOver, bPend, bTech].includes(l.entity_id)));
+
+  // Admin tự chọn kết quả Vắng học viên (result_at và admin_done_at cùng lúc): không vàng
+  c.at('2026-10-23 10:00');
+  assert.ok(pickAdmin(c, rx.bookingId, 'Vắng học viên (admin chọn)').ok);
+  const bx = c.row('BOOKINGS', rx.bookingId);
+  assert.strictEqual(bx.status, 'STUDENT_ABSENT');
+  assert.strictEqual(bkColor(c, rx.bookingId), '', 'admin tự chọn kết quả: đã xử lý, không vàng');
+  c.at('2026-10-25 12:00');
+  // Kỹ thuật: chọn lỗi thì hết hồng; lựa chọn chạy được cũng ghi admin_done_at
+  assert.ok(pickAdmin(c, bTech, 'Không tính lương buổi kỹ thuật').ok);
+  b = c.row('BOOKINGS', bTech);
+  assert.ok(b.tech_decided_at && b.admin_done_at instanceof Date);
+  assert.notStrictEqual(bkColor(c, bTech), HL5N.PINK);
+  // Kỹ thuật đã chọn lỗi: Đã xử lý cho phép
+  assert.ok(pickAdmin(c, bTech, 'Đã xử lý (giữ nguyên)').ok);
+  // Lựa chọn chạy hỏng (Đổi tutor sau giờ học) không ghi admin_done_at
+  const late = c.row('BOOKINGS', bLate).admin_done_at;
+  assert.ok(!pickAdmin(c, bLate, 'Đổi tutor').ok);
+  assert.strictEqual(String(c.row('BOOKINGS', bLate).admin_done_at), String(late));
+  // Dropdown có lựa chọn mới
+  assert.ok(api.BOOKING_ADMIN_ACTIONS.includes('Đã xử lý (giữ nguyên)'));
+});
+
+t('I137', '5N STUDENT_PACKAGES: đỏ khi còn thông báo COMP_ON_EXPIRED chưa đọc của gói (đọc rồi thì hết), xám hết hạn, vàng còn EXPIRY_NOTICE_DAYS ngày (tính theo hôm nay, đổi CONFIG thì đổi), tím admin cộng tay, xanh dương có ngày bù', () => {
+  const c = mk('2026-10-12 10:00'), { api } = c;
+  const sps = c.rows('STUDENT_PACKAGES');
+  assert.ok(sps.length >= 4, 'cần ít nhất 4 gói mẫu');
+  const [p1, p2, p3, p4] = sps.map(x => x.sp_id);
+  const spSet = (id, patch) => api.withLock_(() => { const t = api.table_('STUDENT_PACKAGES'); t.update(t.byId(id), patch); });
+  const color = (id) => cfColor(c, 'STUDENT_PACKAGES', c.sp(id)._row, api.getNow_());
+  const today = new Date(2026, 9, 12);
+  const plus = (n) => new Date(2026, 9, 12 + n);
+  sps.forEach(x => spSet(x.sp_id, { status: 'ACTIVE', end_date: plus(20), comp_days: '', comp_days_admin: '' }));
+  api.applyHighlights_(api.dbSpreadsheet_());
+  spSet(p1, { end_date: plus(3) });
+  spSet(p2, { end_date: plus(4) });
+  spSet(p3, { status: 'EXPIRED', end_date: plus(-2) });
+  spSet(p4, { comp_days_admin: 2, comp_days: 3 });
+  assert.deepStrictEqual([p1, p2, p3, p4].map(color), [HL5N.YELLOW, '', HL5N.GREY, HL5N.PURPLE]);
+  spSet(p4, { comp_days_admin: '' });
+  assert.strictEqual(color(p4), HL5N.BLUE);
+  spSet(p1, { end_date: today });
+  assert.strictEqual(color(p1), HL5N.YELLOW, 'hết hạn hôm nay vẫn vàng');
+  spSet(p1, { end_date: plus(-1) });
+  assert.strictEqual(color(p1), '', 'ACTIVE quá hạn (chưa qua job ngày) không vàng');
+  // EXPIRY_NOTICE_DAYS đổi: chạy lại menu 1 (applyHighlights_) thì vùng vàng đổi theo
+  spSet(p2, { end_date: plus(4) });
+  cfgSet(c, 'EXPIRY_NOTICE_DAYS', 5); api.applyHighlights_(api.dbSpreadsheet_());
+  assert.strictEqual(color(p2), HL5N.YELLOW);
+  // Đỏ: thông báo COMP_ON_EXPIRED chưa đọc của đúng gói; gói khác không đỏ; đánh dấu đã đọc thì về xám
+  const n = api.withLock_(() => api.table_('NOTIFICATIONS').insert({ notif_id: api.nextId_('NOTIFICATIONS'), time: api.getNow_(), level: 'WARNING', event: 'COMP_ON_EXPIRED', channel: 'EMAIL', actor: 'SYSTEM', entity: 'STUDENT_PACKAGE', entity_id: p3, message: 'x', read: false }));
+  api.withLock_(() => api.table_('NOTIFICATIONS').insert({ notif_id: api.nextId_('NOTIFICATIONS'), time: api.getNow_(), level: 'WARNING', event: 'COMP_EXTENDED', channel: 'EMAIL', actor: 'SYSTEM', entity: 'STUDENT_PACKAGE', entity_id: p4, message: 'x', read: false }));
+  api.clearDbCache_();
+  assert.strictEqual(color(p3), HL5N.RED);
+  assert.strictEqual(color(p4), HL5N.BLUE, 'sự kiện khác không đỏ');
+  api.withLock_(() => { const t = api.table_('NOTIFICATIONS'); t.update(t.byId(n.notif_id), { read: true }); });
+  assert.strictEqual(color(p3), HL5N.GREY, 'đọc rồi: hết đỏ');
+});
+
+t('I138', '5N hourlyJob báo buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: một lần mỗi lần kẹt (email Khẩn, nhật ký), chịu lệch nhịp trigger vài phút, nhiều buổi kẹt cùng lượt chỉ một email, buổi ra khỏi trạng thái thì xoá mốc và kẹt lại được báo lại; đổi giờ trong CONFIG, -1 tắt', () => {
+  const c = mk('2026-10-12 10:00'), { api, env } = c;
+  c.onlyOpen('2026-10-20', '19:00', ['T001']); c.onlyOpen('2026-10-21', '19:00', ['T002']); c.onlyOpen('2026-10-22', '19:00', ['T003']);
+  const [r] = c.book('S001', [['2026-10-20', '19:00']]), [r2] = c.book('S002', [['2026-10-21', '19:00']]), [r3] = c.book('S003', [['2026-10-22', '19:00']]);
+  const id = r.bookingId;
+  const stuckN = () => c.rows('NOTIFICATIONS').filter(x => x.event === 'REASSIGN_STUCK');
+  const has = (n, bid) => String(n.entity_id).split(',').includes(bid);
+  const adminMails = () => c.mailsTo(EMAIL.ADMIN).filter(m => /kẹt ở Chờ đổi tutor/.test(JSON.stringify(m))).length;
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-13 08:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 0, 'lần đầu thấy: chưa báo');
+  assert.ok(Number(env.state.props['STUCK_' + id]) > 0, 'ghi mốc lần đầu thấy');
+  c.at('2026-10-13 08:45'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 0, 'chưa đủ 1 giờ (trừ 15 phút lệch nhịp)');
+  // Trigger mỗi giờ của Google lệch: lượt sau chạy sau 59 phút vẫn báo
+  c.at('2026-10-13 09:04'); api.hourlyJob();
+  let ns = stuckN();
+  assert.strictEqual(ns.length, 1, 'lượt sau 59 phút: báo');
+  assert.ok(has(ns[0], id)); assert.strictEqual(ns[0].level, 'CRITICAL'); assert.ok(ns[0].message_en && /stuck/.test(ns[0].message_en));
+  assert.ok(/1 buổi kẹt ở Chờ đổi tutor quá 1 giờ/.test(ns[0].message) && /Đổi tutor hoặc Huỷ bởi admin/.test(ns[0].message) && /Vắng tutor/.test(ns[0].message), ns[0].message);
+  assert.strictEqual(adminMails(), 1, 'email admin');
+  assert.ok(c.rows('ACTIVITY_LOG').some(l => l.action === 'REASSIGN_STUCK' && l.entity_id === id));
+  ['10:05', '11:05', '14:05', '17:05'].forEach(h => { c.at('2026-10-13 ' + h); api.hourlyJob(); });
+  assert.strictEqual(stuckN().length, 1, 'còn kẹt nhiều giờ sau: không báo trùng');
+  // Thông báo bị mất (khoá lỗi, dòng không ghi được): giờ sau báo lại, vì "đã báo" chính là dòng thông báo
+  api.withLock_(() => { const t = api.table_('NOTIFICATIONS'); t.update(t.byId(stuckN()[0].notif_id), { event: 'X_LOST' }); });
+  c.at('2026-10-13 18:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 1, 'thiếu dòng thông báo: báo lại');
+  // Ra khỏi trạng thái: xoá mốc
+  bkSet(c, id, { status: 'CONFIRMED' });
+  c.at('2026-10-13 19:05'); api.hourlyJob();
+  assert.ok(!env.state.props['STUCK_' + id], 'xoá mốc khi ra khỏi trạng thái');
+  // Ba buổi kẹt cùng lúc (ví dụ khoá tutor lỗi giữa chừng): một email liệt kê cả ba
+  const before = adminMails();
+  [id, r2.bookingId, r3.bookingId].forEach(x => bkSet(c, x, { status: 'PENDING_REASSIGN' }));
+  c.at('2026-10-13 20:05'); api.hourlyJob();
+  c.at('2026-10-13 21:05'); api.hourlyJob();
+  ns = stuckN();
+  assert.strictEqual(ns.length, 2);
+  const last = ns[ns.length - 1];
+  assert.ok([id, r2.bookingId, r3.bookingId].every(x => has(last, x)), last.entity_id);
+  assert.ok(/^3 buổi kẹt/.test(last.message), last.message);
+  assert.strictEqual(adminMails() - before, 1, 'một email cho cả ba buổi');
+  // CONFIG 3 giờ: buổi kẹt lại sau đó chờ đủ 3 giờ
+  cfgSet(c, 'REASSIGN_STUCK_HOURS', 3);
+  [r2.bookingId, r3.bookingId].forEach(x => bkSet(c, x, { status: 'CONFIRMED' }));
+  bkSet(c, id, { status: 'CONFIRMED' }); c.at('2026-10-13 22:05'); api.hourlyJob();
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-14 08:05'); api.hourlyJob();
+  c.at('2026-10-14 10:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 2, 'CONFIG 3 giờ: 2 giờ chưa báo');
+  c.at('2026-10-14 11:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 3, 'kẹt lại: báo lần nữa');
+  // -1 tắt: không báo, không giữ mốc
+  cfgSet(c, 'REASSIGN_STUCK_HOURS', -1);
+  bkSet(c, id, { status: 'CONFIRMED' }); c.at('2026-10-14 12:05'); api.hourlyJob();
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  ['13:05', '15:05', '19:05'].forEach(h => { c.at('2026-10-14 ' + h); api.hourlyJob(); });
+  assert.strictEqual(stuckN().length, 3, '-1: tắt');
+  assert.ok(!Object.keys(env.state.props).some(k => /^STUCK_/.test(k)), '-1: không giữ mốc');
+});
+
+t('I139', '5N vùng tô màu phủ tới hết tab: tab tự thêm hàng (ensureRows_) thì nới vùng mọi luật đang chạm hàng cuối (cả luật admin tự thêm), không thay, không nhân đôi; luật vùng nhỏ không đổi; lỗi tô màu không làm hỏng lượt ghi; thiếu cột mới (chưa chạy menu 1) không có công thức trỏ cột không tồn tại', () => {
+  const c = mk('2026-10-12 10:00'), { api, env } = c;
+  const sh = env.state.spreadsheets.DB_STAGING_TEST.sheets.BOOKINGS;
+  const sheet = api.dbSpreadsheet_().getSheetByName('BOOKINGS');
+  sheet.insertRowsAfter(sheet.getMaxRows(), 37);   // tab không tròn 1.000 hàng: menu 1 phủ đúng tới hàng cuối thật
+  api.applyHighlights_(api.dbSpreadsheet_());
+  const max0 = sheet.getMaxRows();
+  assert.strictEqual(sh.cfRules[0].ranges[0].getNumRows(), max0 - 1);
+  // Admin tự thêm 2 luật: một phủ tới hết tab, một chỉ vài hàng đầu
+  const own = env.globals.SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$B2="S001"').setBackground('#000001').setRanges([sheet.getRange(2, 2, max0 - 1, 1)]).build();
+  const small = env.globals.SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$B2="S002"').setBackground('#000002').setRanges([sheet.getRange(2, 2, 10, 1)]).build();
+  sheet.setConditionalFormatRules(sheet.getConditionalFormatRules().concat([own, small]));
+  const formulas0 = sh.cfRules.map(r => r.formula + r.bg).join('|');
+  api.ensureRows_(sheet, 'BOOKINGS', max0 + 1);
+  const max1 = sheet.getMaxRows();
+  assert.ok(max1 > max0);
+  assert.strictEqual(sh.cfRules.length, 8, 'không thay, không nhân đôi');
+  assert.strictEqual(sh.cfRules.map(r => r.formula + r.bg).join('|'), formulas0, 'giữ nguyên công thức, màu, thứ tự (cả luật của admin)');
+  assert.ok(sh.cfRules.slice(0, 7).every(r => r.ranges[0].getNumRows() === max1 - 1 && r.ranges[0].getRow() === 2), 'phủ tới hàng cuối mới');
+  assert.strictEqual(sh.cfRules[7].ranges[0].getNumRows(), 10, 'luật vùng nhỏ không đổi');
+  // Tô màu lỗi: lượt ghi vẫn thành công
+  sh.cfRules.push({ formula: '=1', bg: '#x', getRanges: () => { throw new Error('giả lập lỗi tô màu'); } });
+  api.ensureRows_(sheet, 'BOOKINGS', sheet.getMaxRows() + 1);
+  assert.ok(sheet.getMaxRows() > max1, 'vẫn thêm hàng');
+  sh.cfRules.pop();
+  // Tab không có luật: không đặt luật
+  const us = api.dbSpreadsheet_().getSheetByName('USERS');
+  api.ensureRows_(us, 'USERS', us.getMaxRows() + 1);
+  assert.ok(!(env.state.spreadsheets.DB_STAGING_TEST.sheets.USERS.cfRules || []).length);
+  // Thiếu cột admin_done_at và comp_days (dán code mới, chưa chạy menu 1): không công thức nào trỏ $null
+  const hdr = sh.values[0];
+  ['admin_done_at', 'comp_days'].forEach(col => { hdr[hdr.indexOf(col)] = 'x_' + col; });
+  api.applyHighlights_(api.dbSpreadsheet_());
+  assert.ok(sh.cfRules.every(r => !/null|undefined/.test(r.formula)), sh.cfRules.map(r => r.formula).join(' | '));
+  assert.strictEqual(sh.cfRules.length, 5, 'bỏ luật xanh dương nhạt khi thiếu comp_days');
+});
+
+t('I140', 'Soát 5N (hồi quy): buổi kẹt Chờ đổi tutor xử lý được đúng như thư báo: Đổi tutor ra CONFIRMED với tutor khác; chỉ định tutor bận thì vẫn kẹt (không thành CONFIRMED với tutor cũ); Huỷ bởi admin sau mốc huỷ muộn vẫn là Huỷ bởi admin (lỗi phía trường, không trừ lượt), không phải Huỷ muộn; trang quản trị bỏ buổi Không hoàn thành đã "Đã xử lý" khỏi danh sách chờ', () => {
+  const c = mk('2026-10-12 10:00'), { api } = c;
+  c.onlyOpen('2026-10-20', '19:00', ['T001', 'T002']);
+  c.onlyOpen('2026-10-21', '19:00', ['T001']);
+  const [r] = c.book('S001', [['2026-10-20', '19:00']]);
+  const [r2] = c.book('S002', [['2026-10-21', '19:00']]);
+  const t0 = c.row('BOOKINGS', r.bookingId).tutor_id;
+  bkSet(c, r.bookingId, { status: 'PENDING_REASSIGN' });
+  // Chỉ định tutor không rảnh: vẫn kẹt
+  bkSet(c, r.bookingId, { admin_note: 'T004' });
+  const f = pickAdmin(c, r.bookingId, 'Đổi tutor');
+  assert.ok(!f.ok, JSON.stringify(f));
+  let b = c.row('BOOKINGS', r.bookingId);
+  assert.strictEqual(b.status, 'PENDING_REASSIGN', 'chỉ định hỏng: vẫn kẹt, không thành CONFIRMED');
+  assert.strictEqual(b.tutor_id, t0);
+  // Để trống: hệ thống tự chọn tutor khác
+  bkSet(c, r.bookingId, { admin_note: '' });
+  const ok = pickAdmin(c, r.bookingId, 'Đổi tutor');
+  assert.ok(ok.ok, JSON.stringify(ok));
+  b = c.row('BOOKINGS', r.bookingId);
+  assert.strictEqual(b.status, 'CONFIRMED'); assert.notStrictEqual(b.tutor_id, t0);
+  assert.ok(b.admin_done_at instanceof Date);
+  // Huỷ bởi admin sau mốc huỷ muộn (16:00 hôm trước): buổi kẹt vẫn là Huỷ bởi admin
+  bkSet(c, r2.bookingId, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-20 16:30');
+  const cx = pickAdmin(c, r2.bookingId, 'Huỷ bởi admin');
+  assert.ok(cx.ok, JSON.stringify(cx));
+  assert.strictEqual(c.row('BOOKINGS', r2.bookingId).status, 'CANCELLED_ADMIN');
+  // Buổi bình thường (CONFIRMED) huỷ sau mốc vẫn là Huỷ muộn như cũ
+  c.at('2026-10-12 10:00');
+  c.onlyOpen('2026-10-23', '19:00', ['T001']);
+  const [r3] = c.book('S003', [['2026-10-23', '19:00']]);
+  c.at('2026-10-22 16:30');
+  assert.ok(pickAdmin(c, r3.bookingId, 'Huỷ bởi admin').ok);
+  assert.strictEqual(c.row('BOOKINGS', r3.bookingId).status, 'CANCELLED_LATE');
+  // Trang quản trị: Không hoàn thành đã xử lý không còn trong danh sách chờ (cùng nghĩa với ô Sheets hết đỏ)
+  bkSet(c, r.bookingId, { status: 'NOT_COMPLETED', result_at: new Date(2026, 9, 21, 20, 0), result_by: 'SYSTEM' });
+  const waiting = () => api.adminLessonsWaiting_(c.rows('BOOKINGS'), api.getNow_()).map(x => x.booking_id);
+  assert.ok(waiting().includes(r.bookingId));
+  assert.ok(pickAdmin(c, r.bookingId, 'Đã xử lý (giữ nguyên)').ok);
+  assert.ok(!waiting().includes(r.bookingId), 'đã xử lý: bỏ khỏi danh sách chờ');
+  assert.strictEqual(bkColor(c, r.bookingId), '', 'ô Sheets cũng hết đỏ');
+  // Hàm thuần dùng chung
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2), result_at: new Date(2026, 1, 1) }), true);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 1), result_at: new Date(2026, 1, 2) }), false);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: '', result_at: new Date(2026, 1, 2) }), false);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2), result_at: '' }), true);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2, 9), result_at: new Date(2026, 1, 2, 9) }), true, 'admin tự chọn kết quả (cùng lúc): đã xử lý');
 });
 
 module.exports = { results };

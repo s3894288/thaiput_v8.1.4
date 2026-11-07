@@ -71,7 +71,8 @@ function adminLessonsWaiting_(bks, now) {
   return bks.filter(function (b) {
     if (!(b.date instanceof Date)) return false;
     if (b.status === BOOKING_STATUS.CONFIRMED) return slotStart_(b.date, b.slot) <= now;
-    return b.status === BOOKING_STATUS.NOT_COMPLETED && b.date >= from;
+    // 5N: Không hoàn thành mà admin đã chọn "Đã xử lý (giữ nguyên)" (hoặc kết quả khác) thì không còn chờ, như ô Sheets hết đỏ.
+    return b.status === BOOKING_STATUS.NOT_COMPLETED && b.date >= from && !adminHandled_(b);
   });
 }
 

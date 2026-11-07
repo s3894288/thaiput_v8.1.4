@@ -1458,6 +1458,30 @@ t('U48', '5K: gói giá 0 hiện thẻ có nút Zalo, không chọn được; s�
   assert.ok(reg && reg.phone === 'Line: somchai88', 'lưu nguyên văn: ' + (reg && reg.phone));
 });
 
+t('U49', '5O (05/11): trang chủ có ảnh thương hiệu nhúng base64, viên chữ Thái nền trắng viền vàng; khung email tông đen trắng có gạch vàng, nút viên thuốc đen', async () => {
+  const c = mk(), p = open(c, { page: 'home' });
+  await p.flush();
+  p.clean();
+  const img = p.$('.hero .hero-img');
+  assert.ok(img, 'có ảnh thương hiệu trong hero');
+  assert.ok(/^data:image\/jpeg;base64,/.test(img.getAttribute('src')), 'ảnh nhúng base64 (Apps Script không host file ảnh)');
+  assert.strictEqual(img.getAttribute('alt'), '', 'ảnh trang trí: alt rỗng, không cần key CONTENT');
+  assert.ok(p.$('.hero .th-word'), 'viên chữ Thái còn nguyên');
+  const css = p.$('style').textContent;
+  assert.ok(/\.hero \.th-word \{[^}]*background: var\(--surface\)/.test(css), 'viên chữ Thái nền trắng');
+  assert.ok(/\.hero \.th-word \{[^}]*border: 1\.5px solid var\(--yellow\)/.test(css), 'viên chữ Thái viền vàng');
+  const mail = c.api.emailWrap_('Tiêu đề thử', '<p>x</p>', 'vi');
+  assert.ok(mail.indexOf('#141414') !== -1, 'đầu trang email nền đen 5O');
+  assert.ok(mail.indexOf('border-bottom:3px solid #ffc933') !== -1, 'gạch vàng thương hiệu dưới đầu trang');
+  assert.ok(mail.indexOf('#14532d') === -1, 'hết màu xanh rừng cũ trong khung');
+  const btn = c.api.btn_('https://x.test', 'Mở');
+  assert.ok(btn.indexOf('background:#141414') !== -1 && btn.indexOf('border-radius:999px') !== -1, 'nút email viên thuốc đen');
+  const bi = c.api.emailWrapBi_('Tiêu đề VI', '<p>vi</p>', 'Title EN', '<p>en</p>');
+  assert.ok(bi.indexOf('border-top:1px dashed #d6d6d1') !== -1, 'gạch đứt giữa hai thứ tiếng theo tông 5O');
+  assert.ok(bi.indexOf('color:#141414">Title EN</h2>') !== -1, 'tiêu đề phần hai màu đen 5O');
+  assert.ok(bi.indexOf('color:#9ca3af') === -1 && bi.indexOf('color:#63635d') !== -1, 'nhãn ngôn ngữ hết xám cũ, đạt tương phản');
+});
+
 module.exports = { run };
 if (require.main === module) {
   run().then(r => { r.forEach(x => console.log((x.ok ? 'ĐẠT  ' : 'TRƯỢT ') + x.id + ' ' + x.title + (x.ok ? '' : '\n      ' + x.err))); process.exit(r.every(x => x.ok) ? 0 : 1); });

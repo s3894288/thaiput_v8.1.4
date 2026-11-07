@@ -1,6 +1,21 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 02/11/2026 (lần 8). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 07/11/2026 (lần 11). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 05/11 lần 10
+
+* 5N xong (bản 8.1.7): BL13 đã làm theo đề xuất (b), chờ anh duyệt. Soát chéo 5N đề ra 4 câu mới: BL72 đến BL75.
+* **5N, 5O đã xong: đến lượt anh rà toàn bộ BACKLOG** (đã hẹn sau 5N, 5O).
+
+## Thay đổi so với bản 05/11 lần 9
+
+* 5O xong cả khung email (bản 8.1.6): BL09 phần code đã làm (khung mới vẫn kèm bản chữ thuần cho ứng dụng không hỗ trợ); còn bước gửi thử tới Gmail web, Gmail điện thoại, Outlook là việc của admin trên STAGING.
+* Thêm BL71 (chữ trong ảnh banner trang chủ).
+
+## Thay đổi so với bản 02/11 lần 8
+
+* 5O phần giao diện web xong (bản 8.1.5, theo ảnh thương hiệu): BL08 ghi "đã làm phần web, chờ anh duyệt". Phần email của 5O (khung `emailWrap_` mới, gửi thử Gmail web, Gmail điện thoại, Outlook — BL09) chưa làm.
+* Thêm BL70 (tài liệu thiết kế viết lại, chờ anh duyệt).
 
 ## Thay đổi so với bản 01/11 lần 7
 
@@ -68,9 +83,15 @@
 | BL04 | Khoá tutor còn buổi sắp tới: (a) tự đổi tutor, không đổi được thì huỷ và bù; (b) chặn khoá | (a), có xem trước | 5L (đã làm theo đề xuất ở 5L, chờ duyệt ở 5Q) |
 | BL05 | Ngoài "Chuyển dữ liệu từ v6", mục menu nào bỏ hẳn? | Không xoá thêm, chỉ gom vào "Công cụ kỹ thuật" | 5K (đã làm theo đề xuất ở 5K, chờ duyệt ở 5Q) |
 | BL06 | Gói giá 0: (a) vẫn chọn được trong form, kèm nút Zalo; (b) không chọn được, chỉ nút Zalo | (b) | 5K (đã làm theo đề xuất ở 5K, chờ duyệt ở 5Q) |
-| BL08 | Thiết kế đen trắng, có đổ bóng, đảo quyết định 19/10. Gửi lại ảnh tham chiếu nếu cần | Đổi theo yêu cầu 29/10 | 5O |
+| BL08 | Thiết kế đen trắng, có đổ bóng, đảo quyết định 19/10. Gửi lại ảnh tham chiếu nếu cần | Đổi theo yêu cầu 29/10 | 5O (phần web đã làm 05/11 theo ảnh thương hiệu, bản 8.1.5, chờ anh duyệt trên STAGING) |
+| BL70 | `THIET_KE_GIAO_DIEN.md` viết lại theo bản 5O (file gốc tả bản 19/10 không còn đúng; hơi ngoài phạm vi "chỉ Styles.html" của kế hoạch). (a) giữ file đã cập nhật; (b) bỏ file, chỉ giữ chú thích đầu Styles.html | (a) | Tuần này (rà) |
+| BL71 | Ảnh banner trang chủ (anh đưa 05/11) có chữ "THAIPUT LUYỆN NÓI TIẾNG THÁI 1-1 với người Thái Lan" tiếng Việt cố định, đứng ngay trên h1 cùng ý; người xem tiếng Anh (nút EN) vẫn thấy chữ Việt trong ảnh. (a) giữ nguyên (ảnh là nhận diện); (b) cắt ảnh chỉ lấy phần minh hoạ, bỏ khối chữ, h1 lo thông điệp; (c) 2 bản ảnh VI và EN (nặng thêm ~80KB) | (a), đã làm | Tuần này (rà) |
 | BL09 | Email hiện bản phẳng ở Outlook và ứng dụng không hỗ trợ màu chuyển, đổ bóng | Chấp nhận | 5O |
-| BL13 | Màu vàng "Vắng học viên": (a) bỏ; (b) giữ tới khi admin chọn "Đã xử lý" | (b) | 5N |
+| BL13 | Màu vàng "Vắng học viên": (a) bỏ; (b) giữ tới khi admin chọn "Đã xử lý" | (b) | 5N (đã làm theo đề xuất ở 8.1.7, chờ duyệt) |
+| BL72 | Buổi Vắng học viên (vàng) và Không hoàn thành (đỏ) có TRƯỚC 8.1.7 vẫn tô màu sau nâng cấp (như 8.1.6, không phải lỗi mới), admin phải chọn "Đã xử lý" từng dòng. (a) giữ; (b) bước chuyển dữ liệu một lần: đánh dấu đã xem mọi buổi Vắng học viên cũ hơn 7 ngày (không đụng Không hoàn thành, luật 55 cần admin làm rõ); (c) mục menu đánh dấu hàng loạt | (b) | Tuần này (rà) |
+| BL73 | Màu đỏ STUDENT_PACKAGES "chờ admin cộng tay" dựa vào thông báo COMP_ON_EXPIRED CHƯA ĐỌC: bấm "Đã đọc hết" hoặc mở thông báo trên web là hết đỏ dù chưa cộng ngày. (a) giữ, hướng dẫn ghi "cộng xong mới đánh dấu đã đọc"; (b) cột hệ thống mới `comp_pending_days`: đỏ theo dữ liệu, hết khi admin sửa `comp_days_admin` (bỏ được công thức đọc tab NOTIFICATIONS) | (b) ở 5P | Tuần này (rà) |
+| BL74 | Huỷ bởi admin một buổi KẸT Chờ đổi tutor (lỗi phía trường): luôn Huỷ bởi admin (không trừ lượt, được bù), kể cả sau mốc huỷ muộn 15:00 hôm trước (ngoại lệ của luật huỷ muộn ở 5M). (a) giữ; (b) vẫn xét mốc | (a), đã làm | Tuần này (rà) |
+| BL75 | Màu vàng "còn N ngày" chép số EXPIRY_NOTICE_DAYS vào công thức: đổi CONFIG thì chạy lại menu 1 mới đổi màu; công thức dùng ngày thật (TODAY), không theo giờ giả lập SIM_NOW trên STAGING. (a) giữ, ghi hướng dẫn; (b) sửa ô CONFIG đó thì tự tô lại | (a) | Tuần này (rà) |
 
 ## B. Câu hỏi cũ chưa thấy trả lời
 

@@ -1,5 +1,101 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**Trạng thái 07/11/2026: 5N XONG, bản 8.1.7** (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt Chờ đổi tutor; soát chéo 2 agent tìm ra và đã sửa lỗi buổi kẹt không xử lý được). Chi tiết: mục "Chunk 5N" dưới đây. Chunk 5 còn 5P (hợp nhất, chốt v8). BACKLOG còn **38 câu chờ anh** (mục A 34, mục B 4). **Đến lượt anh rà BACKLOG** (đã hẹn sau 5N, 5O).
+
+## Chunk 5N: tô màu Sheets (07/11/2026, bản 8.1.7)
+
+### Làm gì
+
+* **Cột mới `BOOKINGS.admin_done_at`** (optional, luật 38): ghi khi một lựa chọn ở `admin_action` chạy thành công. Lựa chọn lỗi thì không ghi.
+* **Lựa chọn mới "Đã xử lý (giữ nguyên)"** ở dropdown `admin_action` của BOOKINGS: không đổi trạng thái, lương hay gói; chỉ ghi `admin_done_at` và nhật ký `ADMIN_MARK_DONE`. Không cho chọn khi màu chỉ hết bằng việc thật: buổi chưa có kết quả (CONFIRMED), Chờ đổi tutor, Vấn đề kỹ thuật chưa chọn lỗi; ô báo rõ việc cần làm.
+* **"Chưa xử lý"** = `admin_done_at` trống HOẶC cũ hơn `result_at`: kết quả đổi sau lần admin xử lý trước (tutor sửa lại) thì màu hiện lại.
+* **Màu mới** (luật đầu tiên khớp thắng, theo thứ tự trong bảng dưới). Vùng tô màu phủ tới hết tab; tab tự thêm hàng thì đặt lại (trước đây hàng thêm sau không có màu).
+* **Báo buổi kẹt Chờ đổi tutor:** job mỗi giờ thấy buổi ở PENDING_REASSIGN quá `REASSIGN_STUCK_HOURS` giờ (CONFIG mới, mặc định 1, -1 = tắt) thì báo Khẩn qua email (REASSIGN_STUCK), một lần mỗi lần kẹt. Nhiều buổi kẹt cùng lượt: MỘT email liệt kê hết. Chịu lệch nhịp trigger 15 phút.
+* **Sửa theo soát chéo (cả 2 agent cùng thấy, HIGH):** buổi kẹt trước đây KHÔNG xử lý được như thư báo bảo: "Đổi tutor" luôn lỗi, "Huỷ bởi admin" sau 15:00 hôm trước thành Huỷ muộn (học viên mất lượt cho lỗi phía trường). Nay "Đổi tutor" nhận buổi kẹt; chỉ định tutor bận thì buổi vẫn kẹt (trước đây thành CONFIRMED với tutor cũ, người không dạy); "Huỷ bởi admin" buổi kẹt luôn là Huỷ bởi admin, được bù (BL74). Trang quản trị bỏ buổi Không hoàn thành đã "Đã xử lý" khỏi danh sách chờ (cùng một hàm `adminHandled_` với màu Sheets). Tab tự thêm hàng thì chỉ nới vùng tô màu, giữ luật admin tự thêm.
+
+### Màu nghĩa là gì, làm gì để hết màu
+
+| Tab | Màu | Nghĩa | Làm gì để hết màu |
+|---|---|---|---|
+| BOOKINGS | Đỏ | Tutor quá hạn chọn kết quả; hoặc buổi Không hoàn thành chưa xử lý | Nhắc tutor; hoặc chọn kết quả ở `admin_action` (Hoàn thành, Vắng học viên, Vắng tutor); giữ Không hoàn thành thì chọn "Đã xử lý (giữ nguyên)" |
+| BOOKINGS | Cam đậm | Chờ đổi tutor: buổi chưa có tutor dạy (luôn hiện) | Chọn "Đổi tutor" (ghi mã tutor ở `admin_note` nếu muốn) hoặc "Huỷ bởi admin" |
+| BOOKINGS | Hồng | Vấn đề kỹ thuật chưa chọn lỗi | Chọn 1 trong 3 lựa chọn lỗi kỹ thuật |
+| BOOKINGS | Vàng | Vắng học viên chưa xem (BL13) | "Đã xử lý (giữ nguyên)" |
+| BOOKINGS | Xanh dương nhạt | Buổi được bù ngày (`comp_days` > 0) | Chỉ để biết, không cần làm |
+| BOOKINGS | Xám | Huỷ muộn (trừ lượt, không bù) | Chỉ để biết |
+| STUDENT_PACKAGES | Đỏ | Có thông báo "Bù cho gói đã hết hạn" (COMP_ON_EXPIRED) chưa đọc: chờ admin cộng tay | Cộng ngày ở `comp_days_admin` (của gói đang chạy), rồi đánh dấu đã đọc thông báo đó |
+| STUDENT_PACKAGES | Xám | Gói hết hạn | Chỉ để biết |
+| STUDENT_PACKAGES | Vàng | Gói đang dùng còn `EXPIRY_NOTICE_DAYS` ngày (mặc định 3) | Chỉ để biết (học viên đã nhận email sắp hết hạn) |
+| STUDENT_PACKAGES | Tím | Admin đã cộng tay ngày (`comp_days_admin` khác 0) | Chỉ để biết |
+| STUDENT_PACKAGES | Xanh dương | Gói có ngày bù (`comp_days` > 0) | Chỉ để biết |
+
+### Kết quả test
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 139/139 (mới I136 màu BOOKINGS và "Đã xử lý", I137 màu STUDENT_PACKAGES, I138 báo buổi kẹt, I139 vùng tô màu khi thêm hàng và khi thiếu cột, I140 hồi quy xử lý buổi kẹt; I34 đổi số luật). Test chạy CÔNG THỨC THẬT trên dữ liệu thật qua bộ tính công thức trong test (AND, OR, N, TODAY, COUNTIFS, INDIRECT, so sánh), không chỉ so chuỗi |
+| Giao diện web | 49/49 |
+| Thử tải | 2/2 |
+| Thử phá | 39 đột biến (sau vòng sửa): 38 bắt, 1 tương đương (đảo thứ tự luật đỏ và cam: không dòng nào khớp cả hai). Đặt lại 2 lỗi gốc của soát chéo thì I140 bắt cả hai. Các vòng trước lộ 4 lỗ test (admin tự chọn kết quả cùng lúc; báo trùng sau nhiều giờ; tab không tròn 1.000 hàng; mốc bằng nhau ở adminHandled_), đã thêm test |
+| Soát chéo | 2 agent độc lập (code và luật; vận hành, nâng cấp, dữ liệu): 1 HIGH (cả hai cùng thấy: buổi kẹt không xử lý được), 6 MEDIUM, 12 LOW. Đã sửa HIGH và mọi MEDIUM sửa được trong phạm vi (thư báo kẹt gộp, lệch nhịp trigger, web khớp màu Sheets, chống mất thông báo); 4 câu cần anh quyết ghi BACKLOG BL72 đến BL75 |
+
+### Việc của admin (STAGING, theo thứ tự luật 38)
+
+1. Bảo trì chỉ xem (khuyên dùng).
+2. Dán `dist/Code.gs` và `dist/Index.html` (bản 8.1.7 gồm cả giao diện 5O), Lưu. Không đổi `appsscript.json`.
+3. Chạy **menu 1** (tự sao lưu trước vì phiên bản đổi; thêm cột `admin_done_at`, dropdown có lựa chọn mới cho mọi hàng, đặt màu mới).
+4. Triển khai phiên bản mới (sửa bản cũ). Tắt bảo trì.
+5. Mở BOOKINGS và STUDENT_PACKAGES kiểm màu theo bảng trên.
+
+### Giới hạn còn lại (nói thẳng)
+
+* Bảng màu ở trên chưa đưa vào `HUONG_DAN_VAN_HANH.md` (hướng dẫn chỉ xuất khi anh yêu cầu, quy ước 1); sẽ gộp ở 5P.
+* Màu đỏ gói "chờ cộng tay" hết khi thông báo được đánh dấu đã đọc (kể cả "Đã đọc hết"): cộng ngày xong rồi mới đánh dấu (BL73).
+* Buổi Vắng học viên, Không hoàn thành có từ trước vẫn tô màu tới khi chọn "Đã xử lý" từng dòng (BL72).
+* Đổi `EXPIRY_NOTICE_DAYS`: chạy lại menu 1 để màu vàng đổi theo (BL75).
+* Công thức tô màu được kiểm bằng bộ tính trong test, chưa kiểm trên Google Sheets thật: sau menu 1 trên STAGING, xem đúng màu ở vài dòng mẫu.
+* Phần còn lại của 5Q (BL69: bảng hạn mức 5 dòng, kiểm thư 5 loại hộp thư) chưa làm.
+
+**Trạng thái 05/11/2026 tối: 5O XONG CẢ WEB LẪN KHUNG EMAIL, bản 8.1.6.** Thêm so với 8.1.5: ảnh banner thương hiệu nhúng base64 vào trang chủ (đã cắt lề trắng, ~78KB); viên chữ Thái đổi nền trắng, chữ đen, viền vàng (yêu cầu anh 05/11); khung email `emailWrap_`, `btn_`, `emailWrapBi_` theo thiết kế 5O (đầu trang đen gạch vàng `#ffc933`, nút viên thuốc đen, đồng bộ xám `#63635d`); test mới U49 (49/49 web). Soát chéo 2 agent: 0 HIGH, 0 MEDIUM về code, các LOW đã dọn. CHƯA gửi thử email tới Gmail web, Gmail điện thoại, Outlook (việc của admin trên STAGING, BL09); chữ trong ảnh banner là tiếng Việt cố định — BL71 chờ anh chọn. BACKLOG còn **34 câu chờ anh** (mục A 30, mục B 4).
+
+**Trạng thái 05/11/2026 chiều: 5O PHẦN GIAO DIỆN WEB xong, bản 8.1.5** (đen trắng theo ảnh thương hiệu, chỉ `src/ui/Styles.html` + token màu; phần email của 5O chưa làm). Đồng thời khôi phục 5 file bị sót khi upload repo GitHub (`test/unit.js`, `.gitignore`, workflow CI, `.clasp.json.example`, `THIET_KE_GIAO_DIEN.md`) lấy từ zip còn trong lịch sử git — trước đó `npm test` không chạy được vì thiếu `test/unit.js`. BACKLOG còn **33 câu chờ anh** (mục A 29, mục B 4). Chi tiết: mục "Chunk 5O phần giao diện" dưới đây.
+
+## Chunk 5O phần giao diện web (05/11/2026, bản 8.1.5)
+
+### Làm gì
+
+* Giao diện mới theo ảnh thương hiệu (BL08, kế hoạch 5O): nền trắng; màu chính ĐEN TRẮNG (nút chính, mục đang chọn là viên thuốc đen chữ trắng); vàng thương hiệu `#ffc933` chỉ cho dấu nhận diện (ô logo, viên chữ Thái trang chủ, thẻ gói học); màu phụ xanh lá, tím, vàng, xanh dương dạng phấn cho trạng thái; khối bo góc, ĐỔ BÓNG THAY VIỀN. Đúng phạm vi kế hoạch: chỉ `src/ui/Styles.html` và token màu, mọi class, id, cấu trúc giữ nguyên; viền đỏ đúng ô nhập sai giữ nguyên (`input.invalid`).
+* Sửa theo soát chéo: thanh đầu trang có vạch chân mảnh (hết trắng trên trắng khi cuộn), ô số liệu giữ bóng khi trỏ chuột, bóng không bị cắt ở hàng số liệu cuộn ngang trên điện thoại, 3 mã màu tông xanh lá cũ còn sót đổi về token mới, ô `.chip:disabled` đạt tương phản 4.5:1 (lỗi có từ trước).
+* `THIET_KE_GIAO_DIEN.md` viết lại theo bản 5O (BL70, chờ anh duyệt). `VERSION` 8.1.5, `dist/` dựng lại bằng `npm run build`.
+
+### Kết quả test
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 134/134 |
+| Giao diện web | 48/48 |
+| Thử tải | 2/2 |
+| Ảnh màn hình | 4 trang (chủ, học viên, tutor, admin) × 4 cỡ (360, 390, 768, 1280): không vỡ, luật 43 đạt |
+| Soát chéo | 2 agent độc lập (kỹ thuật CSS; thiết kế theo kế hoạch và ảnh chụp): 0 HIGH, 4 MEDIUM, 9 LOW; đã sửa mọi MEDIUM sửa được trong phạm vi và các LOW có ảnh hưởng thật |
+
+### Việc của admin (STAGING, theo thứ tự luật 38)
+
+1. Dán `dist/Code.gs`, `dist/Index.html` vào project STAGING (không đổi `appsscript.json`), Lưu.
+2. Chạy menu 1 (phiên bản code đổi nên tự sao lưu DB trước, luật 49; không có cột mới).
+3. Triển khai phiên bản mới (sửa bản cũ).
+4. Mở web kiểm trên điện thoại và máy tính: nền trắng, nút đen, logo vàng; form nhập sai thấy viền đỏ đúng ô.
+
+### Giới hạn còn lại (nói thẳng)
+
+* Phần email của 5O CHƯA làm: khung `emailWrap_` (Notify.gs) vẫn tông xanh rừng cũ, lệch bản nhận diện mới; chưa gửi thử mọi mẫu email tới Gmail web, Gmail điện thoại, Outlook (BL09). Làm ở lượt sau cùng 5N.
+* Bộ ảnh chưa có ảnh chụp trạng thái ô nhập sai (`input.invalid`); code giữ nguyên bản cũ đã test.
+* Nút Zalo nổi đè nội dung khi cuộn tới đúng vị trí trên điện thoại: hành vi có từ trước 5O, không đổi ở bản này.
+* 5N (tô màu Sheets, BL13) chưa làm.
+
 **05/11/2026: chuyển sang repo GitHub cho Claude Code** (không đổi code, vẫn bản 8.1.4). Repo có đủ `src/`, `test/`, `dist/`, tài liệu; thêm `.gitignore`, `.clasp.json.example`, GitHub Actions chạy `npm test` và kiểm `dist/` khớp `src/`, lệnh `npm run build`, `npm run clasp:push`. Bỏ 2 bundle `v8/repo/` và `repo/BOOTSTRAP.md`. Hướng dẫn: `HUONG_DAN_GITHUB_CLAUDE_CODE.md`; quy trình cho Claude Code: `CLAUDE.md` mục cuối. Test lại sau khi dựng repo từ bundle: 34/34, 46/46, 134/134, 48/48, 2/2; `dist/` dựng lại trùng từng byte với bản trong project.
 
 **Trạng thái 02/11/2026: 5Q phần gửi email XONG, bản 8.1.4** (= 8.1.3 + gửi email cố định qua GmailApp trong code, **không còn MailFix**). Code giao: `dist/Code.gs`, `dist/Index.html`, `dist/appsscript.json` (không đổi quyền so với 8.1.1), `dist_google_login/` (dự án phụ, thêm `oauthScopes`). Việc của admin: `HUONG_DAN_PHAT_HANH.md` mục 3 (nâng STAGING từ 8.0.10 lên thẳng 8.1.4) và `HUONG_DAN_VAN_HANH.md` Phần M (đăng nhập Google). **5N, 5O dời sang tuần sau.** BACKLOG còn **32 câu chờ anh** (mục A 28, mục B 4), rà sau 5N, 5O. Phiên sau: mở repo GitHub bằng Claude Code, đọc `CLAUDE.md` (luật 19, 54 đổi), file này.

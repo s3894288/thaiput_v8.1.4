@@ -136,13 +136,14 @@ function decideTutorCancelInLock_(availId, decision, actor) {
  * Không có ai thay: huỷ booking với trạng thái CANCELLED_TUTOR, hoàn buổi nếu là Trial hoặc gói cũ (câu 19).
  */
 function reassignBookingInLock_(booking, excludeIds, actor, cause, forcedTutorId) {
-  var tb = table_('BOOKINGS'), oldTutor = userById_(booking.tutor_id), student = userById_(booking.student_id);
+  var tb = table_('BOOKINGS'), oldTutor = userById_(booking.tutor_id), student = userById_(booking.student_id), prevStatus = booking.status;
   tb.update(booking, { status: BOOKING_STATUS.PENDING_REASSIGN });
   var cands = buildTutorCandidates_(booking.date, booking.slot, activeTutors_(), table_('AVAILABILITY').all(),
     tb.all().filter(function (b) { return b.booking_id !== booking.booking_id; }), excludeIds);
   var newId = forcedTutorId ? (cands.some(function (c) { return c.tutor_id === forcedTutorId; }) ? forcedTutorId : null) : pickTutor_(cands);
   if (!newId) {
-    if (forcedTutorId) { tb.update(booking, { status: BOOKING_STATUS.CONFIRMED }); return { ok: false, reason: REASONS.NO_TUTOR }; }
+    // 5N (soát): trả về đúng trạng thái trước đó. Buổi đang kẹt Chờ đổi tutor không được thành CONFIRMED với tutor cũ (người đã không dạy).
+    if (forcedTutorId) { tb.update(booking, { status: prevStatus }); return { ok: false, reason: REASONS.NO_TUTOR }; }
     // 5L (soát): khoá tutor: lý do riêng, không gửi thư huỷ cho tutor bị khoá.
     if (cause === 'LOCK') cancelBookingInternal_(booking, BOOKING_STATUS.CANCELLED_TUTOR, actor, 'Tutor nghỉ, không có tutor thay', 'TUTOR_LOCK');
     else cancelBookingInternal_(booking, BOOKING_STATUS.CANCELLED_TUTOR, actor, 'Tutor huỷ, không có tutor thay', 'TUTOR');
