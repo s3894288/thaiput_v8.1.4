@@ -1,6 +1,6 @@
 {
   "name": "thaiput-v8",
-  "version": "8.1.6",
+  "version": "8.1.7",
   "private": true,
   "description": "Thaiput v8: Apps Script + Google Sheets + web portal đặt lịch học nói 1:1",
   "scripts": {

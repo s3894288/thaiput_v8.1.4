@@ -212,38 +212,82 @@ function setupCore_(ss) {
 }
 
 /**
- * Tô màu việc cần admin chú ý (chunk 5B). Chạy lại an toàn: thay toàn bộ luật tô màu của các tab này.
+ * Tô màu việc cần admin chú ý (chunk 5B, đổi 5N). Chạy lại an toàn: thay toàn bộ luật tô màu của các tab này.
+ * Luật đầu tiên khớp thắng (Sheets), nên thứ tự trong danh sách là thứ tự ưu tiên. Màu và cách làm hết màu: PROGRESS.md mục 5N.
  *   NOTIFICATIONS: đỏ = CRITICAL chưa đọc, vàng = WARNING chưa đọc, xanh = đã tick ô read. Cột read là ô tick.
  *   REGISTRATIONS: vàng = Chờ duyệt.  AVAILABILITY: đỏ = tutor xin huỷ chờ duyệt, xám = BLOCKED.
- *   BOOKINGS: đỏ = TECH_ISSUE, vàng = STUDENT_ABSENT hoặc PENDING_REASSIGN.
+ *   BOOKINGS (5N): đỏ = tutor quá hạn chọn kết quả, Không hoàn thành chưa xử lý; cam đậm = Chờ đổi tutor (luôn hiện);
+ *     hồng = Vấn đề kỹ thuật chưa chọn lỗi; vàng = Vắng học viên chưa xử lý (BL13); xanh dương nhạt = buổi được bù; xám = Huỷ muộn.
+ *     "Chưa xử lý" = admin_done_at trống hoặc cũ hơn result_at (kết quả đổi sau lần admin xử lý trước thì hiện lại).
+ *   STUDENT_PACKAGES (5N): đỏ = còn thông báo COMP_ON_EXPIRED chưa đọc (chờ admin cộng tay comp_days_admin); xám = hết hạn;
+ *     vàng = còn EXPIRY_NOTICE_DAYS ngày; tím = admin đã cộng tay; xanh dương = có ngày bù.
+ * Vùng tô màu phủ từ hàng 2 tới hết tab; tab tự thêm hàng (Db.gs ensureRows_) thì gọi lại applyHighlightsFor_ cho tab đó.
  */
+var HL_ = { RED: '#ea9999', ORANGE: '#f6b26b', PINK: '#f9d2e4', YELLOW: '#fff3cd', LIGHT_BLUE: '#cfe2f3', BLUE: '#9fc5e8',
+  PURPLE: '#d9d2e9', GREEN: '#d1e7dd', GREY: '#e9ecef', SOFT_RED: '#f8d7da' };
+var HIGHLIGHT_TABLES_ = ['NOTIFICATIONS', 'REGISTRATIONS', 'AVAILABILITY', 'BOOKINGS', 'STUDENT_PACKAGES'];
+
+/** Chữ cột (A, B, ..., AA) của một cột theo tên ở hàng tiêu đề; null nếu tab không có cột đó. */
+function hlColLetter_(sh, col) {
+  if (!sh || sh.getLastColumn() < 1) return null;
+  var i = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String).indexOf(col), out = '';
+  if (i === -1) return null;
+  for (var n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) out = String.fromCharCode(65 + (n - 1) % 26) + out;   // 27 = AA
+  return out;
+}
+
+/** Luật tô màu của một tab: danh sách [công thức, màu]. {cột} là ô cùng hàng; [[TAB.cột]] là cả cột ở tab khác (qua INDIRECT). */
+function highlightSpecs_(ss, name) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) return [];
+  var has = function (c) { return !!hlColLetter_(sh, c); };
+  if (name === 'NOTIFICATIONS') return [['={read}=TRUE', HL_.GREEN], ['=AND({level}="CRITICAL",{read}<>TRUE)', HL_.SOFT_RED], ['=AND({level}="WARNING",{read}<>TRUE)', HL_.YELLOW]];
+  if (name === 'REGISTRATIONS') return [['={admin_action}="' + ADMIN_DECISION.PENDING + '"', HL_.YELLOW]];
+  if (name === 'AVAILABILITY') return [['={status}="CANCEL_PENDING"', HL_.SOFT_RED], ['={status}="BLOCKED"', HL_.GREY]];
+  if (name === 'BOOKINGS') {
+    // Thiếu cột (chưa chạy menu 1 sau khi dán code): dùng luật cũ, không viết công thức trỏ vào cột không có.
+    var open = has('admin_done_at') ? 'OR({admin_done_at}="",{admin_done_at}<{result_at})' : 'TRUE';
+    var red = [];
+    if (has('result_notice_at')) red.push('AND({status}="CONFIRMED",{result_notice_at}<>"")');
+    red.push('AND({status}="NOT_COMPLETED",' + open + ')');
+    return [
+      ['=OR(' + red.join(',') + ')', HL_.RED],
+      ['={status}="PENDING_REASSIGN"', HL_.ORANGE],
+      [has('tech_decided_at') ? '=AND({status}="TECH_ISSUE",{tech_decided_at}="")' : '={status}="TECH_ISSUE"', HL_.PINK],
+      ['=AND({status}="STUDENT_ABSENT",' + open + ')', HL_.YELLOW],
+      has('comp_days') ? ['=N({comp_days})>0', HL_.LIGHT_BLUE] : null,
+      ['={status}="CANCELLED_LATE"', HL_.GREY]
+    ].filter(Boolean);
+  }
+  if (name === 'STUDENT_PACKAGES') {
+    var nt = ss.getSheetByName('NOTIFICATIONS'), canNotif = nt && hlColLetter_(nt, 'entity_id') && hlColLetter_(nt, 'event') && hlColLetter_(nt, 'read');
+    return [
+      canNotif ? ['=COUNTIFS([[NOTIFICATIONS.entity_id]],{sp_id},[[NOTIFICATIONS.event]],"COMP_ON_EXPIRED",[[NOTIFICATIONS.read]],"<>TRUE")>0', HL_.RED] : null,
+      ['={status}="' + PKG_STATUS.EXPIRED + '"', HL_.GREY],
+      ['=AND({status}="' + PKG_STATUS.ACTIVE + '",{end_date}<>"",{end_date}>=TODAY(),{end_date}-TODAY()<=' + Number(cfg_('EXPIRY_NOTICE_DAYS')) + ')', HL_.YELLOW],
+      has('comp_days_admin') ? ['=N({comp_days_admin})<>0', HL_.PURPLE] : null,
+      has('comp_days') ? ['=N({comp_days})>0', HL_.BLUE] : null
+    ].filter(Boolean);
+  }
+  return [];
+}
+
+/** Đặt lại luật tô màu một tab, vùng từ hàng 2 tới hết tab. */
+function applyHighlightsFor_(ss, name) {
+  var sh = ss.getSheetByName(name);
+  if (!sh || sh.getMaxRows() < 2) return 0;
+  var range = sh.getRange(2, 1, sh.getMaxRows() - 1, sh.getLastColumn());
+  var rules = highlightSpecs_(ss, name).map(function (sp) {
+    var f = sp[0].replace(/\[\[(\w+)\.(\w+)\]\]/g, function (m, tab, c) { var l = hlColLetter_(ss.getSheetByName(tab), c); return 'INDIRECT("' + tab + '!$' + l + '$2:$' + l + '")'; })
+      .replace(/\{(\w+)\}/g, function (m, c) { return '$' + hlColLetter_(sh, c) + '2'; });
+    return SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(f).setBackground(sp[1]).setRanges([range]).build();
+  });
+  sh.setConditionalFormatRules(rules);
+  return rules.length;
+}
+
 function applyHighlights_(ss) {
-  var RED = '#f8d7da', YELLOW = '#fff3cd', GREEN = '#d1e7dd', GREY = '#e9ecef';
-  var colLetter = function (sh, col) {
-    var i = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String).indexOf(col), out = '';
-    if (i === -1) return null;
-    for (var n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) out = String.fromCharCode(65 + (n - 1) % 26) + out;   // 27 = AA
-    return out;
-  };
-  var setRules = function (name, specs) {
-    var sh = ss.getSheetByName(name); if (!sh) return;
-    var width = sh.getLastColumn(), range = sh.getRange(2, 1, sh.getMaxRows() - 1, width);
-    var rules = specs.map(function (sp) {
-      var f = sp[0].replace(/\{(\w+)\}/g, function (m, c) { return '$' + colLetter(sh, c) + '2'; });
-      return SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(f).setBackground(sp[1]).setRanges([range]).build();
-    });
-    sh.setConditionalFormatRules(rules);
-  };
-  setRules('NOTIFICATIONS', [['={read}=TRUE', GREEN], ['=AND({level}="CRITICAL",{read}<>TRUE)', RED], ['=AND({level}="WARNING",{read}<>TRUE)', YELLOW]]);
-  setRules('REGISTRATIONS', [['={admin_action}="' + ADMIN_DECISION.PENDING + '"', YELLOW]]);
-  setRules('AVAILABILITY', [['={status}="CANCEL_PENDING"', RED], ['={status}="BLOCKED"', GREY]]);
-  // Chunk 5M: buổi kỹ thuật đỏ tới khi admin chọn lỗi (tech_decided_at có giá trị); chọn xong thì hết màu.
-  var bkh = ss.getSheetByName('BOOKINGS'), hasDecided = bkh && bkh.getRange(1, 1, 1, bkh.getLastColumn()).getValues()[0].map(String).indexOf('tech_decided_at') !== -1;
-  var hasNotice = bkh && bkh.getRange(1, 1, 1, bkh.getLastColumn()).getValues()[0].map(String).indexOf('result_notice_at') !== -1;
-  // Chunk 5J: tutor quá hạn chọn kết quả (đã báo đỏ) và buổi Không hoàn thành: đỏ, tới khi có kết quả.
-  setRules('BOOKINGS', [[hasDecided ? '=AND({status}="TECH_ISSUE",{tech_decided_at}="")' : '={status}="TECH_ISSUE"', RED]]
-    .concat(hasNotice ? [['=OR(AND({status}="CONFIRMED",{result_notice_at}<>""),{status}="NOT_COMPLETED")', RED]] : [])
-    .concat([['=OR({status}="STUDENT_ABSENT",{status}="PENDING_REASSIGN")', YELLOW]]));
+  HIGHLIGHT_TABLES_.forEach(function (name) { applyHighlightsFor_(ss, name); });
   // Ô tick cột read: chỉ đặt cho hàng có dữ liệu (Db.gs tự đặt cho hàng mới). Bản 5B từng đặt cả cột: gỡ, và xoá FALSE ở hàng trống.
   var nt = ss.getSheetByName('NOTIFICATIONS');
   if (nt) {

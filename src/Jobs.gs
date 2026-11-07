@@ -246,6 +246,39 @@ function reconcileInLock_(now) {
   return found;
 }
 
+/**
+ * Chunk 5N: buổi kẹt ở Chờ đổi tutor (PENDING_REASSIGN). Bình thường trạng thái này chỉ có trong một khoá (đổi tutor xong thì về
+ * CONFIRMED hoặc huỷ); còn lại sau khoá là do lượt đổi tutor lỗi giữa chừng hoặc sửa tay, và buổi không có tutor dạy.
+ * BOOKINGS không có cột "lúc vào trạng thái này", nên job ghi lần đầu thấy (Script Property STUCK_<mã>, mốc ms) và báo REASSIGN_STUCK
+ * đúng một lần khi đã thấy đủ REASSIGN_STUCK_HOURS giờ. Dấu đã báo (SENT) chỉ ghi sau khi khoá ghi xong dòng thông báo.
+ * Buổi ra khỏi trạng thái (đổi tutor, huỷ) thì xoá dấu: kẹt lại lần sau được báo lại. Trả số buổi vừa báo.
+ */
+function reassignStuckInLock_(now) {
+  var hours = Number(cfg_('REASSIGN_STUCK_HOURS'));
+  if (!(hours >= 0)) hours = DEFAULTS_.REASSIGN_STUCK_HOURS;
+  var p = props_(), all = p.getProperties(), seen = {}, stuck = [];
+  table_('BOOKINGS').filter(function (b) { return b.status === BOOKING_STATUS.PENDING_REASSIGN; }).forEach(function (b) {
+    var k = 'STUCK_' + b.booking_id, v = all[k];
+    seen[k] = true;
+    if (v === 'SENT') return;
+    var since = Number(v);
+    if (!v || isNaN(since)) { since = now.getTime(); p.setProperty(k, String(since)); }
+    if (now.getTime() - since >= hours * 3600000) stuck.push(b);
+  });
+  Object.keys(all).forEach(function (k) { if (/^STUCK_/.test(k) && !seen[k]) p.deleteProperty(k); });
+  if (!stuck.length) return 0;
+  var names = {}; table_('USERS').all().forEach(function (u) { names[u.user_id] = u.name; });
+  stuck.forEach(function (b) {
+    var who = (names[b.student_id] || b.student_id) + ', ' + (names[b.tutor_id] || b.tutor_id);
+    logActivity_('SYSTEM', 'REASSIGN_STUCK', 'BOOKING', b.booking_id, { tutor: b.tutor_id, hours: hours });
+    notify_('REASSIGN_STUCK', { student_id: b.student_id, tutor_id: b.tutor_id, entity: 'BOOKING', entity_id: b.booking_id, link: rowLink_('BOOKINGS', b._row),
+      message: 'Buổi ' + b.booking_id + ' (' + fmtDayVi_(b.date) + ' ' + b.slot + ', ' + who + ') kẹt ở Chờ đổi tutor quá ' + hours + ' giờ: chưa có tutor dạy. Chọn Đổi tutor hoặc Huỷ bởi admin ở cột admin_action.',
+      message_en: 'Lesson ' + b.booking_id + ' (' + fmtDayEn_(b.date) + ' ' + b.slot + ', ' + who + ') has been stuck waiting for a new tutor for over ' + hours + ' hour(s): no tutor will teach it. Pick Đổi tutor (reassign) or Huỷ bởi admin (cancel) in the admin_action column.' });
+    afterLock_(function () { props_().setProperty('STUCK_' + b.booking_id, 'SENT'); });
+  });
+  return stuck.length;
+}
+
 /** Mỗi giờ: tự từ chối yêu cầu huỷ quá hạn duyệt (câu 20), tự hoàn thành buổi quá 24 giờ (câu 29). */
 function hourlyJob(e) { requireOperator_(e);
   var logQueued = [];
@@ -269,6 +302,8 @@ function hourlyJob(e) { requireOperator_(e);
     // Chunk 5J (câu 29 đổi 01/11): không tự Hoàn thành. Báo đỏ khi quá hạn xác nhận; quá hạn tiếp thì Không hoàn thành.
     // Bảo trì: tutor không xác nhận được, nên tạm dừng bước chuyển Không hoàn thành (vẫn báo).
     var completed = resultOverdueInLock_(now, maintMode_() === 'OFF');
+    // Chunk 5N: buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: báo admin một lần.
+    var stuck = 0; try { stuck = reassignStuckInLock_(now); } catch (se) { Logger.log('Báo buổi kẹt lỗi: ' + se.message); }
     // Chunk 5M: tính lại gói còn chạy (khoá ngày bắt đầu khi buổi kỹ thuật quá TECH_DECIDE_HOURS, tự lành ô bị sửa ngoài hệ thống).
     var heal = null; try { heal = pkgHealAllInLock_(now); } catch (he) { Logger.log('Tính lại gói lỗi: ' + he.message); mailAdminError_('Tính lại gói (hourlyJob)', (he && he.stack) || String(he)); }
     // Việc theo giờ trong ngày (chunk 5B), mỗi việc tối đa 1 lần mỗi ngày hoặc mỗi tuần:
@@ -286,7 +321,7 @@ function hourlyJob(e) { requireOperator_(e);
     // Chunk 5G: dọn khoá DONE_ cũ hơn 7 ngày (soát R1 L8, R2 T23); dọn lần bỏ dòng dở (purgeRows_ bị cắt).
     onceAfterHour_('PROPCLEAN', 3, now, function () { return cleanDoneProps_(now); });
 
-    return { rejected: rejected, completed: completed, packages: heal, morning: morning, noAvailability: noAvail, tutorRemind: tutorRemind, digest: digest, authPurged: authPurged, revoked: revoked, issues: issues, metrics: metrics, calendarNight: night };
+    return { rejected: rejected, completed: completed, stuck: stuck, packages: heal, morning: morning, noAvailability: noAvail, tutorRemind: tutorRemind, digest: digest, authPurged: authPurged, revoked: revoked, issues: issues, metrics: metrics, calendarNight: night };
   });
   if (res) forgetLogQueue_(logQueued);   // dữ liệu đã ghi khi ra khỏi khoá: mới xoá hàng chờ nhật ký
   if (res && res.revoked) { forgetSessions_(res.revoked.hashes, res.revoked.users); res.revoked = res.revoked.hashes.length; }

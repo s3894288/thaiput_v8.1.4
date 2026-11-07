@@ -51,6 +51,11 @@ function ensureRows_(sheet, tableName, lastNeeded) {
   var add = Math.max(DB_GROW_ROWS_, lastNeeded - max);
   sheet.insertRowsAfter(max, add);
   applyDropdowns_(sheet, tableName, max + 1, add);
+  // Chunk 5N: luật tô màu có vùng cố định (hàng 2 tới hết tab lúc đặt): đặt lại để phủ cả hàng vừa thêm. Lỗi tô màu không được
+  // làm hỏng lượt ghi dữ liệu (luật 39): chỉ ghi log.
+  if (HIGHLIGHT_TABLES_.indexOf(tableName) !== -1) {
+    try { applyHighlightsFor_(sheet.getParent(), tableName); } catch (e) { Logger.log('Tô màu lại ' + tableName + ' lỗi: ' + e.message); }
+  }
 }
 
 /** Chữ bắt đầu bằng = + - @ ở cột không phải dạng chữ: thêm dấu nháy đơn để Sheets lưu nguyên văn, không chạy công thức. */
@@ -246,7 +251,7 @@ DbTable_.prototype.update = function (rowObj, patch) {
   if ((this.name === 'BOOKINGS' || this.name === 'AVAILABILITY') && Object.keys(patch).some(function (c) { return SLOT_NEUTRAL_COLS_.indexOf(c) === -1; })) markSlotsDirty_();
   return rowObj;
 };
-var SLOT_NEUTRAL_COLS_ = ['event_id', 'meet_link', 'cal_state', 'cal_attempts', 'cal_next_at', 'reminder_sent_at', 'day_reminder_at', 'admin_action', 'admin_note', 'result_at', 'result_by', 'tech_fault', 'tech_decided_at', 'comp_days', 'comp_gap', 'result_notice_at'];
+var SLOT_NEUTRAL_COLS_ = ['event_id', 'meet_link', 'cal_state', 'cal_attempts', 'cal_next_at', 'reminder_sent_at', 'day_reminder_at', 'admin_action', 'admin_note', 'result_at', 'result_by', 'tech_fault', 'tech_decided_at', 'comp_days', 'comp_gap', 'result_notice_at', 'admin_done_at'];
 
 /**
  * Bỏ các dòng mà keepFn trả false (keepFn nhận object của dòng, đọc MỚI từ Sheets ngay lúc bỏ). Phải gọi trong withLock_.

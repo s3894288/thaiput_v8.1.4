@@ -110,6 +110,23 @@ function adminSetTechFault_(bookingId, actor, fault) {
   });
 }
 
+/**
+ * Chunk 5N: "Đã xử lý (giữ nguyên)" ở cột admin_action của BOOKINGS. Không đổi trạng thái, lương hay gói: chỉ ghi admin_done_at
+ * (dòng hết tô vàng Vắng học viên, hết đỏ Không hoàn thành). Không cho chọn khi màu chỉ hết bằng việc thật:
+ *   CONFIRMED, PENDING_REASSIGN (buổi chưa có kết quả hoặc chưa có tutor), TECH_ISSUE chưa chọn lỗi (chọn 1 trong 3 lựa chọn lỗi).
+ * Trả { ok } hoặc { ok: false, reason, block: 'OPEN' | 'TECH' } để phần nối (Admin.gs) báo đúng việc cần làm.
+ */
+function adminMarkDone_(bookingId, actor) {
+  return withLock_(function () {
+    var t = table_('BOOKINGS'), b = t.byId(bookingId);
+    if (!b) return { ok: false, reason: REASONS.INVALID_INPUT };
+    if (b.status === BOOKING_STATUS.CONFIRMED || b.status === BOOKING_STATUS.PENDING_REASSIGN) return { ok: false, reason: REASONS.INVALID_INPUT, block: 'OPEN', status: b.status };
+    if (b.status === BOOKING_STATUS.TECH_ISSUE && !b.tech_decided_at) return { ok: false, reason: REASONS.INVALID_INPUT, block: 'TECH', status: b.status };
+    logActivity_(actor, 'ADMIN_MARK_DONE', 'BOOKING', bookingId, { status: b.status });
+    return { ok: true };
+  });
+}
+
 /** Bản cũ (giữ tên cho code và test cũ): "Tính lương buổi kỹ thuật" = lỗi học viên; tắt = lỗi tutor. */
 function adminPayrollOverride_(bookingId, actor, on) {
   return adminSetTechFault_(bookingId, actor, on !== false ? TECH_FAULT.STUDENT : TECH_FAULT.TUTOR);
