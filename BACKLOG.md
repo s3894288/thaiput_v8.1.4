@@ -1,6 +1,10 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 05/11/2026 chiều (lần 10). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 10/11/2026 (lần 11). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 05/11 lần 10
+
+* 5R xong (bản 8.1.5, SES). Thêm BL85 (`test/unit.js` viết lại). BL80, BL84 đã làm theo đề xuất (SES ngay ở 5R, P0 trong tháng 11), chờ anh duyệt.
 
 ## Thay đổi so với bản 05/11 lần 9
 
@@ -52,6 +56,7 @@
 
 | Mã | Câu hỏi | Đề xuất | Chặn |
 |---|---|---|---|
+| BL85 | `test/unit.js` viết lại 10/11 vì bản gốc không lên repo. (a) giữ bản viết lại; (b) anh gửi `TEST_BUNDLE.txt`, coder gộp test bản gốc có mà bản mới thiếu | (b) nếu còn file, không thì (a) | Không chặn |
 | BL79 | Mức hạ tầng v9: (a) Pro gọn 35 USD mỗi tháng (Cloudflare Workers 5 + Supabase Pro 25 + SES 5); (b) An toàn 65 USD (Vercel Pro mỗi ghế + Supabase Pro + Resend Pro); (c) Tột cùng 10 USD (Workers + D1 + SES, tự viết đăng nhập) | (a), thử nghiệm S0 đỏ thì web về Vercel | v9 S0 |
 | BL80 | Email: (a) Amazon SES ngay từ 5R (0,10 USD mỗi 1.000 thư, một lần cài, dùng tới hết v9; thay đề xuất Resend ở BL70); (b) Resend Pro 20 USD ở 5R rồi đổi SES ở v9. Kèm: thêm `REMINDER_MODE` giảm khoảng 40% thư ở v9 | (a); `REMINDER_MODE` làm ở v9 | 5R |
 | BL81 | Công cụ AI: (a) bỏ Google AI Pro, dùng Gemini CLI miễn phí 1.000 lượt mỗi ngày cho vai đọc dài và viết chữ; (b) giữ AI Pro | (a) trừ khi anh dùng AI Pro cho việc khác | v9 S0 |
@@ -129,7 +134,7 @@
   * GmailApp (8.1.4) trừ cùng hạn mức: menu Kiểm tra gửi email, số "trước → sau" giảm 1;
   * thư GmailApp tới hộp thư cùng tên miền trường (lý do có MailFix);
   * chuyển chủ sở hữu file sang tài khoản ở tên miền khác (chỉ khi đổi tài khoản).
-* **05/11:** `test/unit.js` (34 test hàm thuần và Db) không có trong repo GitHub; `test/harness.js` dòng 21 nạp `./unit` nên `npm test` và GitHub Actions đỏ. Lấy lại từ `TEST_BUNDLE.txt` của project claude.ai cũ rồi commit; làm trước 5R.
+* **05/11:** `test/unit.js` (34 test hàm thuần và Db) không có trong repo GitHub. **10/11: đã viết lại** (34 test cùng mã U01 đến U26, P01 đến P08, thử phá 25 đột biến bắt cả 25). Còn chờ: anh tìm `TEST_BUNDLE.txt` của project claude.ai cũ; có thì gửi coder so với bản viết lại, giữ test nào bản gốc có mà bản mới thiếu (BL85).
 
 ## Đã chốt
 

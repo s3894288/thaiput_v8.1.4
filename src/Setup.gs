@@ -429,7 +429,13 @@ function testSystem(e) { requireOperator_(e);
     if (snd && adm && snd.toLowerCase() !== adm) warn('Menu đang chạy bằng ' + snd + ', khác ADMIN_EMAIL (' + adm + '). Trigger gửi thư từ tài khoản đã chạy menu 3, trang web từ tài khoản đã Triển khai: hai việc này phải làm bằng cùng một tài khoản chủ hệ thống. Cố ý để ADMIN_EMAIL là hộp thư khác thì bỏ qua dòng này.');
     // 5Q: file MailFix.gs cũ còn trong dự án thì testMailFix là hàm công khai không kiểm quyền (trang web mở cho mọi người, luật 24).
     if (typeof testMailFix === 'function' || typeof sendEmailFix_ === 'function') err('Dự án Apps Script còn file MailFix.gs cũ: xoá file đó ngay (từ 8.1.4 gửi email cố định, không cần MailFix, không tìm và thay).');
-    if (mb < 0) warn('Không đọc được hạn mức email (Google chưa cấp quyền gửi thư): chạy menu Email → Kiểm tra gửi email để cấp quyền.');
+    if (mailTransport_() === 'SES') {
+      // Chunk 5R: SES không có hạn mức Google; hạn mức là MAIL_DAILY_CAP tự đặt. Thiếu khoá thì mọi thư đang tự gửi lại bằng GmailApp.
+      if (!sesConfig_()) err('MAIL_TRANSPORT = SES nhưng thiếu SES_KEY, SES_SECRET trong Thuộc tính tập lệnh (Cài đặt dự án → Thuộc tính tập lệnh): mọi thư đang tự gửi lại bằng GmailApp (hạn mức Google). Dán khoá hoặc đổi MAIL_TRANSPORT về GMAILAPP.');
+      if (!String(cfg_('MAIL_FROM_ADDRESS') || '').trim()) warn('MAIL_FROM_ADDRESS trống: SES gửi từ ' + (mailFromAddress_() || '(không suy ra được)') + '. Địa chỉ phải thuộc tên miền đã xác minh trong SES.');
+      lines.push('Email còn gửi được hôm nay qua SES: ' + (mb < 0 ? 'không giới hạn (MAIL_DAILY_CAP = 0)' : mb + ' (MAIL_DAILY_CAP ' + cfg_('MAIL_DAILY_CAP') + ', đã gửi ' + sesSentToday_(0) + ')'));
+    }
+    else if (mb < 0) warn('Không đọc được hạn mức email (Google chưa cấp quyền gửi thư): chạy menu Email → Kiểm tra gửi email để cấp quyền.');
     else { var qi = mailQuotaInfo_(mb, mailSentToday_(), snd); qi.lines.forEach(function (l) { lines.push(l); }); qi.warnings.forEach(warn); }
   } catch (e) { }
   return { errors: errors, warnings: warnings, lines: lines };

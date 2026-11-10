@@ -1,5 +1,7 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**Trạng thái 10/11/2026: chunk 5R XONG, bản 8.1.5** (P0 của kế hoạch v9 phần code: gửi email qua Amazon SES, `test/unit.js` viết lại, GitHub Actions). Code giao: `dist/Code.gs`, `dist/Index.html` (không đổi so với 8.1.4), `dist/appsscript.json` (**quyền đổi**: thêm `script.external_request`). Việc của admin: `plan/P0_BUOC_TUNG_BUOC.md` mục 1 và 2. BACKLOG còn **48 câu chờ anh** (mục A 44, mục B 4).
+
 **05/11/2026 (chiều, lần 2): kế hoạch v9 bản 2, tối ưu giá và điều phối** (`plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md`): kiểm giá thật 05/11; hosting Cloudflare Workers 5 USD cả tài khoản thay Vercel Pro 20 USD mỗi ghế (web qua vinext hoặc OpenNext, Worker jobs Hono riêng, thử nghiệm S0 quyết định, Vercel là dự phòng); email Amazon SES khoảng 5 USD cho 45.000 thư mỗi tháng thay Resend Pro 20, làm ngay ở 5R; bỏ Google AI Pro dùng Gemini CLI miễn phí; hạ tầng 65 → 35 USD mỗi tháng, công cụ 60 → 40. Kế hoạch tổng P0 đến P5 (cắt chuyển khoảng 05/2027 với Claude Pro), điều phối 3 làn Claude, Codex, Gemini qua GitHub với một `AGENTS.md`, MCP và quyền, nhịp tuần, 4 mẫu file. BACKLOG còn **47 câu chờ anh** (mục A 43, mục B 4): thêm BL79 đến BL84.
 
 **05/11/2026 (chiều): kế hoạch v9 chi tiết** (`plan/KE_HOACH_V9_CHI_TIET.md`, bám `plan/KE_HOACH_SAU_GO_LIVE.md` đã duyệt): 14 điểm nghẽn Apps Script + Sheets và cách gỡ; **bước 0 ngay trong v8 (5R, 8.1.5): email qua Resend** để có hơn 1.500 thư mỗi ngày sớm, qua chỗ cắm `MailTransport.gs`; kiến trúc Next.js + Supabase + Resend + Calendar API, bảng Postgres và ràng buộc, ánh xạ 57 luật `CLAUDE.md`, repo, 3 môi trường, CI/CD, chuyển dữ liệu, chạy bóng, cắt chuyển, sprint S0 đến S16 có test chép từ v8, vận hành, chi phí. Không đổi code (vẫn 8.1.4). **Phát hiện: `test/unit.js` thiếu trong repo, `npm test` đỏ ngay dòng nạp** (BACKLOG mục D). BACKLOG còn **41 câu chờ anh** (mục A 37, mục B 4): thêm BL70 đến BL78.
@@ -17,6 +19,42 @@
 **30/10/2026: dọn dẹp project (bản 8.0.10, không đổi logic).** Xoá mã và test v6 (hồ sơ v6 trong `archive/V6_HO_SO_CU.md`), gộp 60 file lịch sử thành 6 file ở `archive/`, bảng đường dẫn cũ sang mới ở `archive/MANIFEST.md`, báo cáo `CLEANUP_REPORT.md`.
 
 **29/10 và 01/11/2026: kế hoạch.** Sub chunk 5J đến 5Q (`plan/KE_HOACH_5J_5P.md`), lộ trình (`plan/LO_TRINH_V8_TOI_CUOI.md`), sau go live (`plan/KE_HOACH_SAU_GO_LIVE.md`), luật bù buổi (`plan/TU_VAN_BU_BUOI.md`), câu hỏi chờ chốt (`BACKLOG.md`).
+
+## Chunk 5R: gửi email qua Amazon SES (10/11/2026, bản 8.1.5)
+
+### 5R.1 Làm gì
+
+* `src/MailTransport.gs`: `MAIL_TRANSPORT = SES` gửi qua API SES v2 bằng `UrlFetchApp`, chữ ký AWS Signature V4 viết thành hàm thuần (`sigV4_`, `sesPayload_`, `amzDate_`). Khoá ở Script Properties `SES_KEY`, `SES_SECRET`, `SES_REGION` (mặc định ap-southeast-1), không ở CONFIG. Thư có tên người gửi, trả lời về ADMIN_EMAIL, HTML kèm chữ thuần, CC, BCC; MAIL_LOG ghi `transport = SES`.
+* SES lỗi (thiếu khoá, mã khác 2xx, mất mạng): thư đó tự gửi lại bằng đường Google, ghi `MAIL_FALLBACK` (chi tiết có `from`, `used`), thông báo MAIL_FAILED song ngữ tối đa 1 lần mỗi giờ; cả hai đường cùng hỏng thì `MAIL_FAILED` như cũ, không ném lỗi (luật 27, 39).
+* Hạn mức SES: CONFIG mới `MAIL_DAILY_CAP` (mặc định 1400, 0 = không giới hạn) trừ số thư SES hôm nay (bộ đệm theo ngày, mất thì đếm lại MAIL_LOG). `MAIL_LOW_QUOTA_RESERVE`, `MARKETING_QUOTA_RESERVE` dùng số này. CONFIG mới `MAIL_FROM_ADDRESS` (trống = `no-reply@mail.<tên miền của ADMIN_EMAIL>`).
+* Menu 2: LỖI khi `MAIL_TRANSPORT = SES` mà thiếu khoá; LƯU Ý khi `MAIL_FROM_ADDRESS` trống; dòng hạn mức SES. Menu Kiểm tra gửi email hiện đường SES.
+* `appsscript.json` thêm quyền `script.external_request`. I133 mở rộng: ngoài MailTransport.gs không file nào gọi `UrlFetchApp` hay `amazonaws.com`.
+* Mock: `UrlFetchApp` (test tự đặt máy chủ giả, không bao giờ gọi mạng), `computeHmacSha256Signature` nhận dạng byte và từ chối trộn chuỗi với byte như Google, `newBlob(chuỗi).getBytes()`, `computeDigest` nhận mảng byte.
+* **`test/unit.js` viết lại** (bản gốc không lên repo ngày 05/11): 34 test cùng mã U01 đến U26, P01 đến P08, kết quả mong đợi theo docs/01, docs/03; 3 test viết theo luật đã đổi (U03 lịch THỨ GIỜ, U06 số điện thoại tự do, U25 chọn tutor xoay vòng). Bản gốc còn thì gửi coder so (BL85).
+* Repo: `.gitignore`, `.clasp.json.example`, `.github/workflows/test.yml` (Node 20, `npm ci`, `npm test`, `npm run build`, đỏ khi `dist/` lệch `src/`), `AGENTS.md` (luật làn cho Codex, Gemini).
+
+### 5R.2 Kết quả test
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 (viết lại) |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 137/137 (mới I136 chữ ký SigV4 khớp vector mẫu AWS và bản tính độc lập, I137 gửi qua SES và tự gửi lại, I138 hạn mức SES; I133 mở rộng) |
+| Giao diện web | 48/48 |
+| Thử tải | 2/2 |
+| Thử phá | SES: 3 đột biến (bỏ sắp xếp header ký, coi mã 400 là thành công, không trừ số đã gửi) bắt cả 3 sau khi thêm ca header lộn thứ tự. `unit.js`: 25 đột biến trên Time, Phone, Packages, Assign, Config và mock, bắt cả 25 |
+
+### 5R.3 Việc của admin (đúng thứ tự luật 38)
+
+1. Chưa cài SES: dán 3 file `dist/` (quyền đổi), Lưu, chạy menu 1 (Google hỏi quyền "Kết nối với dịch vụ bên ngoài": Cho phép), menu 2, Triển khai phiên bản mới. Email vẫn đi GmailApp như 8.1.4.
+2. Cài SES: `plan/P0_BUOC_TUNG_BUOC.md` mục 2, bước A2 đến A11 (tài khoản AWS, tên miền `mail.<tên miền>`, ra khỏi sandbox, IAM, Script Properties, Kiểm tra gửi email tới 5 hộp thư, rồi mới đổi `MAIL_TRANSPORT = SES`, warm up `MAIL_DAILY_CAP` 300 lên 1400).
+
+### 5R.4 Giới hạn còn lại
+
+* Chưa thử trên Google thật và AWS thật: chữ ký đã khớp vector mẫu của AWS, nhưng lần gửi đầu trên STAGING (bước A8) là lần kiểm thật đầu tiên.
+* Thư trả về, báo spam: v8 chưa đọc (cổng `doPost` chỉ dành cho thử tải, luật 48); SES gửi báo qua SNS về email admin (bước A6 trong `plan/P0_BUOC_TUNG_BUOC.md`). v9 nhận webhook.
+* Hạn mức SES đếm theo ngày lịch (0 giờ), AWS đếm theo 24 giờ trượt: `MAIL_DAILY_CAP` phải đặt dưới hạn mức ngày AWS cấp (xem ở SES → Account dashboard sau khi ra khỏi sandbox).
+* Một trigger chạy dưới tài khoản chạy hệ thống: Script Properties dùng chung, không phải dán khoá 2 lần.
 
 ## Chunk 5Q phần A: gửi email cố định (02/11/2026, bản 8.1.4)
 

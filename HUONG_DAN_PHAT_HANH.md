@@ -2,7 +2,12 @@
 
 *Cập nhật 02/11/2026. Áp dụng cho STAGING ngay; cho PRODUCTION sau go live (chunk 6). Nguyên tắc đã chốt: không đóng băng hệ thống; giữ hết lịch sử; không bao giờ mất file; sửa lỗi được bất cứ lúc nào khi đang chạy.*
 
-## Thay đổi so với bản trước (8.0.10, 18/10)
+## Thay đổi so với bản trước (8.1.4, 02/11)
+
+* **Bản 8.1.5 (10/11, chunk 5R): quyền đổi.** `appsscript.json` thêm dòng `"https://www.googleapis.com/auth/script.external_request",` (gọi Amazon SES). Dán cả 3 file theo mục 2; ở bước 5 Google hỏi cấp quyền "Kết nối với dịch vụ bên ngoài": chọn tài khoản chạy hệ thống, **Cho phép**. Chưa cài SES thì không phải làm gì thêm: `MAIL_TRANSPORT` vẫn là GMAILAPP, email gửi như 8.1.4. Cài SES: `plan/P0_BUOC_TUNG_BUOC.md` mục 2.
+* Quay lui về 8.1.4: dán lại 3 file 8.1.4, đổi `MAIL_TRANSPORT` về `GMAILAPP`. Hai ô mới `MAIL_FROM_ADDRESS`, `MAIL_DAILY_CAP` để nguyên (8.1.4 không đọc).
+
+## Thay đổi so với bản trước nữa (8.0.10, 18/10)
 
 * **Không còn MailFix:** từ 8.1.4 không tạo file MailFix, không tìm và thay sau khi dán `Code.gs`. Còn file `MailFix.gs` cũ trong dự án thì xoá (menu 2 báo LỖI nếu còn).
 * **Mục 3 mới:** nâng STAGING từ 8.0.10 lên thẳng 8.1.4, từng bước, kèm việc phải kiểm sau mỗi bước.
