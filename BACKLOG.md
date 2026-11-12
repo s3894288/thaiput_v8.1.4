@@ -1,6 +1,11 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 07/11/2026 (lần 11). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 12/11/2026 (lần 12). **5N và 5O ĐÃ XONG, nên tới lượt anh rà toàn bộ file này (đã hẹn làm ở lượt cuối của chunk 5).** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 07/11 lần 11
+
+* Soát lại plan 5J đến 5P bằng 2 sub agent trước go live: tìm ra 2 mục có tên trong plan mà chưa làm, nay đã làm ở bản 8.1.8 (bảng màu trong Hướng dẫn vận hành; viền đỏ đúng ô nhập sai).
+* **BL22 đã làm** (viền đỏ đúng ô nhập sai), chuyển xuống "Đã chốt". Mục B còn 3 câu.
 
 ## Thay đổi so với bản 05/11 lần 10
 
@@ -99,7 +104,6 @@
 |---|---|---|---|
 | BL20 | Giám sát trang health: (A) Google Cloud; (B) UptimeRobot khoảng 9 đến 10 USD/tháng; (C) Better Stack; (D) chưa giám sát | mục `TU_VAN_GIAM_SAT_16_10.md` trong `archive/TU_VAN_VA_KIEN_TRUC.md` | B cho PRODUCTION |
 | BL21 | "Vắng học viên" báo admin ngay bằng email (đổi NOTIFY_RULES, không cần code) hay giữ email tổng hợp 21 giờ | Trả lời 22/10 | Giữ tổng hợp |
-| BL22 | Form đăng ký: viền đỏ đúng ô nhập sai | Soát giao diện 20/10 | Làm ở 5O |
 | BL23 | Tutor không dùng Gmail vào thẳng Meet: (1) mở Meet cho người chưa đăng nhập; (2) tutor tạo tài khoản Google bằng email đang có; (3) cấp Workspace | Chat tên miền 22/10 | (1) ngay, (2) song song |
 
 ## C. Việc để sau
@@ -131,6 +135,7 @@
 
 | Ngày | Mã | Kết quả |
 |---|---|---|
+| 12/11 | BL22 | Form đăng ký tô viền đỏ ĐÚNG ô nhập sai (tên, email, điện thoại, ảnh, ô đồng ý, nhóm gói), con trỏ về ô sai đầu tiên, sửa ô nào thì ô đó hết đỏ ngay. Làm ở bản 8.1.8, test U50 |
 | 01/11 tối | Mới | 5K, 5L soát chéo 1 agent mỗi sub chunk; từ 5P lại 2 agent |
 | 01/11 tối | Mới | Chưa tách STAGING và PRODUCTION tới hết chunk 5; mọi bản chỉ dán STAGING. Chunk 6: chuyển PRODUCTION đơn giản nhất, không mất dữ liệu, 2 bản chức năng tương đương chạy song song, hướng dẫn tắt hết trigger STAGING khi PRODUCTION chạy chính thức. Thay BL11 |
 | 01/11 tối | Mới | Mục chưa duyệt, chưa trả lời, chưa xử lý giữ ở BACKLOG; anh rà ở sub chunk cuối chunk 5 (5Q), coder nhắc |

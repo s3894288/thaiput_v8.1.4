@@ -135,7 +135,10 @@ label.field { display: flex; flex-direction: column; gap: 7px; font-weight: 600;
 input[type=text], input[type=email], input[type=tel], input[type=search], select { width: 100%; font: 400 1rem/1.3 var(--font-body); padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); min-height: 48px; transition: border-color .15s; }
 input[type=text]:hover, input[type=email]:hover, input[type=tel]:hover, input[type=search]:hover, select:hover { border-color: var(--ink-2); }
 input::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
-input.invalid { border-color: var(--bad); background: color-mix(in srgb, var(--bad-soft) 40%, var(--surface)); }
+/* Ô nhập sai: viền đỏ ĐÚNG ô đó (5O, BL22). Ô không có viền sẵn (ảnh, đồng ý, nhóm gói) dùng vòng đỏ bao ngoài. */
+input.invalid, select.invalid { border-color: var(--bad); background: color-mix(in srgb, var(--bad-soft) 40%, var(--surface)); }
+.file.invalid { border-color: var(--bad); border-style: solid; background: color-mix(in srgb, var(--bad-soft) 40%, var(--surface-2)); color: var(--bad); }
+.check.invalid, .pkg-list.invalid { outline: 2px solid var(--bad); outline-offset: 6px; border-radius: var(--radius-sm); }
 .hint { font-weight: 400; font-size: .8rem; color: var(--muted); }
 .hint.bad { color: var(--bad); }
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: .86rem; color: var(--ink-2); }

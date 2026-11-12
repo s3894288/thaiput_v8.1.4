@@ -76,14 +76,14 @@
       '<div class="facts"><div><b>' + T.t('h.fact1_big') + '</b><span>' + T.t('h.fact1') + '</span></div><div><b>' + T.t('h.fact2_big') + '</b><span>' + T.t('h.fact2') + '</span></div>' + (info.bookingLeadHours >= 0 ? '<div><b>' + (info.bookingLeadHours ? info.bookingLeadHours + 'h' : T.t('h.fact3_lead_zero')) + '</b><span>' + T.t('h.fact3_lead') + '</span></div>' : '<div><b>15:00</b><span>' + T.t('h.fact3_deadline') + '</span></div>') + '</div>' +
       '<form id="reg" class="card stack" novalidate>' +
       '<h2>' + T.t('h.form_title') + '</h2>' +
-      '<div class="pkg-list" role="radiogroup" aria-label="' + T.esc(T.t('h.pkg_aria')) + '">' + pk + '</div>' +
+      '<div class="pkg-list" id="f-pkg-list" role="radiogroup" aria-label="' + T.esc(T.t('h.pkg_aria')) + '">' + pk + '</div>' +
       '<label class="field" for="f-name">' + T.t('h.f_name') + '<input type="text" id="f-name" autocomplete="name" required></label>' +
       '<label class="field" for="f-email">' + T.t('h.f_email') + '<input type="email" id="f-email" autocomplete="email" inputmode="email" required><span class="hint">' + T.t('h.f_email_hint') + '</span></label>' +
       '<label class="field" for="f-phone">' + T.t('h.f_phone') + '<input type="text" id="f-phone" autocomplete="tel" inputmode="text" placeholder="' + T.esc(T.t('h.f_phone_ph')) + '"><span class="hint" id="f-phone-hint">' + T.t('h.f_phone_hint') + '</span></label>' +
       '<label class="field" for="f-level">' + T.t('h.f_level') + '<select id="f-level">' + levelOptions() + '</select></label>' +
       bank +
       '<label class="file" id="f-file-box" for="f-file"><input type="file" id="f-file" accept="image/*,application/pdf"><span id="f-file-label">' + T.t('a.file_label') + '</span></label>' +
-      '<label class="check" for="f-consent"><input type="checkbox" id="f-consent"><span>' + T.t('h.f_consent') + '' +
+      '<label class="check" id="f-consent-box" for="f-consent"><input type="checkbox" id="f-consent"><span>' + T.t('h.f_consent') + '' +
       (T.safeUrl(info.policyUrl) ? ' (<a href="' + T.esc(T.safeUrl(info.policyUrl)) + '" target="_blank" rel="noopener">' + T.t('h.f_policy') + '</a>)' : '') + '.</span></label>' +
       '<div class="hp" aria-hidden="true"><label for="f-website">Website</label><input type="text" id="f-website" tabindex="-1" autocomplete="off"></div>' +
       '<div id="reg-msg" hidden></div>' +
@@ -103,7 +103,9 @@
   function bind(root) {
     var gl = T.$('#go-login', root); if (gl) gl.onclick = function () { T.go('login'); };
     var gp = T.$('#go-portal', root); if (gp) gp.onclick = function () { var s = T.session.get(); T.go(s && s.role === 'TUTOR' ? 'tutor' : 'student'); };
-    T.$$('.pkg input', root).forEach(function (r) { r.onchange = function () { T.$$('.pkg', root).forEach(function (l) { l.classList.toggle('on', l.contains(T.$('input:checked', l))); }); }; });
+    T.$$('.pkg input', root).forEach(function (r) { r.onchange = function () { T.$$('.pkg', root).forEach(function (l) { l.classList.toggle('on', l.contains(T.$('input:checked', l))); }); clearBad(root, '#f-pkg-list'); }; });
+    ['#f-name', '#f-email'].forEach(function (sel) { var el = T.$(sel, root); if (el) el.oninput = function () { clearBad(root, sel); }; });
+    var cs = T.$('#f-consent', root); if (cs) cs.onchange = function () { if (cs.checked) clearBad(root, '#f-consent-box'); };
     var phone = T.$('#f-phone', root), hint = T.$('#f-phone-hint', root);
     phone.oninput = function () {
       var ok = !phone.value || T.phone(phone.value);
@@ -117,23 +119,43 @@
       chosenFile = f || null;
       T.$('#f-file-label', root).textContent = f ? T.t('a.file_chosen', { name: f.name }) : T.t('a.file_label');
       T.$('#f-file-box', root).classList.toggle('has', !!f);
+      if (f) clearBad(root, '#f-file-box');
     };
     T.$('#reg', root).onsubmit = function (e) { e.preventDefault(); submit(root); };
   }
 
+  /** 5O (BL22): tô viền đỏ đúng những ô trong danh sách bad, bỏ viền ở mọi ô còn lại. */
+  var FORM_FIELDS_ = ['#f-name', '#f-email', '#f-phone', '#f-file-box', '#f-consent-box', '#f-pkg-list'];
+  function markBad(root, bad) {
+    FORM_FIELDS_.forEach(function (sel) {
+      var el = T.$(sel, root);
+      if (el) el.classList.toggle('invalid', bad.indexOf(sel) !== -1);
+    });
+  }
+  /** Người dùng sửa xong ô nào thì bỏ viền đỏ ô đó ngay, không chờ bấm Gửi lần nữa. */
+  function clearBad(root, sel) { var el = T.$(sel, root); if (el) el.classList.remove('invalid'); }
+
   function showMsg(root, kind, html) { var m = T.$('#reg-msg', root); m.className = 'alert ' + kind; m.innerHTML = html; m.hidden = false; }
 
   function submit(root) {
-    var errs = [];
+    var errs = [], bad = [];
     var name = T.$('#f-name', root).value.trim(), email = T.$('#f-email', root).value.trim(), phoneRaw = T.$('#f-phone', root).value;
-    if (!name) errs.push(T.t('h.err_name'));
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errs.push(T.t('a.err_email'));
-    if (phoneRaw.trim() && !T.phone(phoneRaw)) errs.push(T.t('a.err_phone'));
+    // 5O (BL22): mỗi lỗi vừa thêm câu vào hộp đỏ trên cùng, vừa ghi ĐÚNG ô sai để tô viền đỏ.
+    var no = function (sel, key) { bad.push(sel); errs.push(T.t(key)); };
+    if (!name) no('#f-name', 'h.err_name');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) no('#f-email', 'a.err_email');
+    if (phoneRaw.trim() && !T.phone(phoneRaw)) no('#f-phone', 'a.err_phone');
     var f = T.$('#f-file', root).files[0] || chosenFile;
-    if (!f) errs.push(T.t('a.err_file'));
-    if (!T.$('#f-consent', root).checked) errs.push(T.t('h.err_consent'));
-    if (!T.$('input[name=pkg]:checked', root)) errs.push(T.t('a.pkg_none'));
-    if (errs.length) return showMsg(root, 'bad', errs.map(T.esc).join('<br>'));
+    if (!f) no('#f-file-box', 'a.err_file');
+    if (!T.$('#f-consent', root).checked) no('#f-consent-box', 'h.err_consent');
+    if (!T.$('input[name=pkg]:checked', root)) no('#f-pkg-list', 'a.pkg_none');
+    markBad(root, bad);
+    if (errs.length) {
+      showMsg(root, 'bad', errs.map(T.esc).join('<br>'));
+      var firstBad = T.$(bad[0], root);
+      if (firstBad && firstBad.focus) { try { firstBad.focus(); } catch (fe) {} }
+      return;
+    }
     var btn = T.$('#reg-submit', root); btn.disabled = true; btn.textContent = T.t('a.sending');
     var release = T.hold();
     T.readUpload(f).then(function (shot) {

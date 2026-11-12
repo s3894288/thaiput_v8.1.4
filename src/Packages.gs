@@ -211,7 +211,6 @@ function techFault_(b) {
   if (TECH_FAULT[f]) return f;
   return (b.payroll_override === true || String(b.payroll_override).toUpperCase() === 'TRUE') ? TECH_FAULT.OBJECTIVE : TECH_FAULT.TUTOR;
 }
-/** Buổi trừ lượt và giữ ngày bắt đầu tạm tính: CONSUMING_STATUSES, huỷ muộn, kỹ thuật lỗi học viên. */
 /**
  * Chunk 5N: admin đã xử lý buổi sau kết quả cuối: admin_done_at có và không cũ hơn result_at. Cùng nghĩa với luật tô màu BOOKINGS
  * (Setup.gs highlightSpecs_: chưa xử lý = admin_done_at trống hoặc < result_at) và danh sách chờ kết quả của trang quản trị.
@@ -225,6 +224,7 @@ function adminHandled_(b) {
   return isNaN(r) || d >= r;
 }
 
+/** Buổi trừ lượt và giữ ngày bắt đầu tạm tính: CONSUMING_STATUSES, huỷ muộn, kỹ thuật lỗi học viên. */
 function bookingDeducts_(b) {
   if (isConsuming_(b.status) || b.status === BOOKING_STATUS.CANCELLED_LATE) return true;
   return b.status === BOOKING_STATUS.TECH_ISSUE && techFault_(b) === TECH_FAULT.STUDENT;

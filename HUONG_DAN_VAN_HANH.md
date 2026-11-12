@@ -1,10 +1,16 @@
-# Hướng dẫn vận hành thaiput v8 (bản 8.1.4)
+# Hướng dẫn vận hành thaiput v8 (bản 8.1.7)
 
-*Cập nhật 02/11/2026. Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
+*Cập nhật 12/11/2026. Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
 
 ## Thay đổi so với bản trước
 
-Bản trước: 8.0.10 (18/10/2026, đã xuất) và bản nháp 8.1.1 (01/11, chưa xuất). Những điểm mới:
+Bản trước: 8.1.4 (02/11/2026, đã xuất). Những điểm mới của 8.1.5 tới 8.1.7:
+
+* **Màu dòng Sheets viết lại (8.1.7, chunk 5N).** K6 BOOKINGS nay có 6 màu (đỏ, cam đậm, hồng, vàng, xanh dương nhạt, xám) thay cho 2 màu cũ; K5 STUDENT_PACKAGES có 5 màu (đỏ, xám, vàng, tím, xanh dương). Mỗi bảng ghi rõ **làm gì để hết màu**. Bảng màu ở bản 8.1.4 nay SAI, xem lại K5 và K6.
+* **Lựa chọn mới `admin_action`: "Đã xử lý (giữ nguyên)" (8.1.7).** Không đổi trạng thái, lương hay gói; chỉ làm dòng hết màu. Xem K6.
+* **Ô CONFIG mới `REASSIGN_STUCK_HOURS` (8.1.7)**, Phần B. Thông báo mới `REASSIGN_STUCK` (Khẩn, email), Phần J: buổi kẹt ở Chờ đổi tutor quá 1 giờ thì báo. Buổi kẹt nay xử lý được bằng Đổi tutor hoặc Huỷ bởi admin (huỷ buổi kẹt không trừ lượt học viên, kể cả sau 15:00 hôm trước).
+* **Cột mới `BOOKINGS.admin_done_at`** (hệ thống ghi, không sửa tay): lúc một lựa chọn `admin_action` chạy xong. Chạy **menu 1** sau khi dán code 8.1.7 để thêm cột này.
+* **Giao diện web đổi sang đen trắng (8.1.5 và 8.1.6, chunk 5O):** nền trắng, nút đen, vàng thương hiệu cho logo và thẻ gói; trang chủ có ảnh banner; khung email cũng đổi theo. Chỉ đổi cách hiển thị, mọi thao tác giữ nguyên. Form đăng ký nay tô viền đỏ ĐÚNG ô nhập sai.
 
 * **Email gửi cố định qua GmailApp (8.1.4):** không còn file MailFix, không còn bước tìm và thay sau mỗi lần dán code. Ô mới `MAIL_TRANSPORT` (B8). Tab MAIL_LOG thêm cột `transport`. Tình huống thư không tới: Phần L3.
 * **Phần B viết lại đủ 98 ô CONFIG** theo bản 8.1.4. Ô mới: bù buổi (8.1.0), link đăng nhập theo vai trò, lịch tutor kiểu `THỨ GIỜ`, 3 ô kết quả buổi (8.1.1), `LOG_KEEP_DAYS`, 4 ô `SHORT_URL_*`, `MOVED_TO_URL` (8.1.3), `MAIL_TRANSPORT` (8.1.4). Ô cũ đã bỏ: B15.
@@ -23,7 +29,7 @@ Cách đọc: chữ **đậm** là tên nút hoặc mục menu. `Chữ đơn cá
 Nội dung:
 
 * Phần A. Luật chung khi sửa CONFIG
-* Phần B. 98 ô CONFIG
+* Phần B. 99 ô CONFIG
 * Phần C. Menu thaiput
 * Phần D. Chữ trên trang web (tab CONTENT), hai thứ tiếng
 * Phần E. Ngôn ngữ của từng người dùng
@@ -46,7 +52,7 @@ Nội dung:
 6. Sửa nhiều ô một lúc: chạy menu 2 sau khi sửa.
 
 
-## Phần B. 98 ô CONFIG
+## Phần B. 99 ô CONFIG
 
 Mặc định là giá trị code dùng khi ô trống hoặc không có dòng. Menu 1 thêm dòng còn thiếu với giá trị mặc định, không ghi đè ô đã sửa.
 
@@ -117,6 +123,7 @@ Không còn tự Hoàn thành. Tutor phải chọn kết quả trên trang tutor
 | `RESULT_NOTICE_AFTER_HOURS` | 24 | Quá chừng này giờ sau giờ kết thúc mà tutor chưa chọn: dòng đỏ trên trang tutor, trang quản trị, BOOKINGS; thông báo Khẩn `RESULT_OVERDUE` |
 | `RESULT_EXPIRE_AFTER_HOURS` | 48 | Quá chừng này giờ (và đã báo đỏ đủ ô dưới): buổi thành **Không hoàn thành**, không tính lương |
 | `RESULT_EXPIRE_AFTER_NOTICE_HOURS` | 24 | Thời gian tối thiểu từ lúc báo đỏ tới lúc thành Không hoàn thành. Đang bảo trì: mốc báo đỏ tự dời để tutor còn đủ giờ |
+| `REASSIGN_STUCK_HOURS` | 1 | (8.1.7) Buổi kẹt ở Chờ đổi tutor quá chừng này giờ thì job mỗi giờ gửi một email Khẩn liệt kê mọi buổi đang kẹt (`REASSIGN_STUCK`). Đặt `-1` để tắt |
 
 ### B7. Đăng nhập
 
@@ -705,6 +712,7 @@ Cột "Tên trên web" là chữ hiện dưới mỗi thông báo trên trang qu
 | `RESULT_COMPLETED` | Buổi hoàn thành | Thông tin | DIGEST | Tutor chọn Hoàn thành | Không |
 | `RESULT_STUDENT_ABSENT` | Học viên vắng | Cần xử lý | DIGEST | Tutor chọn Vắng học viên (vẫn trừ buổi, tutor có lương) | Hỏi học viên nếu vắng nhiều |
 | `RESULT_TECH_ISSUE` | Báo lỗi kỹ thuật | Cần xử lý | EMAIL | Tutor chọn Vấn đề kỹ thuật | Chọn lỗi ở BOOKINGS cột `admin_action` (tutor, học viên, khách quan); chưa chọn sau `TECH_DECIDE_HOURS` (48) giờ thì tính là lỗi tutor |
+| `REASSIGN_STUCK` | Buổi kẹt chờ đổi tutor | Khẩn | EMAIL | (8.1.7) Buổi ở `PENDING_REASSIGN` quá `REASSIGN_STUCK_HOURS` (1) giờ: buổi CHƯA CÓ tutor dạy. Mỗi lượt một email liệt kê mọi buổi đang kẹt, không gửi trùng | Chưa tới giờ học: `admin_action` chọn **Đổi tutor** hoặc **Huỷ bởi admin**. Đã qua giờ học: chọn **Vắng tutor** |
 | `RESULT_OVERDUE` | Tutor quá hạn chọn kết quả | Khẩn | **LOG** | Buổi quá 24 giờ sau giờ kết thúc mà tutor chưa chọn kết quả (một thông báo mỗi buổi; trang tutor và trang quản trị tô đỏ) | Nhắc tutor chọn; hoặc tự chọn ở `admin_action` ("Hoàn thành (admin chọn)", "Vắng học viên (admin chọn)", "Vấn đề kỹ thuật (admin chọn)", "Vắng tutor"). Muốn nhận email từng buổi: đổi kênh sang `EMAIL` |
 | `RESULT_NOT_COMPLETED` | Buổi Không hoàn thành | Cần xử lý | DIGEST | Buổi quá 48 giờ và đã báo đỏ 24 giờ mà vẫn chưa có kết quả: thành Không hoàn thành, không lương (gom nhiều buổi một thông báo) | Làm rõ với tutor và học viên rồi chọn kết quả đúng ở `admin_action`. Chưa xử lý thì ngày bắt đầu gói của học viên chưa khoá |
 | `AUTO_COMPLETED` | Tự chuyển Hoàn thành | Thông tin | DIGEST | Chỉ bản tới 8.1.0. Từ 8.1.1 không còn xảy ra; dòng giữ để đọc thông báo cũ | Không |
@@ -819,6 +827,18 @@ Hệ thống tính hầu hết các ô. **Ô hệ thống sửa tay bị trả l
 
 Hạn gói = ngày bắt đầu + số ngày + ngày tạm khoá + `comp_days` + `comp_days_admin` − 1.
 
+**Màu dòng (bản 8.1.7).** Một dòng chỉ mang MỘT màu: màu nào đứng trên trong bảng thì thắng.
+
+| Màu | Nghĩa | Làm gì để hết màu |
+|---|---|---|
+| Đỏ | Còn thông báo "Bù cho gói đã hết hạn" (`COMP_ON_EXPIRED`) CHƯA ĐỌC của gói này: hệ thống không tự cộng được, chờ anh cộng tay | Cộng ngày vào `comp_days_admin`, RỒI mới đánh dấu thông báo đó đã đọc. Lưu ý: bấm "Đã đọc hết" trên trang quản trị cũng làm hết đỏ dù chưa cộng |
+| Xám | Gói đã hết hạn (`EXPIRED`) | Chỉ để biết |
+| Vàng | Gói đang dùng, còn `EXPIRY_NOTICE_DAYS` (3) ngày là hết hạn | Chỉ để biết; học viên đã nhận email sắp hết hạn |
+| Tím | Anh đã cộng tay ngày (`comp_days_admin` khác 0) | Chỉ để biết |
+| Xanh dương | Gói có ngày bù tự động (`comp_days` lớn hơn 0) | Chỉ để biết |
+
+Đổi `EXPIRY_NOTICE_DAYS` trong CONFIG thì phải chạy lại **menu 1** màu vàng mới tính theo số mới.
+
 ### K6. BOOKINGS (buổi học)
 
 Trạng thái (`status`): `CONFIRMED` Xác nhận, `PENDING_REASSIGN` Chờ xác nhận (đang tìm tutor thay), `COMPLETED` Hoàn thành, `STUDENT_ABSENT` Vắng học viên, `TECH_ISSUE` Vấn đề kỹ thuật, `TUTOR_ABSENT` Vắng tutor, `CANCELLED_STUDENT`, `CANCELLED_TUTOR`, `CANCELLED_ADMIN` Huỷ bởi học viên, tutor, admin, `CANCELLED_LATE` Huỷ muộn, `NOT_COMPLETED` Không hoàn thành.
@@ -836,14 +856,28 @@ Trạng thái (`status`): `CONFIRMED` Xác nhận, `PENDING_REASSIGN` Chờ xác
 | Hoàn thành (admin chọn) | Tutor quên chọn, buổi đã học | `COMPLETED`, tutor có lương |
 | Vắng học viên (admin chọn) | Tutor quên chọn, học viên không vào | `STUDENT_ABSENT`, tutor có lương, học viên bị trừ |
 | Vấn đề kỹ thuật (admin chọn) | Tutor quên chọn, buổi lỗi kỹ thuật | `TECH_ISSUE`, rồi chọn tiếp 1 trong 3 dòng lỗi kỹ thuật ở trên |
+| Đã xử lý (giữ nguyên) | Dòng đang tô màu nhưng anh đã xem và KHÔNG muốn đổi gì (Vắng học viên, Không hoàn thành) | Không đổi trạng thái, lương hay gói. Chỉ ghi `admin_done_at` nên dòng hết màu. Không chọn được ở buổi chưa có kết quả, buổi Chờ đổi tutor, buổi kỹ thuật chưa chọn lỗi: ô sẽ báo rõ việc cần làm |
 
 3 lựa chọn "(admin chọn)" chỉ dùng cho buổi đã bắt đầu mà chưa có kết quả, hoặc buổi Không hoàn thành. Kết quả của mỗi lần chọn ghi ở `admin_note` ("Đã: ..." hoặc "Lỗi: ...").
 
 Buổi `TECH_ISSUE` chưa chọn lỗi sau `TECH_DECIDE_HOURS` (48) giờ: hệ thống coi là lỗi tutor.
 
-**Màu dòng:** đỏ = Vấn đề kỹ thuật chưa chọn lỗi, tutor quá hạn chọn kết quả (đã báo đỏ), Không hoàn thành; vàng = Vắng học viên, Chờ xác nhận (đang tìm tutor thay).
+**Màu dòng (bản 8.1.7).** Một dòng chỉ mang MỘT màu: màu nào đứng trên trong bảng thì thắng.
 
-Cột hệ thống (không sửa): `meet_link`, `event_id`, `cal_state`, `cal_attempts`, `cal_next_at` (hàng đợi Calendar), `reminder_sent_at`, `day_reminder_at`, `request_id`, `tech_fault`, `tech_decided_at`, `comp_days`, `comp_gap`, `result_notice_at`, `result_at`, `result_by`.
+| Màu | Nghĩa | Làm gì để hết màu |
+|---|---|---|
+| Đỏ | Tutor quá hạn chọn kết quả; hoặc buổi `NOT_COMPLETED` Không hoàn thành chưa xử lý | Nhắc tutor; hoặc chọn kết quả ở `admin_action` (Hoàn thành, Vắng học viên, Vắng tutor). Muốn giữ nguyên Không hoàn thành: chọn **Đã xử lý (giữ nguyên)** |
+| Cam đậm | `PENDING_REASSIGN` Chờ đổi tutor: buổi CHƯA CÓ tutor dạy (luôn hiện, không tắt được bằng Đã xử lý) | Chưa tới giờ học: chọn **Đổi tutor** hoặc **Huỷ bởi admin** (huỷ buổi kẹt không trừ lượt, học viên được bù). Đã qua giờ học: chọn **Vắng tutor** |
+| Hồng | `TECH_ISSUE` Vấn đề kỹ thuật chưa chọn lỗi | Chọn 1 trong 3 lựa chọn lỗi kỹ thuật |
+| Vàng | `STUDENT_ABSENT` Vắng học viên chưa xem | Chọn **Đã xử lý (giữ nguyên)** |
+| Xanh dương nhạt | Buổi được bù ngày (`comp_days` lớn hơn 0) | Chỉ để biết, không phải làm gì |
+| Xám | `CANCELLED_LATE` Huỷ muộn (trừ lượt, không bù) | Chỉ để biết |
+
+"Chưa xử lý" nghĩa là ô `admin_done_at` trống, hoặc cũ hơn `result_at`. Vì vậy nếu tutor sửa lại kết quả SAU khi anh đã đánh dấu, màu hiện lại để anh xem lần nữa.
+
+Buổi kẹt Chờ đổi tutor quá `REASSIGN_STUCK_HOURS` (1) giờ: anh nhận một email Khẩn liệt kê mọi buổi đang kẹt (sự kiện `REASSIGN_STUCK`).
+
+Cột hệ thống (không sửa): `meet_link`, `event_id`, `cal_state`, `cal_attempts`, `cal_next_at` (hàng đợi Calendar), `reminder_sent_at`, `day_reminder_at`, `request_id`, `tech_fault`, `tech_decided_at`, `comp_days`, `comp_gap`, `result_notice_at`, `result_at`, `result_by`, `admin_done_at` (lúc một lựa chọn `admin_action` chạy xong).
 
 ### K7. AVAILABILITY (giờ rảnh của tutor)
 

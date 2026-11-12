@@ -1482,6 +1482,66 @@ t('U49', '5O (05/11): trang chủ có ảnh thương hiệu nhúng base64, viên
   assert.ok(bi.indexOf('color:#9ca3af') === -1 && bi.indexOf('color:#63635d') !== -1, 'nhãn ngôn ngữ hết xám cũ, đạt tương phản');
 });
 
+t('U50', '5O (BL22): gửi form đăng ký thiếu thì viền đỏ ĐÚNG từng ô sai (tên, email, ảnh, đồng ý, nhóm gói), ô trống không bắt buộc (điện thoại) không bị đỏ; con trỏ nhảy về ô sai đầu tiên; sửa ô nào thì ô đó hết đỏ ngay, không chờ bấm Gửi lại', async () => {
+  const c = mk(), p = open(c, { page: 'home' });
+  await p.flush();
+  const bad = (s) => p.$(s).classList.contains('invalid');
+  const all = ['#f-name', '#f-email', '#f-phone', '#f-file-box', '#f-consent-box', '#f-pkg-list'];
+  assert.ok(all.every(s => p.$(s)), 'đủ 6 ô có thể tô đỏ: ' + all.filter(s => !p.$(s)).join(','));
+  assert.ok(all.every(s => !bad(s)), 'lúc mới mở chưa ô nào đỏ');
+
+  // Gửi form rỗng: 4 ô sai đỏ. Điện thoại không bắt buộc và đang trống nên KHÔNG đỏ;
+  // nhóm gói đã có sẵn một gói chọn mặc định nên cũng KHÔNG đỏ.
+  assert.ok(p.$('input[name=pkg]:checked'), 'form mở ra đã chọn sẵn một gói');
+  p.submit('#reg');
+  await p.flush();
+  p.clean();
+  assert.deepStrictEqual(all.map(bad), [true, true, false, true, true, false], all.map(s => s + '=' + bad(s)).join(' '));
+  assert.strictEqual(p.doc.activeElement, p.$('#f-name'), 'con trỏ về ô sai đầu tiên');
+  assert.ok(/./.test(p.text('#reg-msg')), 'vẫn có hộp đỏ gộp câu báo ở trên');
+  assert.strictEqual(c.rows('REGISTRATIONS').length, 0, 'không gửi lên máy chủ khi còn ô sai');
+
+  // Bỏ chọn gói (người dùng bấm lại đúng gói đang chọn trên một số trình duyệt): nhóm gói đỏ
+  p.$('input[name=pkg]:checked').checked = false;
+  p.submit('#reg');
+  await p.flush();
+  assert.ok(bad('#f-pkg-list'), 'không chọn gói thì nhóm gói đỏ');
+
+  // Sửa từng ô thì ô đó hết đỏ ngay (không bấm Gửi lại)
+  p.type('#f-name', 'Minh Anh');
+  assert.ok(!bad('#f-name') && bad('#f-email'), 'sửa tên: chỉ ô tên hết đỏ');
+  p.type('#f-email', 'minhanh@test.com');
+  assert.ok(!bad('#f-email'));
+  p.click('#f-consent');
+  assert.ok(!bad('#f-consent-box'));
+  p.click('#pkg-PASS_1M');
+  assert.ok(!bad('#f-pkg-list'), 'chọn lại gói: nhóm gói hết đỏ');
+  p.file('#f-file', 'ck.pdf', 'application/pdf', '%PDF-1.4 x');
+  assert.ok(!bad('#f-file-box'));
+
+  // Email sai định dạng: chỉ ô email đỏ lại
+  p.type('#f-email', 'sai-dinh-dang');
+  p.submit('#reg');
+  await p.flush();
+  assert.deepStrictEqual(all.map(bad), [false, true, false, false, false, false], all.map(s => s + '=' + bad(s)).join(' '));
+  assert.strictEqual(p.doc.activeElement, p.$('#f-email'), 'con trỏ về ô email');
+
+  // Số điện thoại sai (quá dài) cũng đỏ đúng ô đó
+  p.type('#f-email', 'minhanh@test.com');
+  p.type('#f-phone', 'x'.repeat(60));
+  p.submit('#reg');
+  await p.flush();
+  assert.ok(bad('#f-phone') && !bad('#f-email'), 'chỉ ô điện thoại đỏ');
+
+  // Sửa hết thì gửi được, mọi ô hết đỏ
+  p.type('#f-phone', '0912 345 678');
+  p.submit('#reg');
+  await p.flush(60);
+  p.clean();
+  assert.ok(all.every(s => !bad(s)), 'gửi được: không ô nào còn đỏ');
+  assert.strictEqual(c.rows('REGISTRATIONS').length, 1, 'đã gửi lên máy chủ');
+});
+
 module.exports = { run };
 if (require.main === module) {
   run().then(r => { r.forEach(x => console.log((x.ok ? 'ĐẠT  ' : 'TRƯỢT ') + x.id + ' ' + x.title + (x.ok ? '' : '\n      ' + x.err))); process.exit(r.every(x => x.ok) ? 0 : 1); });

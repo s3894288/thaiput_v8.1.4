@@ -1,5 +1,12 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**Trạng thái 12/11/2026: VÁ NỐT 2 MỤC PLAN CÒN THIẾU CỦA 5N VÀ 5O, bản 8.1.8.** Soát lại toàn bộ plan 5J đến 5P bằng 2 sub agent trước khi go live chunk 6 thì thấy 2 mục có tên trong plan nhưng chưa làm, nay đã làm:
+
+* **5N mục 6 (bảng màu trong Hướng dẫn vận hành):** trước đó bảng màu chỉ nằm trong `PROGRESS.md`, còn `HUONG_DAN_VAN_HANH.md` vẫn tả màu CŨ (2 màu), nay SAI so với 8.1.7. Đã viết lại K6 BOOKINGS (6 màu) và K5 STUDENT_PACKAGES (5 màu), mỗi bảng có cột "làm gì để hết màu"; thêm lựa chọn "Đã xử lý (giữ nguyên)" vào bảng `admin_action`, ô CONFIG `REASSIGN_STUCK_HOURS` vào Phần B (99 ô), thông báo `REASSIGN_STUCK` vào Phần J, cột `admin_done_at` vào danh sách cột hệ thống. Hướng dẫn lên bản 8.1.7, có mục "Thay đổi so với bản trước".
+* **5O mục Form (BL22, viền đỏ đúng ô nhập sai):** trước đó chỉ ô số điện thoại có viền đỏ, các ô khác chỉ gộp câu báo vào hộp đỏ phía trên. Nay gửi form thiếu thì tô viền đỏ ĐÚNG ô sai (tên, email, điện thoại, ảnh chuyển khoản, ô đồng ý, nhóm gói), con trỏ nhảy về ô sai đầu tiên, sửa ô nào thì ô đó hết đỏ ngay. Test mới U50 (giao diện web 50/50).
+
+Còn lại trước go live chunk 6: **5P** (xuất 3 hướng dẫn còn lại và 2 chính sách, soát tổng 2 agent, thử tải lại) và phần còn lại của 5Q (BL69). BACKLOG còn **37 câu chờ anh** (mục A 34, mục B 3).
+
 **Trạng thái 07/11/2026: 5N XONG, bản 8.1.7** (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt Chờ đổi tutor; soát chéo 2 agent tìm ra và đã sửa lỗi buổi kẹt không xử lý được). Chi tiết: mục "Chunk 5N" dưới đây. Chunk 5 còn 5P (hợp nhất, chốt v8). BACKLOG còn **38 câu chờ anh** (mục A 34, mục B 4). **Đến lượt anh rà BACKLOG** (đã hẹn sau 5N, 5O).
 
 ## Chunk 5N: tô màu Sheets (07/11/2026, bản 8.1.7)
@@ -64,6 +71,8 @@
 
 ## Chunk 5O phần giao diện web (05/11/2026, bản 8.1.5)
 
+> **Mục này ghi lại đúng bản 8.1.5 lúc đó.** Những việc mục này ghi là "chưa làm" đều đã làm ở các bản sau: khung email ở 8.1.6 (trạng thái 05/11 tối), tô màu Sheets 5N ở 8.1.7 (mục "Chunk 5N" đầu file). Giữ lại để tra lịch sử.
+
 ### Làm gì
 
 * Giao diện mới theo ảnh thương hiệu (BL08, kế hoạch 5O): nền trắng; màu chính ĐEN TRẮNG (nút chính, mục đang chọn là viên thuốc đen chữ trắng); vàng thương hiệu `#ffc933` chỉ cho dấu nhận diện (ô logo, viên chữ Thái trang chủ, thẻ gói học); màu phụ xanh lá, tím, vàng, xanh dương dạng phấn cho trạng thái; khối bo góc, ĐỔ BÓNG THAY VIỀN. Đúng phạm vi kế hoạch: chỉ `src/ui/Styles.html` và token màu, mọi class, id, cấu trúc giữ nguyên; viền đỏ đúng ô nhập sai giữ nguyên (`input.invalid`).
@@ -91,10 +100,10 @@
 
 ### Giới hạn còn lại (nói thẳng)
 
-* Phần email của 5O CHƯA làm: khung `emailWrap_` (Notify.gs) vẫn tông xanh rừng cũ, lệch bản nhận diện mới; chưa gửi thử mọi mẫu email tới Gmail web, Gmail điện thoại, Outlook (BL09). Làm ở lượt sau cùng 5N.
+* Phần email của 5O CHƯA làm: khung `emailWrap_` (Notify.gs) vẫn tông xanh rừng cũ, lệch bản nhận diện mới; chưa gửi thử mọi mẫu email tới Gmail web, Gmail điện thoại, Outlook (BL09). *(Đã làm ở 8.1.6; riêng việc gửi thử 3 hộp thư vẫn chờ anh làm tay trên STAGING.)*
 * Bộ ảnh chưa có ảnh chụp trạng thái ô nhập sai (`input.invalid`); code giữ nguyên bản cũ đã test.
 * Nút Zalo nổi đè nội dung khi cuộn tới đúng vị trí trên điện thoại: hành vi có từ trước 5O, không đổi ở bản này.
-* 5N (tô màu Sheets, BL13) chưa làm.
+* 5N (tô màu Sheets, BL13) chưa làm. *(Đã làm ở 8.1.7.)*
 
 **05/11/2026: chuyển sang repo GitHub cho Claude Code** (không đổi code, vẫn bản 8.1.4). Repo có đủ `src/`, `test/`, `dist/`, tài liệu; thêm `.gitignore`, `.clasp.json.example`, GitHub Actions chạy `npm test` và kiểm `dist/` khớp `src/`, lệnh `npm run build`, `npm run clasp:push`. Bỏ 2 bundle `v8/repo/` và `repo/BOOTSTRAP.md`. Hướng dẫn: `HUONG_DAN_GITHUB_CLAUDE_CODE.md`; quy trình cho Claude Code: `CLAUDE.md` mục cuối. Test lại sau khi dựng repo từ bundle: 34/34, 46/46, 134/134, 48/48, 2/2; `dist/` dựng lại trùng từng byte với bản trong project.
 

@@ -1,5 +1,5 @@
 /**
- * THAIPUT v8.1.7 · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)
+ * THAIPUT v8.1.8 · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)
  * Gộp từ 38 file trong src/: Config.gs, Schema.gs, Time.gs, Admin.gs, AdminApi.gs, AdminOps.gs, Api.gs, Archive.gs, Assign.gs, Auth.gs, Availability.gs, Backup.gs, Booking.gs, CalendarQueue.gs, CalendarSync.gs, Compensation.gs, Content.gs, Db.gs, EmailTemplates.gs, Jobs.gs, LoadTest.gs, Log.gs, MailTransport.gs, Maintenance.gs, Marketing.gs, Metrics.gs, Notifications.gs, Notify.gs, Packages.gs, Phone.gs, Registration.gs, Release.gs, Report.gs, Reset.gs, Sessions.gs, Setup.gs, SystemMove.gs, TutorLock.gs
  * Không sửa file này: sửa src/ rồi chạy node test/build_dist.js. Hướng dẫn cập nhật: HUONG_DAN_PHAT_HANH.md.
  * Gửi email cố định từ 8.1.4 (MailTransport.gs, GmailApp): KHÔNG cần file MailFix, KHÔNG tìm và thay. Có file MailFix.gs cũ thì xoá.
@@ -21,7 +21,7 @@
  */
 
 var APP = {
-  VERSION: '8.1.7',
+  VERSION: '8.1.8',
   NAME: 'thaiput',
   TIMEZONE: 'Asia/Ho_Chi_Minh'
 };
@@ -8420,7 +8420,6 @@ function techFault_(b) {
   if (TECH_FAULT[f]) return f;
   return (b.payroll_override === true || String(b.payroll_override).toUpperCase() === 'TRUE') ? TECH_FAULT.OBJECTIVE : TECH_FAULT.TUTOR;
 }
-/** Buổi trừ lượt và giữ ngày bắt đầu tạm tính: CONSUMING_STATUSES, huỷ muộn, kỹ thuật lỗi học viên. */
 /**
  * Chunk 5N: admin đã xử lý buổi sau kết quả cuối: admin_done_at có và không cũ hơn result_at. Cùng nghĩa với luật tô màu BOOKINGS
  * (Setup.gs highlightSpecs_: chưa xử lý = admin_done_at trống hoặc < result_at) và danh sách chờ kết quả của trang quản trị.
@@ -8434,6 +8433,7 @@ function adminHandled_(b) {
   return isNaN(r) || d >= r;
 }
 
+/** Buổi trừ lượt và giữ ngày bắt đầu tạm tính: CONSUMING_STATUSES, huỷ muộn, kỹ thuật lỗi học viên. */
 function bookingDeducts_(b) {
   if (isConsuming_(b.status) || b.status === BOOKING_STATUS.CANCELLED_LATE) return true;
   return b.status === BOOKING_STATUS.TECH_ISSUE && techFault_(b) === TECH_FAULT.STUDENT;
