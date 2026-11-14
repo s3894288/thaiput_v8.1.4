@@ -1,10 +1,18 @@
-# Hướng dẫn vận hành thaiput v8 (bản 8.1.7)
+# Hướng dẫn vận hành thaiput v8 (bản 8.1.9)
 
-*Cập nhật 12/11/2026. Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
+*Cập nhật 14/11/2026. Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
 
 ## Thay đổi so với bản trước
 
-Bản trước: 8.1.4 (02/11/2026, đã xuất). Những điểm mới của 8.1.5 tới 8.1.7:
+Bản trước: 8.1.4 (02/11/2026, đã xuất). Những điểm mới của 8.1.5 tới 8.1.9:
+
+* **Mỗi key đúng một dòng ở EMAIL_TEMPLATES và CONTENT (8.1.9, chunk 5R).** Trước đây có key bị 2 dòng (anh từng thấy LOGIN_LINK, REG_RECEIVED). Từ 8.1.9 menu 1 tự gộp thành một dòng; dòng đó chính là chữ được gửi hoặc hiện. Ô trống = chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Xem Phần F. Chú ý: nếu dòng đầu có chữ anh sửa mà dòng cuối là chữ mặc định, sau khi gộp chữ anh sửa mới là chữ thật sự được gửi.
+* **Ô CONFIG mới `BANK_QR_IMAGE` (8.1.9):** ảnh mã QR chuyển khoản (link Drive). Thông số ảnh và cách đưa lên: B11. Trang đăng ký và trang gia hạn có khung chuyển khoản mới, dòng lưu ý (key `h.bank_note`) đậm và nổi; chữ mặc định mới "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." (chữ anh đã sửa được giữ). Phần D7.
+* **Tab mới `RELEASE_LOG`, thông báo `RELEASE_NOTES`, email "Tóm tắt cập nhật" (8.1.9):** mỗi lần menu 1 thấy phiên bản đổi, nó hiện tóm tắt thay đổi, ghi vào `RELEASE_LOG`, báo một lần qua thông báo và email tới `ADMIN_EMAIL`. Menu mới **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này** (C5). Tab: K10. Thông báo: J4.
+* Phần B nay đủ **100 ô CONFIG** (thêm `REASSIGN_STUCK_HOURS` ở 8.1.7 và `BANK_QR_IMAGE` ở 8.1.9). Khoá CONFIG mới có ghi chú "Mới ở <bản>: ..." ở cột `note`.
+* **Tăng tốc tải trang (8.1.9):** không đổi cách dùng. Muốn biết nhanh hơn bao nhiêu thì đo bằng menu **Đo tốc độ** trước và sau khi dán.
+* **Form đăng ký tô viền đỏ ĐÚNG ô nhập sai (8.1.8).**
+* Phần J nay có **39 sự kiện** (thêm `REASSIGN_STUCK` ở 8.1.7 và `RELEASE_NOTES` ở 8.1.9).
 
 * **Màu dòng Sheets viết lại (8.1.7, chunk 5N).** K6 BOOKINGS nay có 6 màu (đỏ, cam đậm, hồng, vàng, xanh dương nhạt, xám) thay cho 2 màu cũ; K5 STUDENT_PACKAGES có 5 màu (đỏ, xám, vàng, tím, xanh dương). Mỗi bảng ghi rõ **làm gì để hết màu**. Bảng màu ở bản 8.1.4 nay SAI, xem lại K5 và K6.
 * **Lựa chọn mới `admin_action`: "Đã xử lý (giữ nguyên)" (8.1.7).** Không đổi trạng thái, lương hay gói; chỉ làm dòng hết màu. Xem K6.
@@ -22,14 +30,14 @@ Bản trước: 8.1.4 (02/11/2026, đã xuất). Những điểm mới của 8.1
 * Phần G5, I3, B13: nhật ký, email, thông báo, METRICS giữ 60 ngày (`LOG_KEEP_DAYS`) rồi chuyển sang file lưu trữ mỗi đêm; dòng email marketing không bao giờ bị chuyển; bỏ mốc chờ 7 ngày; tên file lưu trữ mới `THAIPUT · Lưu trữ · <môi trường> · <năm>`.
 * Phần I3: không còn ghi nhật ký khi đổi ngôn ngữ và khi mở từng thông báo (chỉ ghi "Đã đọc hết").
 * Số điện thoại không bắt buộc, gõ tự do (Phần K2). Gói đang bán có giá 0 chỉ đăng ký qua Zalo (Phần K3).
-* Phần J (37 sự kiện thông báo) giữ nguyên nội dung bản nháp 01/11, đối chiếu lại với 8.1.4: không có sự kiện mới.
+* Phần J (37 sự kiện thông báo ở bản 8.1.4; nay 39) giữ nguyên nội dung bản nháp 01/11; sự kiện mới là `REASSIGN_STUCK` (8.1.7) và `RELEASE_NOTES` (8.1.9).
 
 Cách đọc: chữ **đậm** là tên nút hoặc mục menu. `Chữ đơn cách` là tên tab, cột, ô hoặc nội dung gõ đúng từng ký tự. "Menu 1" là **thaiput → 1. Cài đặt lần đầu / cập nhật cấu trúc**, "menu 2" là **thaiput → 2. Kiểm tra hệ thống**, "menu 3" là **thaiput → 3. Tạo lại trigger tự động**.
 
 Nội dung:
 
 * Phần A. Luật chung khi sửa CONFIG
-* Phần B. 99 ô CONFIG
+* Phần B. 100 ô CONFIG
 * Phần C. Menu thaiput
 * Phần D. Chữ trên trang web (tab CONTENT), hai thứ tiếng
 * Phần E. Ngôn ngữ của từng người dùng
@@ -52,7 +60,7 @@ Nội dung:
 6. Sửa nhiều ô một lúc: chạy menu 2 sau khi sửa.
 
 
-## Phần B. 99 ô CONFIG
+## Phần B. 100 ô CONFIG
 
 Mặc định là giá trị code dùng khi ô trống hoặc không có dòng. Menu 1 thêm dòng còn thiếu với giá trị mặc định, không ghi đè ô đã sửa.
 
@@ -195,7 +203,30 @@ Không còn tự Hoàn thành. Tutor phải chọn kết quả trên trang tutor
 | `WEBAPP_URL` | trống | **Bắt buộc**: link `/exec` của lần triển khai trang web. Link trong email dùng link này |
 | `POLICY_URL` | trống | Link chính sách ở form đăng ký |
 | `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER` | trống | Thông tin chuyển khoản trên form đăng ký, gia hạn |
+| `BANK_QR_IMAGE` | trống | (8.1.9) Ảnh mã QR chuyển khoản: link chia sẻ Google Drive hoặc mã file. Trống = trang không hiện ô QR. Cách làm và thông số ảnh ngay dưới bảng |
 | `SHORT_URL_HOME`, `SHORT_URL_LOGIN`, `SHORT_URL_STUDENT`, `SHORT_URL_TUTOR` | trống | Link rút gọn trên tên miền (URL Redirect ở Namecheap), ví dụ `https://dangky.thaiput.vn`. Chỉ để menu **Xem link trang web** hiện và đối chiếu; email vẫn dùng `WEBAPP_URL` |
+
+**Ảnh `BANK_QR_IMAGE`: thông số và cách đưa lên**
+
+| Mục | Giá trị |
+|---|---|
+| Định dạng | PNG (nhận cả JPG, WEBP, GIF) |
+| Kích thước | 600 x 600 px, vuông đúng 1:1 |
+| Cắt | Sát thẻ QR nền trắng, gồm cả logo ngân hàng |
+| Lề trắng | Ít nhất 16 px mỗi cạnh |
+| Dung lượng | Dưới 300 KB (khuyên dưới 150 KB) |
+| Hiện trên web | 200 x 200 px trên điện thoại (giữa, dưới các dòng tài khoản); 184 x 184 px trên máy tính (cột phải của khung chuyển khoản) |
+
+Từng bước:
+
+1. Xuất ảnh QR từ ứng dụng ngân hàng, cắt vuông 600 x 600 px theo bảng trên.
+2. Mở Drive bằng **tài khoản chủ hệ thống** (tài khoản chạy web app), tải ảnh lên.
+3. Chuột phải vào file → **Chia sẻ** → **Sao chép đường liên kết** (hoặc chỉ lấy mã file trong đường link, đoạn giữa `/file/d/` và `/view`).
+4. Dán vào CONFIG `BANK_QR_IMAGE`.
+5. Chạy **menu 2**: dòng "BANK_QR_IMAGE hợp lệ" (kèm loại và KB). Báo hỏng thì làm theo câu hướng dẫn đi kèm (sai link, không mở được file, file ở thùng rác, quá 300 KB, không phải ảnh).
+6. Mở trang đăng ký, quét thử bằng ứng dụng ngân hàng.
+
+Muốn bỏ QR: xoá ô `BANK_QR_IMAGE` (trang không hiện ô QR, không để lại khoảng trống). Đổi LINK thì ảnh mới hiện ngay. Ghi đè nội dung file giữ nguyên link thì web có thể hiện ảnh cũ tới 6 giờ (bộ nhớ đệm): muốn đổi ngay thì đổi link. Ảnh tải sau khi khung chuyển khoản đã hiện, nên không làm trang chậm đi.
 
 ### B12. Hạ tầng (Setup ghi, không sửa)
 
@@ -302,6 +333,7 @@ Menu nằm trên thanh công cụ của file Sheets (tải lại trang nếu ch�
 | Bảo trì: đóng cổng học viên và tutor | `MAINTENANCE_MODE = CLOSED` |
 | Bảo trì: tắt | Về bình thường |
 | Phát hành: sao lưu ngay | Bản sao file dữ liệu vào thư mục Releases (không bao giờ tự xoá) |
+| Phát hành: xem thay đổi của bản này (8.1.9) | Hiện ghi chú thay đổi của bản đang cài (người dùng thấy gì, ô CONFIG, chữ web, mẫu email, dữ liệu, việc admin cần làm). Chỉ đọc. Tóm tắt đầy đủ sau mỗi lần nâng cấp nằm ở hộp thoại menu 1, tab `RELEASE_LOG` và email "Tóm tắt cập nhật" |
 | Các bước chuyển dữ liệu theo phiên bản (chỉ đọc) | Danh sách bước chuyển dữ liệu của từng phiên bản, ĐÃ CHẠY hay CHƯA. Sau menu 1 mọi bước phải ĐÃ CHẠY |
 | Bù buổi 8.1.0: xem trước gói sẽ đổi ngày (chỉ đọc) | Liệt kê gói sẽ đổi hạn khi chạy bước bù buổi. Chỉ có ích trước lần chạy menu 1 đầu tiên của bản 8.1.0 trở lên |
 
@@ -428,6 +460,10 @@ Vì sao nên xem lại: bản cũ không tự cập nhật ô `value` khi chữ 
 
 Menu 1 bị ngắt giữa chừng (khoá bận, quá 6 phút): chạy lại menu 1, bước chép tự làm tiếp. Xem tab cũ: chuột phải vào thanh tab → **Hiện trang tính ẩn**.
 
+### D7. Dòng lưu ý chuyển khoản (`h.bank_note`) và chữ ảnh QR (`h.bank_qr_alt`)
+
+Dòng lưu ý dưới thông tin ngân hàng (8.1.9) là khung nổi: chữ khoảng 16,8 px, đậm, nền vàng nhạt, vạch vàng bên trái, ở cả hai ngôn ngữ. Chữ mặc định mới: "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." và "Transfer reference: Please enter only your phone number." Chữ anh đã sửa ở cột `vi`, `en` được giữ nguyên khi nâng cấp; muốn dùng chữ mặc định mới thì xoá hai ô đó. Key `h.bank_qr_alt` là chữ thay thế (alt) của ảnh QR. Cùng một khung dùng cho trang đăng ký và trang gia hạn của học viên.
+
 ## Phần E. Ngôn ngữ của từng người dùng
 
 * Mọi trang có nút **VI | EN** ở góc trên, kể cả trang quản trị. Bấm là đổi ngay toàn bộ chữ; tab đang xem, giờ đang chọn, chữ đang nhập trong form, trang con đang mở (trang một học viên, đặt thay, nhật ký đang tìm) giữ nguyên, không tải lại từ máy chủ.
@@ -443,7 +479,9 @@ Menu 1 bị ngắt giữa chừng (khoá bận, quá 6 phút): chạy lại menu
 
 ## Phần F. Email hệ thống (tab EMAIL_TEMPLATES)
 
-Mỗi dòng là một loại email hệ thống tự gửi (link đăng nhập, chào mừng, xác nhận đặt, huỷ, nhắc buổi, sắp hết hạn, thông báo cho admin...). Mỗi email có nửa tiếng Việt và nửa tiếng Anh.
+Mỗi dòng là một loại email hệ thống tự gửi (link đăng nhập, chào mừng, xác nhận đặt, huỷ, nhắc buổi, sắp hết hạn, thông báo cho admin, tóm tắt cập nhật...). Mỗi email có nửa tiếng Việt và nửa tiếng Anh.
+
+**Mỗi key đúng một dòng (từ 8.1.9).** Trả lời câu "dòng nào được dùng": sau 8.1.9 mỗi `key` chỉ có đúng MỘT dòng, và dòng đó chính là thư được gửi. Ô để trống = dùng chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Nếu tab từng có 2 dòng cùng key, menu 1 gộp thành một dòng ở vị trí đầu: chữ anh đã sửa thắng chữ mặc định hoặc ô trống; hai dòng cùng có chữ anh khác nhau thì dòng CUỐI thắng (dòng thư thật sự dùng trước đây), chữ bị bỏ được ghi ở hộp thoại menu 1 và ở ACTIVITY_LOG (hành động `TEMPLATE_DEDUPE`). Nguyên nhân sinh dòng trùng (key có khoảng trắng thừa làm menu 1 thêm dòng nữa) đã sửa. Thấy key lại hiện 2 dòng: menu 2 và menu **Cập nhật nội dung web và email** báo, chạy menu 1 để gộp. Tab CONTENT theo cùng luật. Email mới `ADMIN_RELEASE_NOTES` (tóm tắt cập nhật cho admin) nằm ở đây, sửa được như mọi mẫu khác.
 
 | Cột | Nghĩa |
 |---|---|
@@ -661,7 +699,7 @@ Luật dùng:
 
 Dòng cũ được chuyển sang file lưu trữ theo Phần B13; thông báo Khẩn và Cần xử lý chưa đọc không bị chuyển.
 
-### J4. Danh sách sự kiện (mặc định bản 8.1.4, giống 8.1.1)
+### J4. Danh sách sự kiện (mặc định bản 8.1.9: 39 sự kiện)
 
 Cột "Tên trên web" là chữ hiện dưới mỗi thông báo trên trang quản trị (sửa ở CONTENT, key `ad.ev.<mã>`).
 
@@ -732,6 +770,7 @@ Cột "Tên trên web" là chữ hiện dưới mỗi thông báo trên trang qu
 | `PACKAGE_HEALED` | Tự sửa ngày gói | Cần xử lý | EMAIL | Đối soát mỗi giờ thấy ngày gói lệch luật (dán đè, sắp xếp) và đã ghi lại đúng | Kiểm dòng; tìm ai đã dán đè |
 | `PACKAGE_ROW_MISSING` | Mất dòng gói | Khẩn | EMAIL | Buổi học trỏ tới gói không còn trong STUDENT_PACKAGES | Khôi phục dòng từ bản sao lưu đêm |
 | `PACKAGE_PASTE_UNSAFE` | Dán đè ô gói không tự lành | Khẩn | EMAIL | Ô mã gói, học viên, ngày mua... bị dán đè, hệ thống không tự sửa được | Chép lại từ bản sao lưu đêm |
+| `RELEASE_NOTES` | Tóm tắt cập nhật phiên bản | Thông tin | EMAIL | (8.1.9) Sau menu 1 khi phiên bản code đổi: một thông báo và một email "Tóm tắt cập nhật" mỗi lần đổi phiên bản; chi tiết ở tab `RELEASE_LOG` | Đọc tóm tắt, đối chiếu việc admin cần làm; không cần xử lý |
 
 ### J5. Gợi ý chỉnh theo tình huống
 
@@ -911,6 +950,7 @@ Phần I2, J. Tick cột `read` = đã đọc. Màu: đỏ Khẩn chưa đọc, 
 | AUTH | Link và phiên đăng nhập (mã băm) | **Không sửa, không xoá dòng**. Muốn cho ai thoát: trang quản trị, trang một người, **Thoát mọi thiết bị** |
 | METRICS | Số đo tốc độ mỗi giờ | |
 | META | Phiên bản, mốc mã tự sinh, bước chuyển dữ liệu đã chạy, giờ chuẩn bị chuyển | Code ghi ở menu 1 và Chuyển hệ thống Bước 1 |
+| RELEASE_LOG | (8.1.9) Tóm tắt mỗi lần đổi phiên bản, mỗi mục một dòng: `at`, `from_version`, `to_version`, `kind`, `item`, `detail` | Chỉ ghi thêm, không sửa, không xoá. Không lưu trữ, không bị xoá khi xoá dữ liệu test, không chép sang hệ thống mới |
 | REPORT_MONTH | Báo cáo tháng | Menu Báo cáo ghi đè mỗi lần chạy |
 | CONTENT, EMAIL_TEMPLATES, MARKETING_EMAILS | Chữ web, mẫu email, email marketing | Phần D, F, G |
 
@@ -1031,6 +1071,10 @@ Phần I2, J. Tick cột `read` = đã đọc. Màu: đỏ Khẩn chưa đọc, 
 | Trang web báo bảo trì | CONFIG `MAINTENANCE_MODE`; menu **Bảo trì: tắt** |
 | Thông báo `ARCHIVE_FAILED`, `PURGE_CHECK` | Phần J4. Menu **Lưu trữ: xem tình trạng** |
 | Trang chậm | Menu **Đo tốc độ**. BOOKINGS quá 15.000 dòng: kiểm lưu trữ đang bật |
+| Một key hiện 2 dòng ở EMAIL_TEMPLATES hoặc CONTENT | Menu 2 báo; chạy menu 1: gộp thành một dòng, chữ anh sửa được giữ (Phần F) |
+| Mã QR không hiện trên trang đăng ký | Kiểm CONFIG `BANK_QR_IMAGE` (trống = không hiện), chạy menu 2 xem dòng `BANK_QR_IMAGE` (sai link, file không mở được, quá 300 KB, không phải ảnh); mở trang lại sau vài phút (lỗi được nhớ ngắn) |
+| Đã thay ảnh QR mà trang còn hiện ảnh cũ | Ghi đè file cùng link thì tới 6 giờ mới đổi; đổi LINK ở `BANK_QR_IMAGE` để hiện ngay |
+| Muốn xem hôm nâng cấp đã đổi gì | Tab `RELEASE_LOG`, email "Tóm tắt cập nhật", menu **Phát hành: xem thay đổi của bản này** |
 | Cần dòng cũ (tranh chấp) | Menu **Lưu trữ → mở file**, tab cùng tên |
 | Cập nhật phiên bản code | `HUONG_DAN_PHAT_HANH.md` |
 

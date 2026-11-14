@@ -1,6 +1,13 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 12/11/2026 (lần 12). **5N và 5O ĐÃ XONG, nên tới lượt anh rà toàn bộ file này (đã hẹn làm ở lượt cuối của chunk 5).** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 14/11/2026 (lần 13). **5R ĐÃ XONG (bản 8.1.9), thêm 13 câu mới BL76 đến BL88. BACKLOG còn 50 câu chờ anh (mục A 47, mục B 3).** Anh rà toàn bộ file này khi tiện (đã hẹn rà ở lượt cuối của chunk 5). Trả lời theo mã, ví dụ "BL76 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 12/11 lần 12
+
+* 5R xong (bản 8.1.9, 14/11/2026): gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT, khung chuyển khoản mới có ô mã QR (CONFIG `BANK_QR_IMAGE`), tăng tốc tải trang, tóm tắt thay đổi sau mỗi lần nâng cấp (tab RELEASE_LOG).
+* Thêm BL76 đến BL88: 1 mâu thuẫn chữ chuyển khoản (BL76), 8 đề xuất tăng tốc từ lượt kiểm toàn bộ đường tải (BL77 đến BL84), 2 điểm hành vi cũ của menu 1 nay đã ghi trong tóm tắt nâng cấp (BL85, BL86), 1 giới hạn ảnh QR (BL87) và 1 việc chưa làm của 5R (BL88: soát chéo 2 agent).
+* Mục D thêm các việc cần kiểm trên Google thật cho 5R.
+* Các câu BL77 đến BL84 đều là tối ưu, không câu nào chặn go live; BL76 và BL88 nên trả lời trước 5P.
 
 ## Thay đổi so với bản 07/11 lần 11
 
@@ -97,6 +104,19 @@
 | BL73 | Màu đỏ STUDENT_PACKAGES "chờ admin cộng tay" dựa vào thông báo COMP_ON_EXPIRED CHƯA ĐỌC: bấm "Đã đọc hết" hoặc mở thông báo trên web là hết đỏ dù chưa cộng ngày. (a) giữ, hướng dẫn ghi "cộng xong mới đánh dấu đã đọc"; (b) cột hệ thống mới `comp_pending_days`: đỏ theo dữ liệu, hết khi admin sửa `comp_days_admin` (bỏ được công thức đọc tab NOTIFICATIONS) | (b) ở 5P | Tuần này (rà) |
 | BL74 | Huỷ bởi admin một buổi KẸT Chờ đổi tutor (lỗi phía trường): luôn Huỷ bởi admin (không trừ lượt, được bù), kể cả sau mốc huỷ muộn 15:00 hôm trước (ngoại lệ của luật huỷ muộn ở 5M). (a) giữ; (b) vẫn xét mốc | (a), đã làm | Tuần này (rà) |
 | BL75 | Màu vàng "còn N ngày" chép số EXPIRY_NOTICE_DAYS vào công thức: đổi CONFIG thì chạy lại menu 1 mới đổi màu; công thức dùng ngày thật (TODAY), không theo giờ giả lập SIM_NOW trên STAGING. (a) giữ, ghi hướng dẫn; (b) sửa ô CONFIG đó thì tự tô lại | (a) | Tuần này (rà) |
+| BL76 | Chữ chuyển khoản tự mâu thuẫn: dòng đậm trên form nay ghi "chỉ ghi số điện thoại của bạn", nhưng sau khi gửi, web (key `h.done_code`, `s.renew_done_code`) và email REG_RECEIVED còn nói "Mã nội dung chuyển khoản của bạn: {{transfer_code}}", email REG_ADMIN cho admin cũng hiện mã đó. Học viên có thể chuyển khoản theo mã thay vì số điện thoại. (a) giữ cả hai; (b) đổi các chữ đó thành "mã đăng ký" chỉ để tham khảo, không nói là nội dung chuyển khoản; (c) bỏ `transfer_code` khỏi chữ học viên thấy, chỉ admin còn thấy | (b). Bản admin đang chạy đã tự đổi tên thành "mã đăng ký" ở REG_RECEIVED (theo ảnh chụp tab), nên đổi chữ mặc định cho khớp | Trước 5P |
+| BL77 | Ảnh bìa trang chủ nặng khoảng 74 KB trên khoảng 125 KB tải lần đầu (59 phần trăm). (a) giữ; (b) nén lại ở rộng 800 px (nhẹ hơn khoảng 30 đến 40 KB, hơi mềm hơn trên điện thoại); (c) đưa ảnh lên Drive như ảnh QR, tải sau | (a) tới khi đo trên Google thật; nếu chậm thì (b) | Không (tối ưu) |
+| BL78 | Trang chủ cần 1 lượt gọi máy chủ (`apiPublicInfo`: gói, ngân hàng) sau khi tải. (a) giữ; (b) nhúng thông tin công khai vào trang đầu để khỏi gọi thêm (nhanh hơn khoảng 0,4 đến 1,5 giây); giá hoặc ngân hàng admin sửa có thể hiện trễ vài phút trừ khi sửa PACKAGES cũng làm mới bộ nhớ đệm | (a) tới khi đo; (b) nếu số đo thấy chậm | Không (tối ưu) |
+| BL79 | Bộ nhớ đệm CONFIG 60 giây và CONTENT 300 giây hết hạn nhanh nên giờ vắng khách hay phải đọc lại Sheets. (a) giữ; (b) kéo dài khoảng 10 và 30 phút, làm mới khi sửa Sheets (tiết kiệm 0,4 đến 0,9 giây mỗi lượt vào giờ vắng); đổi luật 41, sửa bằng script phải chạy menu làm mới | (a) | Không (tối ưu) |
+| BL80 | Bộ nhớ đệm danh sách slot đặt theo phút nên gần như luôn trượt khi ít khách. (a) giữ; (b) làm lại: nhớ danh sách và áp hạn đặt lúc đọc | (a) | Không (tối ưu) |
+| BL81 | `SESSION_CACHE_SECONDS` 120 giây: phiên bị hỏi lại Sheets sau mỗi 2 phút. (a) giữ 120; (b) 900 hoặc 3600 (nhanh hơn, nhưng sửa tay tab AUTH có hiệu lực trễ tới chừng đó; thoát mọi thiết bị qua web vẫn tức thì, luật 35) | (a) | Không (tối ưu) |
+| BL82 | Gửi email link đăng nhập đang nằm TRONG khoá, trái ý luật 5 (việc chậm đăng ký ra sau khoá). (a) giữ; (b) chuyển ra ngoài khoá (nhanh hơn 0,5 đến 1,5 giây, nhả khoá sớm); cần quyết cách đóng dấu chống xin lại và dạng nhật ký | (b) ở 5P | Không (tối ưu) |
+| BL83 | Đo tốc độ (METRICS) ghi cả API đọc: (a) giữ; (b) chỉ lấy mẫu một phần API đọc để nhẹ hơn | (a) | Không (ưu tiên thấp) |
+| BL84 | Mã trang quản trị được gửi cho mọi người dùng (học viên, tutor cũng tải). (a) giữ; (b) chỉ gửi mã quản trị cho admin | (a) | Không (ưu tiên thấp) |
+| BL85 | Menu 1 thay TOÀN BỘ luật tô màu của 5 tab NOTIFICATIONS, REGISTRATIONS, AVAILABILITY, BOOKINGS, STUDENT_PACKAGES: luật admin tự thêm bằng tay ở các tab này mất sau mỗi lần chạy (hành vi cũ từ 5N; nay ghi rõ trong tóm tắt nâng cấp). (a) giữ và nhắc admin ở hướng dẫn; (b) giữ lại luật lạ (không phải của hệ thống) | (a) | 5P |
+| BL86 | `removeLegacyPackage_` chạy ở MỖI lần menu 1: dòng PACKAGES có mã `LEGACY` mà chưa học viên nào dùng sẽ bị xoá, kể cả khi admin cố ý thêm lại gói tên đó. (a) giữ; (b) chỉ chạy một lần (đánh dấu bước chuyển dữ liệu) | (b) | 5P |
+| BL87 | Ảnh QR nhớ đệm 6 giờ: thay NỘI DUNG file Drive mà giữ nguyên link thì web hiện ảnh cũ tới 6 giờ (đổi LINK thì đổi tức thì). (a) giữ 6 giờ, hướng dẫn "đổi link, đừng ghi đè file"; (b) rút còn 1 giờ; (c) thêm mục menu "Làm mới ảnh QR" | (c) nếu admin hay đổi QR, không thì (a) | Không |
+| BL88 | Luật Soát (CLAUDE.md): việc lớn soát bằng 2 agent độc lập và thử phá. Ở 5R anh tắt agent giám sát nên chỉ chạy 1 orchestrator và 1 worker mỗi việc; CHƯA có soát chéo 2 agent. Đã có 13 đột biến thử phá (đều bị test bắt). (a) bỏ qua; (b) chạy soát chéo 2 agent và thử phá trước go live (gộp vào 5P) | (b) | 5P |
 
 ## B. Câu hỏi cũ chưa thấy trả lời
 
@@ -125,6 +145,13 @@
 * Thêm, xoá tab thử: nhật ký ghi đúng tên tab.
 * Đo tốc độ.
 * Vùng tô màu khi tab tự thêm hàng (sửa ở 5N).
+* **Mới ở 5R (bản 8.1.9):**
+  * Drive: web đọc đúng file ảnh QR bằng tài khoản chạy hệ thống; menu 2 báo "BANK_QR_IMAGE hợp lệ" với ảnh thật, báo LỖI đúng với link sai, file ở thùng rác, file quá 300 KB;
+  * quét thử mã QR bằng ứng dụng ngân hàng thật trên điện thoại, ở cả hai cỡ (200 px trên điện thoại, 184 px trên máy tính), trang đăng ký lẫn gia hạn; kiểm ô trống thì không hiện khung QR;
+  * bộ nhớ đệm mảnh dưới 100 KB: ảnh gần 300 KB vẫn hiện; đổi link thì ảnh mới hiện ngay;
+  * nâng cấp thật 8.1.4 lên 8.1.9: tóm tắt trong hộp thoại menu 1, tab RELEASE_LOG, email "Tóm tắt cập nhật" tới `ADMIN_EMAIL`, chạy lại menu 1 thì im lặng;
+  * trên file Sheets thật: EMAIL_TEMPLATES và CONTENT mỗi key đúng một dòng sau menu 1; chữ gửi đi đúng là chữ admin đã sửa (ví dụ thân REG_RECEIVED tiếng Anh bắt đầu "Thaiput received"); nguồn gốc các cặp dòng trùng đứng cạnh nhau mới giải thích một phần;
+  * tốc độ: đo bằng menu **Đo tốc độ** trước và sau khi dán 8.1.9 (số tăng tốc ở PROGRESS.md mới là ước lượng).
 * **Mới:**
   * Gmail API có trừ vào bộ đếm hạn mức của Apps Script không (đo ở 5J);
   * GmailApp (8.1.4) trừ cùng hạn mức: menu Kiểm tra gửi email, số "trước → sau" giảm 1;

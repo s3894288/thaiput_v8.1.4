@@ -1,11 +1,20 @@
-# Hướng dẫn phát hành, cập nhật và quay lui (bản 8.1.4)
+# Hướng dẫn phát hành, cập nhật và quay lui (bản 8.1.9)
 
-*Cập nhật 02/11/2026. Áp dụng cho STAGING ngay; cho PRODUCTION sau go live (chunk 6). Nguyên tắc đã chốt: không đóng băng hệ thống; giữ hết lịch sử; không bao giờ mất file; sửa lỗi được bất cứ lúc nào khi đang chạy.*
+*Cập nhật 14/11/2026. Áp dụng cho STAGING ngay; cho PRODUCTION sau go live (chunk 6). Nguyên tắc đã chốt: không đóng băng hệ thống; giữ hết lịch sử; không bao giờ mất file; sửa lỗi được bất cứ lúc nào khi đang chạy.*
 
-## Thay đổi so với bản trước (8.0.10, 18/10)
+## Thay đổi so với bản trước (8.1.4, 02/11/2026)
+
+* **Mục 3A mới:** nâng từ 8.1.4 lên 8.1.9 từng bước (hệ thống anh đang chạy là 8.1.4), kèm danh sách chính xác những gì đổi trong database và cách quay lui.
+* **Menu 1 nay tự tóm tắt mỗi lần đổi phiên bản (8.1.9):** hộp thoại liệt kê thay đổi của mọi bản sau bản đang chạy cộng những gì lượt chạy thật sự làm; ghi vào tab mới `RELEASE_LOG`; gửi một thông báo `RELEASE_NOTES` và một email "Tóm tắt cập nhật" tới `ADMIN_EMAIL`. Menu mới **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này**. Chạy lại menu 1 cùng phiên bản thì im lặng.
+* **Menu 1 gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT (8.1.9).** Mục 3A bước 5 và 6 nói rõ phải đọc lại gì sau đó.
+* Ô CONFIG mới `BANK_QR_IMAGE` (ảnh mã QR chuyển khoản, Drive): mục 3A bước 7.
+* Mục 2 bước 5: đọc thêm tóm tắt; mục 4 thêm cách quay lui từ 8.1.9.
+* `appsscript.json` KHÔNG đổi từ 8.1.4 lên 8.1.9.
+
+Các thay đổi của bản 8.1.4 so với 8.0.10 (nằm ở bản hướng dẫn 8.1.4, vẫn đúng cho mục 3):
 
 * **Không còn MailFix:** từ 8.1.4 không tạo file MailFix, không tìm và thay sau khi dán `Code.gs`. Còn file `MailFix.gs` cũ trong dự án thì xoá (menu 2 báo LỖI nếu còn).
-* **Mục 3 mới:** nâng STAGING từ 8.0.10 lên thẳng 8.1.4, từng bước, kèm việc phải kiểm sau mỗi bước.
+* **Mục 3:** nâng STAGING từ 8.0.10 lên thẳng 8.1.4, từng bước, kèm việc phải kiểm sau mỗi bước.
 * Mục 2: tên menu theo menu gom nhóm (**Cập nhật phiên bản → ...**), thêm bước F5 Sheets, bước Kiểm tra gửi email; menu 3 tạo 8 trigger.
 * Mục 4: thêm cách quay lui từ 8.1.4.
 * Mục 5: bỏ "Chuyển sang tài khoản mới" (thay bằng menu **Chuyển hệ thống**).
@@ -37,7 +46,7 @@ Quyền: mọi file và thư mục do tài khoản chạy hệ thống tạo. Kh
    * `appsscript.json` ← chỉ khi coder ghi "quyền đổi".
    **Không tìm và thay gì trong code.**
 4. Tải lại trang Sheets (**F5**) để menu mới hiện.
-5. **Ngay sau đó** chạy menu 1. Google hỏi cấp quyền (khi quyền đổi): chọn đúng tài khoản chạy hệ thống → **Cho phép**, rồi chạy lại menu 1. Hộp thoại phải có dòng "Sao lưu trước cập nhật (<bản cũ> sang <bản mới>): THAIPUT_DB_..._TRUOC_<bản mới>_...". Có dòng "CẢNH BÁO: chưa sao lưu được": **dừng**, chạy **Cập nhật phiên bản → Phát hành: sao lưu ngay**, thành công mới đi tiếp.
+5. **Ngay sau đó** chạy menu 1. Google hỏi cấp quyền (khi quyền đổi): chọn đúng tài khoản chạy hệ thống → **Cho phép**, rồi chạy lại menu 1. Hộp thoại phải có dòng "Sao lưu trước cập nhật (<bản cũ> sang <bản mới>): THAIPUT_DB_..._TRUOC_<bản mới>_...". Có dòng "CẢNH BÁO: chưa sao lưu được": **dừng**, chạy **Cập nhật phiên bản → Phát hành: sao lưu ngay**, thành công mới đi tiếp. Từ 8.1.9 hộp thoại còn có **tóm tắt thay đổi** của bản mới: đọc, đối chiếu với tab `RELEASE_LOG` và email "Tóm tắt cập nhật".
 6. Coder ghi "chạy menu 3": chạy menu 3, hộp thoại báo 8.
 7. Menu 2: không có dòng LỖI.
 8. **Triển khai → Quản lý các lần triển khai** → chọn bản triển khai đang dùng → **bút chì (Chỉnh sửa)** → ô **Phiên bản** chọn **Phiên bản mới** → Mô tả: số phiên bản → **Triển khai**. Link `/exec` giữ nguyên. **Không bấm "Triển khai mới"**: tạo link `/exec` mới, làm hỏng `WEBAPP_URL`, Google Sites, đăng nhập Google, link rút gọn.
@@ -125,6 +134,50 @@ Sau 1 tuần chạy ổn: `ADMIN_LINK_LOGIN = FALSE`.
 * Tutor: link đăng nhập bấm được nhiều lần trong 15 phút; mỗi email xin link 1 lần mỗi giờ. Nhắc mở lịch tuần sau lúc 15:00 thứ Sáu, hạn 22:00 thứ Bảy. Không còn tự Hoàn thành: tutor phải chọn kết quả, quá 24 giờ thì báo đỏ, quá 48 giờ thành Không hoàn thành (không lương).
 * Học viên: buổi lỗi phía trường được cộng ngày bù và có email báo. Huỷ muộn (admin huỷ sau 15:00 hôm trước theo yêu cầu học viên) bị trừ lượt.
 * Admin: menu gom nhóm; xử lý theo `HUONG_DAN_VAN_HANH.md`.
+
+## 3A. Nâng từ 8.1.4 lên 8.1.9 (khoảng 25 phút)
+
+Hệ thống anh đang chạy là 8.1.4. Bản 8.1.9 gồm 8.1.5 (giao diện đen trắng), 8.1.6 (khung email), 8.1.7 (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt), 8.1.8 (viền đỏ đúng ô nhập sai) và 8.1.9 (gộp key trùng, mã QR chuyển khoản, tăng tốc, tóm tắt nâng cấp). Menu 1 cộng dồn mọi thay đổi nên lên thẳng được. Theo quy ước đã chốt, bản này chỉ dán STAGING tới khi go live (chunk 6). Chọn giờ vắng.
+
+### 3A.1 Làm theo thứ tự (không đảo)
+
+1. **Bảo trì chỉ xem.** Nên chạy thêm **Phát hành: sao lưu ngay** (menu 1 cũng tự sao lưu, nhưng làm thêm cho chắc).
+2. Trình soạn: dán `Code.gs` (dòng 2 ghi `THAIPUT v8.1.9`) và `Index.html`, **Lưu** từng file. **Không dán `appsscript.json`** (không đổi). Không tìm và thay gì.
+3. Sheets: **F5**, chạy **menu 1**. Hộp thoại phải có dòng "Sao lưu trước cập nhật (8.1.4 sang 8.1.9)" rồi tới phần **tóm tắt thay đổi**. Có "CẢNH BÁO: chưa sao lưu được": **dừng**, chạy **Phát hành: sao lưu ngay**, thành công mới chạy lại menu 1. Quá giờ giữa chừng: chạy lại menu 1, nó làm tiếp.
+4. Mở tab **`RELEASE_LOG`** (mỗi mục tóm tắt một dòng: `at`, `from_version`, `to_version`, `kind`, `item`, `detail`) và email "Tóm tắt cập nhật" tới `ADMIN_EMAIL`; so với hộp thoại. Menu **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này** hiện lại ghi chú của bản đang cài.
+5. Mở tab **EMAIL_TEMPLATES**: mỗi key đúng **một** dòng. Nếu hộp thoại hoặc ACTIVITY_LOG (hành động `TEMPLATE_DEDUPE`) báo có "chữ bị bỏ" khi gộp, đọc chữ đó và quyết giữ hay sửa lại.
+6. Đọc lại thân thư các mẫu hay có bản trùng (`REG_RECEIVED`, `LOGIN_LINK`). Dòng được giữ là dòng đang được gửi; ô để trống = chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Ví dụ: nếu dòng đầu có chữ anh sửa mà dòng cuối là chữ mặc định, sau khi gộp thư gửi đi dùng chữ anh sửa (thân tiếng Anh REG_RECEIVED bắt đầu "Thaiput received").
+7. **Ảnh QR:** chuẩn bị ảnh PNG **600 x 600 px**, vuông đúng 1:1, cắt sát thẻ QR nền trắng gồm logo ngân hàng, lề trắng ít nhất 16 px, dưới 300 KB (khuyên dưới 150 KB). Mở Drive bằng **tài khoản chủ hệ thống** (tài khoản chạy web app), tải ảnh lên, bấm chuột phải → **Chia sẻ** → **Sao chép đường liên kết** (ảnh nằm trong Drive của tài khoản chạy hệ thống thì không cần chia sẻ rộng), dán link (hoặc mã file) vào CONFIG `BANK_QR_IMAGE`. Để trống = trang không hiện QR.
+8. Chạy **menu 2**. Phải thấy "BANK_QR_IMAGE hợp lệ: (loại), (KB)" và không có dòng LỖI. Báo hỏng thì làm theo câu hướng dẫn kèm theo (sai link, không mở được file, file ở thùng rác, quá 300 KB, không phải ảnh).
+9. **Triển khai → Quản lý các lần triển khai → bút chì → Phiên bản mới** → Mô tả `8.1.9` → **Triển khai**. Link `/exec` giữ nguyên; không bấm "Triển khai mới". Rồi **Bảo trì: tắt**.
+10. Kiểm trên điện thoại và máy tính: trang đăng ký có khung chuyển khoản mới, dòng lưu ý đậm màu vàng nhạt; ô QR 200 px trên điện thoại, 184 px trên máy tính; **quét mã bằng ứng dụng ngân hàng thật**. Trang gia hạn của học viên có cùng khung. Gửi thử một đăng ký và đọc thư xác nhận. Đổi nội dung file ảnh mà giữ link thì ảnh trên web có thể cũ tới 6 giờ; muốn đổi ngay thì đổi link ở `BANK_QR_IMAGE`.
+
+Vì sao thứ tự Lưu → menu 1 → Triển khai: như mục 2 (trigger chạy code vừa Lưu ngay; menu 1 phải có trước để tab, cột, ô mới sẵn sàng). Lỡ dán code mà chưa chạy menu 1 thì hệ thống vẫn chạy (đã kiểm: trang, đăng nhập, đặt, huỷ, job); chạy menu 1 ngay khi nhớ ra.
+
+### 3A.2 Database sẽ đổi những gì (danh sách đầy đủ)
+
+| Loại | Nội dung |
+|---|---|
+| Tab mới | `RELEASE_LOG` |
+| Cột mới | `BOOKINGS.admin_done_at` (chỉ tiêu đề, các dòng cũ để trống) |
+| Dòng thêm ở CONFIG | `BANK_QR_IMAGE`, `REASSIGN_STUCK_HOURS`, đều có ghi chú "Mới ở ..." ở cột `note` |
+| Dòng thêm ở NOTIFY_RULES | `REASSIGN_STUCK`, `RELEASE_NOTES` |
+| Dòng thêm ở CONTENT | 6 key: `h.bank_qr_alt`, `ad.ev.REASSIGN_STUCK`, `ad.ev.RELEASE_NOTES`, `ad.act.REASSIGN_STUCK`, `ad.act.ADMIN_MARK_DONE`, `ad.act.TEMPLATE_DEDUPE` |
+| Dòng thêm ở EMAIL_TEMPLATES | `ADMIN_RELEASE_NOTES` |
+| Dòng ghi thêm | 1 thông báo (NOTIFICATIONS), 1 dòng MAIL_LOG, 3 dòng ACTIVITY_LOG |
+| Dòng bỏ | Chỉ dòng EMAIL_TEMPLATES trùng key (gộp thành một) |
+| Ô đổi | CONTENT `h.bank_note`: các cột do code quản lý (`position`, `default_vi`, `default_en`); cột `vi`, `en` của anh giữ nguyên. Dòng mẫu email đã gộp. META: phiên bản, mốc mã tự sinh |
+| Không đổi gì | PACKAGES, USERS, REGISTRATIONS, STUDENT_PACKAGES, PAYMENTS, AVAILABILITY, AUTH, METRICS, MARKETING_EMAILS; mọi ô của BOOKINGS (ngoài tiêu đề cột mới) |
+
+Menu 1 cũng đặt lại dropdown `admin_action` và luật tô màu của 5 tab NOTIFICATIONS, REGISTRATIONS, AVAILABILITY, BOOKINGS, STUDENT_PACKAGES: **luật tô màu anh tự thêm bằng tay ở 5 tab này sẽ mất**. Khoá CONFIG anh tự thêm lạ chỉ được báo, không bị xoá. Giá trị và ghi chú CONFIG đã có không bị ghi đè.
+
+Các tab và khoá của bản 8.1.5 đến 8.1.8 (không có tab hay chữ mới ngoài danh sách trên) nằm trong tóm tắt của menu 1.
+
+### 3A.3 Quay lui từ 8.1.9
+
+* **Chỉ code lỗi, dữ liệu không sao:** như mục 4 dòng đầu (chọn lại phiên bản triển khai cũ, rồi dán lại code cũ và Lưu). Tab và cột do 8.1.9 thêm (`RELEASE_LOG`, `admin_done_at`) không gây hại cho bản cũ.
+* **Muốn lấy lại dòng EMAIL_TEMPLATES đã gộp hoặc chữ bị bỏ:** mở bản sao `THAIPUT_DB_..._TRUOC_8.1.9_...` trong thư mục `THAIPUT_V8_<môi trường>_Releases` (menu 1 sao lưu ngay trước khi đổi cấu trúc, không bao giờ tự xoá), chép chữ cũ về tab; chữ bị bỏ khi gộp cũng ghi ở ACTIVITY_LOG `TEMPLATE_DEDUPE`.
+* **Quay cả dữ liệu về trước menu 1:** như dòng "Muốn quay về" ở mục 4: không dùng bản sao Releases để chạy (hệ thống vẫn trỏ vào file gốc); chỉ khi coder đồng ý và đi cùng, khôi phục file bằng **Tệp → Nhật ký phiên bản** về mốc trước menu 1 (mất dữ liệu ghi sau đó). Hiếm khi cần: nâng cấp này không đụng dữ liệu học viên, gói, buổi, thanh toán.
 
 ## 4. Quay lui khi bản mới có lỗi
 

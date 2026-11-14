@@ -1,5 +1,7 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**Trạng thái 14/11/2026: 5R XONG, bản 8.1.9.** Bốn việc: (1) gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT (anh thấy tận mắt LOGIN_LINK, REG_RECEIVED bị 2 dòng); (2) khung chuyển khoản mới có ô mã QR (CONFIG `BANK_QR_IMAGE`) và dòng lưu ý đậm, nổi; (3) tăng tốc tải trang, 5 mục an toàn; (4) tóm tắt thay đổi sau mỗi lần nâng cấp (tab RELEASE_LOG, thông báo và email một lần mỗi bản), kèm bài thử nâng cấp thật từ database 8.1.4 lên 8.1.9 so từng ô. Hệ thống anh đang chạy là **8.1.4**; repo giữ 8.1.9. Chi tiết: mục "Chunk 5R" dưới đây. BACKLOG còn **50 câu chờ anh** (mục A 47, mục B 3), trong đó 13 câu mới BL76 đến BL88. **Chưa chạy trên Google thật**, và **chưa soát chéo 2 agent** (nói thẳng ở mục Giới hạn).
+
 **Trạng thái 12/11/2026: VÁ NỐT 2 MỤC PLAN CÒN THIẾU CỦA 5N VÀ 5O, bản 8.1.8.** Soát lại toàn bộ plan 5J đến 5P bằng 2 sub agent trước khi go live chunk 6 thì thấy 2 mục có tên trong plan nhưng chưa làm, nay đã làm:
 
 * **5N mục 6 (bảng màu trong Hướng dẫn vận hành):** trước đó bảng màu chỉ nằm trong `PROGRESS.md`, còn `HUONG_DAN_VAN_HANH.md` vẫn tả màu CŨ (2 màu), nay SAI so với 8.1.7. Đã viết lại K6 BOOKINGS (6 màu) và K5 STUDENT_PACKAGES (5 màu), mỗi bảng có cột "làm gì để hết màu"; thêm lựa chọn "Đã xử lý (giữ nguyên)" vào bảng `admin_action`, ô CONFIG `REASSIGN_STUCK_HOURS` vào Phần B (99 ô), thông báo `REASSIGN_STUCK` vào Phần J, cột `admin_done_at` vào danh sách cột hệ thống. Hướng dẫn lên bản 8.1.7, có mục "Thay đổi so với bản trước".
@@ -8,6 +10,118 @@
 Còn lại trước go live chunk 6: **5P** (xuất 3 hướng dẫn còn lại và 2 chính sách, soát tổng 2 agent, thử tải lại) và phần còn lại của 5Q (BL69). BACKLOG còn **37 câu chờ anh** (mục A 34, mục B 3).
 
 **Trạng thái 07/11/2026: 5N XONG, bản 8.1.7** (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt Chờ đổi tutor; soát chéo 2 agent tìm ra và đã sửa lỗi buổi kẹt không xử lý được). Chi tiết: mục "Chunk 5N" dưới đây. Chunk 5 còn 5P (hợp nhất, chốt v8). BACKLOG còn **38 câu chờ anh** (mục A 34, mục B 4). **Đến lượt anh rà BACKLOG** (đã hẹn sau 5N, 5O).
+
+## Chunk 5R: key trùng, mã QR chuyển khoản, tốc độ, tóm tắt nâng cấp (14/11/2026, bản 8.1.9)
+
+### Làm gì
+
+**T1. Hết dòng trùng key ở EMAIL_TEMPLATES (và CONTENT)**
+
+* Triệu chứng anh gặp trên file thật: tab EMAIL_TEMPLATES có từng cặp 2 dòng cùng key (LOGIN_LINK, REG_RECEIVED).
+* **Gốc lỗi đã chứng minh:** khi thêm dòng mặc định, menu 1 tra key bằng so khớp tuyệt đối, còn khi gửi thư thì key được cắt khoảng trắng đầu cuối. Một ô key có khoảng trắng thừa làm menu 1 thêm dòng thứ hai. Ngoài ra khi gửi thư dùng dòng CUỐI, còn phần logic menu dùng dòng ĐẦU, nên hai nơi hiểu khác nhau.
+* **Đã sửa:** tra key sau khi cắt khoảng trắng; hai nơi dùng chung một dòng. Menu 1 tự **gộp** dòng trùng ở EMAIL_TEMPLATES và CONTENT thành một dòng ở vị trí đầu: chữ admin đã sửa thắng chữ mặc định hoặc ô trống; hai dòng cùng có chữ admin khác nhau thì dòng CUỐI (dòng đang thực sự được gửi) thắng, và chữ bị bỏ được ghi vào kết quả menu 1 và ACTIVITY_LOG (`TEMPLATE_DEDUPE`). Menu 2 và menu **Cập nhật nội dung web và email** báo khi một key xuất hiện 2 lần.
+* **Anh cần biết hệ quả:** nếu dòng đầu có chữ anh sửa mà dòng cuối là chữ mặc định, thì sau khi gộp chữ anh sửa trở thành chữ thật sự được gửi (ví dụ thân tiếng Anh của REG_RECEIVED bắt đầu "Thaiput received"). Đó là chữ anh đã viết, nhưng trước đây thư gửi đi dùng dòng cuối, nên thư có thể đổi nội dung sau lần menu 1 này. Đọc lại các mẫu sau menu 1 (mục Việc của admin, bước 6).
+* Test I141 đến I145.
+
+**T2. Khung chuyển khoản mới, có mã QR**
+
+* Khung ở trang đăng ký và trang gia hạn của học viên dùng chung một hàm dựng (`T.bankPanel`). Có ô QR vuông: 200 x 200 px trên điện thoại (nằm giữa, dưới các dòng tài khoản), 184 x 184 px trên máy tính (cột phải của khung). Ô CONFIG trống thì không hiện ô QR.
+* Dòng lưu ý (key `h.bank_note`) thành khung nổi: chữ khoảng 16,8 px, đậm 700, nền vàng nhạt, vạch vàng bên trái, ở cả hai ngôn ngữ. Chữ mặc định mới: "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." và "Transfer reference: Please enter only your phone number." Chữ anh đã sửa trong CONTENT được giữ. Key mới `h.bank_qr_alt`.
+* Ô CONFIG mới **`BANK_QR_IMAGE`**: link chia sẻ Drive hoặc mã file của ảnh. Máy chủ đọc file (png, jpeg, webp, gif; tối đa 300 KB), nhớ đệm tối đa 6 giờ; trình duyệt tải ảnh SAU khi khung đã hiện, qua API công khai mới `apiBankQr`, nên trang không chậm đi. Menu 2 báo: trống, hợp lệ (loại, KB), hoặc hỏng (mã lỗi và cách sửa). Đổi link thì ảnh mới hiện ngay; ghi đè nội dung file giữ nguyên link thì có thể tới 6 giờ mới đổi (BL87).
+* Test U51, I146.
+
+**Phê bình ý anh muốn dán ảnh THẲNG VÀO ô CONFIG, và quyết định**
+
+Anh muốn chèn ảnh vào ô của tab CONFIG. Không làm, 3 lý do:
+
+1. Apps Script không đọc được nội dung ảnh nằm trong ô; chỉ lấy được một link tạm của Google, hết hạn hoặc trả về rỗng. Web không có gì để gửi cho học viên.
+2. Cột `value` của CONFIG là chữ; `cfg_` và bộ nhớ đệm CONFIG 60 giây chỉ chứa chữ, không chứa đối tượng ảnh.
+3. Nhật ký sửa tay (`logSheetEdit_`, luật 52) sẽ gặp một đối tượng ảnh thay vì chữ.
+
+Cách đã chọn: ảnh là một file trên Drive, ô CONFIG giữ link. Anh vẫn làm đúng việc chỉ một chỗ (dán link), và ảnh nằm ngoài Sheets nên không làm file dữ liệu nặng thêm.
+
+**T3. Tăng tốc tải trang**
+
+Kiểm toàn bộ đường tải rồi làm 5 mục an toàn: (1) stylesheet Google Fonts không còn chặn hiển thị và lượt gọi máy chủ đầu tiên; (2) khung chờ tĩnh trong `#app` nên có gì đó hiện trước khi chạy script; (3) ảnh bìa có sẵn rộng và cao (không giật bố cục); (4) cổng tutor tải trước giờ rảnh ở nền, mở tab Giờ rảnh là hiện ngay khi dữ liệu còn mới (dưới 60 giây); (5) đọc tab tính sẵn bộ chuẩn hoá từng cột (nhanh hơn khoảng 9 phần trăm trên tab 5.000 dòng trong bộ mô phỏng). Test U52, U53, I147.
+
+Số đo khi kiểm toán: `Index.html` dựng xong khoảng 290 KB, khoảng 125 KB nén, trong đó ảnh bìa nhúng khoảng 74 KB (59 phần trăm). Trang chủ cần 1 lượt gọi máy chủ (`apiPublicInfo`); cổng học viên và cổng tutor mỗi nơi 1 lượt. Các mục tối ưu lớn hơn (nén ảnh bìa, nhúng thông tin công khai vào trang đầu, kéo dài bộ nhớ đệm, gửi email link ngoài khoá...) cần anh quyết: BL77 đến BL84.
+
+**T4. Bản 8.1.9 và tóm tắt nâng cấp**
+
+* Đóng số bản 8.1.9, ngày 14/11/2026 (đầu `Code.gs`, dòng đầu menu 1, JSON khởi động, `package.json`).
+* `RELEASE_NOTES_` trong code giữ ghi chú của 8.1.5 đến 8.1.9. Khi menu 1 thấy phiên bản đã đổi, nó hiện **tóm tắt**: ghi chú tĩnh của mọi bản sau bản đang chạy, cộng những gì lượt chạy THẬT SỰ làm (khoá CONFIG thêm, khoá CONFIG lạ chỉ báo không xoá, dòng CONTENT thêm, chữ mặc định làm mới ở ô admin chưa sửa, chữ admin được giữ khi mặc định đổi, mẫu email thêm, dòng trùng gộp, cột và tab thêm). Tóm tắt được ghi vào tab mới **RELEASE_LOG** (chỉ ghi thêm), kèm 1 thông báo và 1 email (mẫu mới `ADMIN_RELEASE_NOTES`, luật thông báo mới `RELEASE_NOTES`) mỗi lần đổi phiên bản. Menu mới **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này**. Khoá CONFIG mới được thêm ghi chú "Mới ở <bản>: ..." ở cột note; giá trị và ghi chú đã có không bao giờ bị ghi đè.
+* **Bằng chứng nâng cấp không mất dữ liệu:** một database 8.1.4 đầy đủ (dựng bằng chạy chính code 8.1.4) được nâng bằng menu 1 của 8.1.9 trong test I151 đến I157, so từng ô (bảng dưới). Còn chứng minh được: dán code mới mà chưa chạy menu 1 thì trang, đăng nhập, đặt, huỷ, job vẫn chạy; chạy lại menu 1 thì im lặng. Test không tìm ra lỗi nào trong `src/`. Thử phá: 13 đột biến của `src/`, cả 13 bị test bắt.
+* Không đổi `appsscript.json` (quyền Drive đã có). Số trigger vẫn 8.
+
+### Ảnh QR: thông số cho admin
+
+| Mục | Giá trị |
+|---|---|
+| Định dạng | PNG (nhận cả JPG, WEBP, GIF) |
+| Kích thước | **600 x 600 px**, VUÔNG đúng 1:1 |
+| Cắt | Cắt sát thẻ QR nền trắng, gồm cả logo ngân hàng |
+| Lề trắng | Ít nhất 16 px mỗi cạnh |
+| Dung lượng | Dưới 300 KB (khuyên dưới 150 KB) |
+| Hiện trên web | 200 x 200 px trên điện thoại (giữa, dưới các dòng tài khoản); 184 x 184 px trên máy tính (cột phải của khung) |
+| Ô CONFIG | `BANK_QR_IMAGE`: link chia sẻ Drive hoặc mã file. Trống = không hiện ô QR |
+| Kiểm | Menu 2: trống (thông tin), hợp lệ (loại, KB), hoặc hỏng (mã lỗi và cách sửa) |
+| Đổi ảnh | Đổi LINK: hiện ngay. Ghi đè nội dung file cùng link: tới 6 giờ (BL87) |
+
+### Kết quả test
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 156/156 (mới I141 đến I145 key trùng, I146 ảnh QR, I147 đọc tab nhanh, I148 mỗi bản có ghi chú phát hành, I149 đối chiếu ghi chú với code, I150 tóm tắt và RELEASE_LOG, I151 đến I157 nâng cấp 8.1.4 lên 8.1.9 so từng ô) |
+| Giao diện web | 53/53 (mới U51 khung chuyển khoản và QR, U52, U53 tải trang) |
+| Thử tải | 2/2 |
+| Thử phá | 13 đột biến của `src/`, cả 13 bị bắt |
+| Soát chéo | CHƯA CHẠY 2 agent độc lập (xem Giới hạn; BL88). Phương pháp lần này: một orchestrator lập kế hoạch và duyệt, mỗi việc một worker; không có agent giám sát riêng (anh chọn) |
+
+### Nâng cấp từ 8.1.4: những gì đổi trong database
+
+Đây là danh sách khác biệt DUY NHẤT test cho phép khi nâng database 8.1.4 lên 8.1.9 bằng menu 1. Gì ngoài danh sách là lỗi và test đỏ.
+
+| Loại | Nội dung |
+|---|---|
+| Tab mới | `RELEASE_LOG` (chỉ ghi thêm) |
+| Cột mới (chỉ tiêu đề) | `BOOKINGS.admin_done_at` |
+| Dòng thêm ở CONFIG | `BANK_QR_IMAGE`, `REASSIGN_STUCK_HOURS` (đều có ghi chú "Mới ở ...") |
+| Dòng thêm ở NOTIFY_RULES | `REASSIGN_STUCK`, `RELEASE_NOTES` |
+| Dòng thêm ở CONTENT (6 key) | `h.bank_qr_alt`, `ad.ev.REASSIGN_STUCK`, `ad.ev.RELEASE_NOTES`, `ad.act.REASSIGN_STUCK`, `ad.act.ADMIN_MARK_DONE`, `ad.act.TEMPLATE_DEDUPE` |
+| Dòng thêm ở EMAIL_TEMPLATES | `ADMIN_RELEASE_NOTES` |
+| Dòng ghi thêm | 1 thông báo (NOTIFICATIONS), 1 dòng MAIL_LOG, 3 dòng ACTIVITY_LOG |
+| Dòng bỏ | CHỈ các dòng EMAIL_TEMPLATES trùng key |
+| Ô đổi | Cột do code quản lý của CONTENT `h.bank_note` (`position`, `default_vi`, `default_en`; cột `vi`, `en` của anh KHÔNG đổi); dòng mẫu email đã gộp; META (phiên bản, mốc mã tự sinh) |
+| Không đổi một ô nào | PACKAGES, USERS, REGISTRATIONS, STUDENT_PACKAGES, PAYMENTS, AVAILABILITY, AUTH, METRICS, MARKETING_EMAILS; BOOKINGS (ngoài tiêu đề cột mới) |
+
+### Việc của admin (STAGING, theo thứ tự luật 38)
+
+Theo quy ước 5, bản này chỉ dán STAGING; không có bước PRODUCTION. Vì hệ thống đang chạy là 8.1.4, cùng thứ tự này áp dụng khi anh nâng hệ thống thật sau này, và tóm tắt sẽ gồm đủ thay đổi của 8.1.5 đến 8.1.9. Chi tiết từng bước: `HUONG_DAN_PHAT_HANH.md` mục 3A.
+
+1. **Bảo trì chỉ xem** (khuyên dùng). Nên chạy thêm **Phát hành: sao lưu ngay**.
+2. Dán `dist/Code.gs` (dòng 2 ghi bản 8.1.9) và `dist/Index.html`, **Lưu** từng file. `appsscript.json` KHÔNG đổi.
+3. F5 Sheets, chạy **menu 1**. Đọc hộp thoại tóm tắt thay đổi (có dòng sao lưu trước cập nhật, các dòng khoá thêm, dòng gộp mẫu trùng).
+4. Mở tab **RELEASE_LOG** và email "Tóm tắt cập nhật" (tới `ADMIN_EMAIL`) đối chiếu với hộp thoại.
+5. Mở tab EMAIL_TEMPLATES: **mỗi key đúng một dòng**. Nếu hộp thoại báo chữ bị bỏ khi gộp, đọc chữ đó (cũng ở ACTIVITY_LOG, hành động `TEMPLATE_DEDUPE`) và quyết giữ hay sửa.
+6. Đọc lại thân REG_RECEIVED và LOGIN_LINK: chữ đang hiện là chữ sẽ được gửi.
+7. Tải ảnh QR (PNG 600 x 600 px, vuông, dưới 300 KB) lên Drive của tài khoản chủ hệ thống, dán link vào CONFIG `BANK_QR_IMAGE`.
+8. Chạy **menu 2**: dòng `BANK_QR_IMAGE hợp lệ`, không dòng LỖI.
+9. Triển khai phiên bản mới (sửa bản cũ, KHÔNG "Triển khai mới"). Tắt bảo trì.
+10. Mở trang đăng ký trên điện thoại và máy tính: khung chuyển khoản, dòng lưu ý đậm; quét mã QR bằng ứng dụng ngân hàng thật; kiểm cả trang gia hạn của học viên. Gửi thử đăng ký để chắc chữ chuyển khoản (BL76).
+
+### Giới hạn còn lại (nói thẳng)
+
+* **Chưa chạy trên Google thật.** Ảnh QR và mọi hành vi mới chỉ được kiểm trong bộ mô phỏng Node và ảnh chụp trình duyệt không giao diện. Chưa kiểm: Drive đọc bằng tài khoản chạy web app, bộ nhớ đệm chia mảnh 100 KB, quét mã QR bằng điện thoại thật.
+* **Con số tăng tốc là ước lượng** cho tới khi đo bằng menu **Đo tốc độ** trước và sau.
+* **Chưa soát chéo bằng 2 agent độc lập** (luật "Soát" của CLAUDE.md) cho 5R, vì anh tắt agent giám sát lần này; chỉ có 13 đột biến thử phá và test. Đề xuất chạy trước go live ở 5P (BL88).
+* Menu 1 vẫn thay toàn bộ luật tô màu ở 5 tab (NOTIFICATIONS, REGISTRATIONS, AVAILABILITY, BOOKINGS, STUDENT_PACKAGES): luật anh tự thêm bằng tay ở đó mất (hành vi cũ, nay ghi trong tóm tắt; BL85).
+* Nguồn gốc các cặp dòng trùng thật anh thấy (đứng cạnh nhau) mới giải thích được MỘT PHẦN: key có khoảng trắng thừa làm ra bản trùng đã chứng minh, nhưng chưa chắc là nguyên nhân duy nhất trên file của anh.
+* Chữ chuyển khoản còn mâu thuẫn: dòng đậm bảo ghi số điện thoại, nhưng sau khi gửi, web và email còn nói "Mã nội dung chuyển khoản" (BL76, chờ anh).
+* Ghi đè nội dung file ảnh QR cùng link có thể tới 6 giờ mới đổi (BL87).
+* Chưa làm phần còn lại của 5Q (BL69), 5P (hướng dẫn còn lại, chính sách, soát tổng, thử tải lại).
+* BACKLOG còn **50 câu chờ anh** (mục A 47, mục B 3), thêm BL76 đến BL88.
 
 ## Chunk 5N: tô màu Sheets (07/11/2026, bản 8.1.7)
 
