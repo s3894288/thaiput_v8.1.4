@@ -1,5 +1,7 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**14/11/2026: nhánh `claude/hopeful-galileo-xa1dv9` TẠM DỪNG** theo lệnh anh Chris: chờ chạy pilot v8 và sửa dần ở vòng 5S tới khi chốt bản Apps Script chuẩn, rồi mới lên v9. Phần email (SES, Resend) xuất ra `handoff/EMAIL_SES_RESEND/` (README, 3 patch đã thử áp lên `main` sạch và test xanh, hướng dẫn cài SES) để mang sang nhánh khác.
+
 **Trạng thái 10/11/2026: chunk 5R XONG, bản 8.1.5** (P0 của kế hoạch v9 phần code: gửi email qua Amazon SES, `test/unit.js` viết lại, GitHub Actions). Code giao: `dist/Code.gs`, `dist/Index.html` (không đổi so với 8.1.4), `dist/appsscript.json` (**quyền đổi**: thêm `script.external_request`). Việc của admin: `plan/P0_BUOC_TUNG_BUOC.md` mục 1 và 2. BACKLOG còn **48 câu chờ anh** (mục A 44, mục B 4).
 
 **05/11/2026 (chiều, lần 2): kế hoạch v9 bản 2, tối ưu giá và điều phối** (`plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md`): kiểm giá thật 05/11; hosting Cloudflare Workers 5 USD cả tài khoản thay Vercel Pro 20 USD mỗi ghế (web qua vinext hoặc OpenNext, Worker jobs Hono riêng, thử nghiệm S0 quyết định, Vercel là dự phòng); email Amazon SES khoảng 5 USD cho 45.000 thư mỗi tháng thay Resend Pro 20, làm ngay ở 5R; bỏ Google AI Pro dùng Gemini CLI miễn phí; hạ tầng 65 → 35 USD mỗi tháng, công cụ 60 → 40. Kế hoạch tổng P0 đến P5 (cắt chuyển khoảng 05/2027 với Claude Pro), điều phối 3 làn Claude, Codex, Gemini qua GitHub với một `AGENTS.md`, MCP và quyền, nhịp tuần, 4 mẫu file. BACKLOG còn **47 câu chờ anh** (mục A 43, mục B 4): thêm BL79 đến BL84.
