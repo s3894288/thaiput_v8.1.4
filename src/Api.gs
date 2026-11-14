@@ -271,7 +271,7 @@ function bankQrRev_() {
 }
 /** Tăng số phiên bản ảnh QR (bỏ hết bộ nhớ đệm máy chủ và trình duyệt). Trả số mới. Ném lỗi nếu không ghi được Script Property. */
 function bankQrBump_() {
-  var v = String(realNowMs_()) + Math.random().toString(36).slice(2, 6);
+  var v = Utilities.getUuid().replace(/-/g, '').substring(0, 12);   // không dùng đồng hồ (luật 1): chỉ cần giá trị mới, không trùng lần trước
   props_().setProperty('BANK_QR_REV', v);
   BANK_QR_REV_MEMO_ = v;
   return v;

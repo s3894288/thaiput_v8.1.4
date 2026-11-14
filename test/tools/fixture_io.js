@@ -94,15 +94,31 @@ function restore(env, data) {
 }
 
 /**
- * Dời mọi giá trị ĐỒNG HỒ THẬT trong Script Properties về "bây giờ" (giữ nguyên khoảng cách giữa chúng). Fixture lưu các mốc này lúc dựng (nhịp tim job
- * HB_<job>, BACKUP_OK_AT, MET_LAST...), còn mã đọc chúng bằng realNowMs_ (luật 1: ngoại lệ đồng hồ thật), nên để nguyên thì fixture càng cũ càng "STALE"
- * và test đỏ không vì lỗi mã. Nhận dạng theo dạng giá trị, không theo danh sách tên: số nguyên 13 chữ số (mili giây Unix, 2017 đến 2033) hoặc "<mili giây>:<chuỗi>"
- * (dấu chạy MKT_RUN_). Mốc gốc (anchor) là mốc lớn nhất trong nhóm HB_* và BACKUP_OK_AT (lúc dựng fixture), không phải mốc "đến hạn" ở tương lai.
- * MET_LAST (mốc giờ tròn) chỉ dời theo số GIỜ NGUYÊN để vẫn tròn giờ. Giờ mô phỏng (SIM_NOW, ngày trong Sheets) KHÔNG đổi. Trả về { anchor, delta } hoặc null nếu không có gì để dời.
+ * Phân loại TÊN mọi Script Property mà code có thể ghi bằng một mốc thời gian dạng số (mili giây Unix), theo đồng hồ nào code dùng khi ghi (đã đối chiếu từng chỗ ghi trong src/):
+ *   ĐỒNG HỒ THẬT (realNowMs_ hoặc Date.now(), luật 1 ngoại lệ): HB_<job> (Jobs.gs heartbeat_), BACKUP_OK_AT (Backup.gs), MET_LAST (Metrics.gs, mốc giờ tròn),
+ *     CAL_PAUSED_UNTIL (Reset.gs), LOADTEST_UNTIL (LoadTest.gs), MKT_RUN_<mã> (Marketing.gs, dạng "mili giây:chuỗi").
+ *   GIỜ MÔ PHỎNG (getNow_(), đi theo SIM_NOW): TA_CONFIRM_<mã> (Admin.gs), ARCH_CUTOFF_MAIN, ARCH_CUTOFF_MAIL (Archive.gs, ngày dữ liệu), STUCK_<mã> (Jobs.gs),
+ *     PKGMISS_<...> (Compensation.gs), COMPBLK_, PKGOUT_, TRIALOVER_, TRIALLEFT_ (Compensation.gs, dấu "đã báo").
+ * Các Script Property khác không giữ mốc dạng số (JSON, '1', mã file, ISO của SIM_NOW) nên không cần phân loại. Thêm khoá ghi mốc thời gian mới ở src/ thì thêm vào MỘT trong hai danh sách này.
  */
-const RC_MS_ = /^(1[5-9]\d{11})(?::.*)?$/;
+const REAL_CLOCK_PROPS = [/^HB_[A-Za-z0-9_]+$/, /^BACKUP_OK_AT$/, /^MET_LAST$/, /^CAL_PAUSED_UNTIL$/, /^LOADTEST_UNTIL$/, /^MKT_RUN_.+$/];
+const SIM_CLOCK_PROPS = [/^TA_CONFIRM_.+$/, /^ARCH_CUTOFF_MAIN$/, /^ARCH_CUTOFF_MAIL$/, /^STUCK_.+$/, /^PKGMISS_.+$/, /^COMPBLK_.+$/, /^PKGOUT_.+$/, /^TRIALOVER_.+$/, /^TRIALLEFT_.+$/];
+const RC_MS_ = /^(1[5-9]\d{11})(?::.*)?$/;   // giá trị dạng mốc: mili giây Unix 13 chữ số (2017 đến 2033), có thể kèm ":chuỗi"
+const isReal_ = (k) => REAL_CLOCK_PROPS.some(r => r.test(k));
+const isSim_ = (k) => SIM_CLOCK_PROPS.some(r => r.test(k));
+
+/**
+ * Dời mọi Script Property ĐỒNG HỒ THẬT (chọn theo TÊN, REAL_CLOCK_PROPS) về "bây giờ", giữ nguyên khoảng cách giữa chúng. Fixture lưu các mốc này lúc dựng, còn mã đọc chúng
+ * bằng realNowMs_ (luật 1: ngoại lệ đồng hồ thật), nên để nguyên thì fixture càng cũ càng "STALE" và test đỏ không vì lỗi mã. Thuộc tính GIỜ MÔ PHỎNG (SIM_CLOCK_PROPS) không bao giờ bị dời.
+ * Thuộc tính có giá trị dạng mốc mà tên không nằm trong danh sách nào thì NÉM LỖI (fixture sau này không được dời nhầm hay bỏ sót im lặng).
+ * Mốc gốc (anchor) là mốc lớn nhất trong nhóm HB_* và BACKUP_OK_AT (lúc dựng fixture), không phải mốc "đến hạn" ở tương lai.
+ * MET_LAST (mốc giờ tròn) chỉ dời theo số GIỜ NGUYÊN để vẫn tròn giờ. SIM_NOW và ngày trong Sheets KHÔNG đổi. Trả về { anchor, delta } hoặc null nếu không có gì để dời.
+ */
 function rebaseRealClock(data, nowMs) {
-  const props = data.props || {}, keys = Object.keys(props).filter(k => typeof props[k] === 'string' && RC_MS_.test(props[k]));
+  const props = data.props || {}, shaped = Object.keys(props).filter(k => typeof props[k] === 'string' && RC_MS_.test(props[k]));
+  const unknown = shaped.filter(k => !isReal_(k) && !isSim_(k));
+  if (unknown.length) throw new Error('Script Property có giá trị dạng mốc thời gian nhưng chưa phân loại đồng hồ thật hay giờ mô phỏng (test/tools/fixture_io.js REAL_CLOCK_PROPS, SIM_CLOCK_PROPS): ' + unknown.join(', '));
+  const keys = shaped.filter(isReal_);
   if (!keys.length) return null;
   const beat = keys.filter(k => /^HB_/.test(k) || k === 'BACKUP_OK_AT').map(k => Number(props[k].match(RC_MS_)[1]));
   const anchor = beat.length ? Math.max.apply(null, beat) : Math.max.apply(null, keys.map(k => Number(props[k].match(RC_MS_)[1])));
@@ -114,4 +130,4 @@ function rebaseRealClock(data, nowMs) {
   return { anchor, delta };
 }
 
-module.exports = { dump, restore, stringify, parse, rebaseRealClock };
+module.exports = { dump, restore, stringify, parse, rebaseRealClock, REAL_CLOCK_PROPS, SIM_CLOCK_PROPS };

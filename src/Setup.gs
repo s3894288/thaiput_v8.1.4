@@ -563,8 +563,11 @@ function dupKeysOf_(rows) {
   return order.filter(function (k) { return g[k].length > 1; }).map(function (k) { return { key: k, rows: g[k] }; });
 }
 
-/** Cỡ tối đa (ký tự, tính theo dạng JSON đã thoát) của chữ trong MỘT ô nhật ký khi lưu chữ admin bị bỏ. Giới hạn của Sheets là 50.000 ký tự mỗi ô; chừa dư cho phần bọc. */
-var DUP_TEXT_CHUNK_ = 30000;
+/**
+ * Cỡ tối đa (ký tự, tính theo dạng JSON đã thoát) của chữ trong MỘT dòng nhật ký TEMPLATE_DEDUPE_TEXT. Hai giới hạn phải qua: một ô Sheets tối đa 50.000 ký tự, và trang quản trị
+ * (adminLogView_, LOG_DETAIL_FULL_MAX_ = 20.000) chỉ gửi đủ tới chừng đó, quá thì cắt im lặng. 19.000 cộng phần bọc JSON (run, col, row, part...) vẫn dưới 20.000.
+ */
+var DUP_TEXT_CHUNK_ = 19000;
 /** Cỡ tối đa (ký tự) của ô chi tiết dòng tóm tắt TEMPLATE_DEDUPE; danh sách dài hơn thì cắt bớt kèm số còn lại. */
 var DUP_SUMMARY_MAX_ = 30000;
 
@@ -585,15 +588,16 @@ function dupSplitText_(text, maxJson) {
 
 /**
  * Hàm thuần: các dòng nhật ký TEMPLATE_DEDUPE_TEXT cho MỌI bản chữ admin bị bỏ của một kế hoạch gộp (không cắt chữ). Mỗi bản bị bỏ một hoặc nhiều dòng;
- * chữ dài chia nhiều dòng (part 1..parts) để ô không bao giờ vượt giới hạn Sheets. Khôi phục: chọn các dòng cùng entity, entity_id, col, row, nối text theo part.
+ * chữ dài chia nhiều dòng (part 1..parts) để ô không bao giờ vượt giới hạn. `run` là mã của MỘT lượt gộp một tab (cũng ghi ở dòng tóm tắt TEMPLATE_DEDUPE): cùng một key có thể
+ * được gộp ở nhiều lượt (dòng đầu giữ nguyên số hàng), nên số hàng không đủ để phân biệt. Khôi phục: chọn các dòng cùng run, entity, entity_id, col, row rồi nối text theo part.
  */
-function dupTextLogRows_(p) {
+function dupTextLogRows_(p, run) {
   var out = [];
   p.cells.forEach(function (c) {
     c.discarded.forEach(function (d) {
       var parts = dupSplitText_(d.full, DUP_TEXT_CHUNK_);
       parts.forEach(function (txt, i) {
-        out.push({ tab: p.tab, key: p.key, detail: JSON.stringify({ col: c.col, row: d.row, kept_row: c.kept_row, part: i + 1, parts: parts.length, chars: String(d.full).length, text: txt }) });
+        out.push({ tab: p.tab, key: p.key, detail: JSON.stringify({ run: run || '', col: c.col, row: d.row, kept_row: c.kept_row, part: i + 1, parts: parts.length, chars: String(d.full).length, text: txt }) });
       });
     });
   });
@@ -601,19 +605,19 @@ function dupTextLogRows_(p) {
 }
 
 /** Hàm thuần: chi tiết dòng tóm tắt TEMPLATE_DEDUPE: không chứa chữ bị bỏ (đã ở dòng TEMPLATE_DEDUPE_TEXT riêng), và không bao giờ quá DUP_SUMMARY_MAX_ ký tự. */
-function dupSummaryDetail_(plan) {
+function dupSummaryDetail_(plan, run) {
   var items = plan.map(function (p) {
-    return { key: String(p.key).substring(0, 120), rows: p.rows.slice(0, 40), rows_total: p.rows.length, active: p.active || undefined,
+    return { run: run || '', key: String(p.key).substring(0, 120), rows: p.rows.slice(0, 40), rows_total: p.rows.length, active: p.active || undefined,
       cells: p.cells.map(function (c) { return { col: c.col, adopted_from: c.adopted_from, kept_row: c.kept_row, discarded: c.discarded.map(function (d) { return { row: d.row, chars: String(d.full).length }; }) }; }) };
   });
   var out = [], used = 2;
   for (var i = 0; i < items.length; i++) {
     var j = JSON.stringify(items[i]);
-    if (used + j.length + 60 > DUP_SUMMARY_MAX_ && out.length) { out.push({ truncated: items.length - i }); break; }
+    if (used + j.length + 60 > DUP_SUMMARY_MAX_ && out.length) { out.push({ run: run || '', truncated: items.length - i }); break; }
     out.push(items[i]); used += j.length + 1;
   }
   var s = JSON.stringify(out);
-  return s.length > DUP_SUMMARY_MAX_ ? JSON.stringify([{ truncated: items.length }]) : s;
+  return s.length > DUP_SUMMARY_MAX_ ? JSON.stringify([{ run: run || '', truncated: items.length }]) : s;
 }
 
 /** Hàm thuần: kế hoạch này có bỏ chữ admin đã sửa không (bản bị bỏ khác bản giữ). Chỉ ô chữ, không tính ô active (dòng cuối luôn thắng, báo riêng). */
@@ -625,12 +629,12 @@ function dupDiscardsText_(p) { return p.cells.some(function (c) { return c.disca
  * GHI XUỐNG SHEETS NGAY (flushDb_) rồi mới ghi ô vào dòng đầu (DbTable.update), rồi purgeRows_ bỏ dòng sau (quyết định theo nội dung đọc mới, luật 10).
  * Ghi nhật ký lỗi thì ném lỗi, tab đó không bị gộp (e.partial = báo cáo các tab đã gộp xong). opts.protectText (sao lưu trước cập nhật hỏng): key nào gộp
  * sẽ bỏ chữ admin thì để nguyên dòng trùng (entry skipped: true), key chỉ có dòng giống nhau hay chữ admin so với chữ gốc vẫn gộp.
- * Trả [{ tab, key, rows, removed, cells, active, skipped }].
+ * Trả [{ tab, key, rows, removed, cells, active, run, skipped, aborted }] (aborted chỉ có trong e.partial: lượt gộp tab này bị ngắt sau khi đã ghi nhật ký).
  */
 function dedupeDuplicateKeys_(opts) {
   opts = opts || {};
   return withLock_(function () {
-    var all = [];
+    var all = [], logged = null;   // logged: kế hoạch đã ghi nhật ký xuống Sheets nhưng tab chưa gộp xong (bị ngắt thì báo ở e.partial, soát D2)
     try {
       ['EMAIL_TEMPLATES', 'CONTENT'].forEach(function (tab) {
         var t = table_(tab), full = dupPlanTab_(tab, t.all());
@@ -641,10 +645,12 @@ function dedupeDuplicateKeys_(opts) {
           else plan.push(p);
         });
         if (!plan.length) return;
-        logActivity_(adminActor_(), 'TEMPLATE_DEDUPE', tab, String(plan.length), dupSummaryDetail_(plan));
-        plan.forEach(function (p) { dupTextLogRows_(p).forEach(function (r) { logActivity_(adminActor_(), 'TEMPLATE_DEDUPE_TEXT', r.tab, r.key, r.detail); }); });
+        var run = Utilities.getUuid().substring(0, 8);   // một mã cho mỗi lượt gộp một tab: ghi ở dòng tóm tắt và mọi dòng TEMPLATE_DEDUPE_TEXT (soát D1)
+        logActivity_(adminActor_(), 'TEMPLATE_DEDUPE', tab, String(plan.length), dupSummaryDetail_(plan, run));
+        plan.forEach(function (p) { dupTextLogRows_(p, run).forEach(function (r) { logActivity_(adminActor_(), 'TEMPLATE_DEDUPE_TEXT', r.tab, r.key, r.detail); }); });
         // Nhật ký (kể cả chữ admin sắp bị bỏ) phải nằm trong Sheets TRƯỚC khi ghi đè dòng đầu: ghi ngay, không chờ purgeRows_. Ghi lỗi thì dừng, chưa đụng tab.
         flushDb_(); SpreadsheetApp.flush();
+        logged = { run: run, plan: plan };
         if (opts.onPlan) { try { opts.onPlan(plan); } catch (pe) { } }   // soát X2: báo kế hoạch (cho số đo cập nhật) TRƯỚC khi sửa tab
         plan.forEach(function (p) {
           if (!Object.keys(p.patch).length) return;
@@ -662,9 +668,15 @@ function dedupeDuplicateKeys_(opts) {
           seen[k] = true; return true;
         });
         if (got !== want) throw new Error('Gộp dòng trùng ' + tab + ': dự định bỏ ' + want + ' dòng, thực tế bỏ ' + got + ' (kiểm tab rồi chạy lại menu 1)');
-        plan.forEach(function (p) { all.push({ tab: p.tab, key: p.key, rows: p.rows, removed: p.removed, cells: p.cells, active: p.active }); });
+        plan.forEach(function (p) { all.push({ tab: p.tab, key: p.key, rows: p.rows, removed: p.removed, cells: p.cells, active: p.active, run: run }); });
+        logged = null;
       });
-    } catch (e) { e.partial = all; throw e; }
+    } catch (e) {
+      // Bị ngắt SAU khi nhật ký đã ghi (ví dụ lần ghi ô thứ hai lỗi): dòng đầu của key trước có thể đã bị ghi đè, lượt sau thấy các dòng giống nhau và không còn gì để báo.
+      // Báo ngay ở đây, trỏ tới chữ đã lưu.
+      if (logged) logged.plan.forEach(function (p) { all.push({ tab: p.tab, key: p.key, rows: p.rows, removed: 0, cells: p.cells, active: p.active, run: logged.run, aborted: true }); });
+      e.partial = all; throw e;
+    }
     return all;
   });
 }
@@ -683,12 +695,19 @@ function dupKeyWarnings_() {
 /** Hàm thuần: báo cáo gộp → các dòng chữ tiếng Việt cho kết quả menu 1 (mỗi phần tử báo cáo đúng một dòng). Dòng chỉ cắt gọn chữ bị bỏ; chữ đầy đủ nằm ở ACTIVITY_LOG. */
 function dupReportLines_(report) {
   return (report || []).map(function (p) {
+    var ptr = ' [chữ đầy đủ đã lưu ở tab ACTIVITY_LOG: hành động TEMPLATE_DEDUPE_TEXT, run ' + (p.run || '') + ', entity ' + p.tab + ', entity_id ' + p.key + ']';
+    if (p.aborted) {
+      var lost = p.cells.some(function (c) { return c.discarded.length > 0; });
+      return 'CẢNH BÁO: gộp dở' + (lost ? ', chữ bị bỏ đã lưu ở ACTIVITY_LOG' : '') + ' ở ' + p.tab + ' key ' + p.key + ' (hàng ' + p.rows.join(', ') + '): lượt gộp bị ngắt giữa chừng nên dòng đầu có thể đã được ghi đè' +
+        (lost ? '; ' + p.cells.filter(function (c) { return c.discarded.length; }).map(function (c) { return 'ô ' + c.col + ' bỏ ' + c.discarded.map(function (d) { return 'bản ở hàng ' + d.row + ' (' + String(d.full).length + ' ký tự)'; }).join(', '); }).join('; ') + ptr : '') +
+        '. Chạy lại menu 1 để gộp nốt.';
+    }
     if (p.skipped) return 'CẢNH BÁO: KHÔNG gộp key trùng ' + p.tab + ': ' + p.key + ' (hàng ' + p.rows.join(', ') + ') vì chưa sao lưu được trước cập nhật mà việc gộp sẽ bỏ chữ admin đã sửa. Để nguyên các dòng; chạy menu "Phát hành: sao lưu ngay" rồi chạy lại menu 1 (menu 2 vẫn báo key trùng).';
     var s = 'Gộp dòng trùng ' + p.tab + ': key ' + p.key + ' có ' + p.rows.length + ' dòng (hàng ' + p.rows.join(', ') + '), giữ 1 dòng ở hàng ' + p.rows[0] + ', bỏ ' + p.removed + ' dòng';
     p.cells.forEach(function (c) {
       if (c.adopted_from) s += '; ô ' + c.col + ' lấy chữ admin đã sửa ở hàng ' + c.adopted_from;
       c.discarded.forEach(function (d) { s += '; ô ' + c.col + ' có 2 bản admin sửa khác nhau, giữ bản ở hàng ' + c.kept_row + ' (dòng đang dùng), BỎ bản ở hàng ' + d.row + ': "' + d.text + '"' + (String(d.full).length > 300 ? ' (' + String(d.full).length + ' ký tự, dòng này chỉ hiện 300 ký tự đầu)' : ''); });
-      if (c.discarded.length) s += ' [chữ đầy đủ đã lưu ở tab ACTIVITY_LOG: hành động TEMPLATE_DEDUPE_TEXT, entity ' + p.tab + ', entity_id ' + p.key + ']';
+      if (c.discarded.length) s += ptr;
     });
     return s;
   });

@@ -12,8 +12,9 @@
  *   3. node test/tools/release_baseline.js --write      (từ chối nếu ghi chú chưa phủ hết thay đổi, hoặc nếu chưa tăng phiên bản)
  *   4. node test/tools/release_baseline.js              (in ra thay đổi so với baseline và phần ghi chú còn thiếu, không ghi gì)
  * Bản CHƯA phát hành (chưa dán lên hệ thống nào) mà soát thêm mặc định mới: thêm mục vào phần tử RELEASE_NOTES_ của chính bản đó rồi
- *   node test/tools/release_baseline.js --write --same-version     (cho phép ghi khi APP.VERSION không đổi; vẫn từ chối nếu ghi chú chưa phủ hết)
- * Không dùng --same-version cho bản đã phát hành: admin đã nâng cấp bằng bản đó sẽ không được báo thay đổi mới (phải tăng phiên bản).
+ *   node test/tools/release_baseline.js --write --same-version=<APP.VERSION hiện tại>     (ví dụ --same-version=8.1.9)
+ * Phải gõ ĐÚNG số phiên bản đang ở APP.VERSION (khác thì từ chối) và vẫn từ chối nếu ghi chú chưa phủ hết. Không dùng cho bản đã phát hành: admin đã nâng cấp bằng bản đó
+ * sẽ không được báo thay đổi mới (phải tăng phiên bản).
  * fingerprint(api, version) dùng cả cho fixture 8.1.4 (test/fixtures/release_baseline_8_1_4.json) để test I149 đối chiếu ghi chú 8.1.5 đến 8.1.9.
  */
 'use strict';
@@ -82,6 +83,19 @@ function invented(d, notes) {
   return out;
 }
 
+/**
+ * Hàm thuần: có được ghi baseline không (chỉ xét phiên bản). Trả chuỗi lý do từ chối, hoặc null nếu được.
+ * Mặc định đổi mà APP.VERSION không đổi so với baseline: chỉ được khi gõ đúng --same-version=<APP.VERSION hiện tại>.
+ */
+function writeGuard(argv, baseVersion, curVersion, nItems) {
+  if (!nItems || baseVersion !== curVersion) return null;
+  const flag = (argv || []).filter(a => /^--same-version(=|$)/.test(a))[0];
+  if (!flag) return 'Không ghi baseline: mặc định đổi nhưng APP.VERSION vẫn là ' + curVersion + '. Tăng phiên bản trước (hoặc --same-version=' + curVersion + ' nếu bản này CHƯA phát hành).';
+  const given = flag.indexOf('=') === -1 ? '' : flag.substring(flag.indexOf('=') + 1);
+  if (given !== curVersion) return 'Không ghi baseline: --same-version phải kèm đúng số phiên bản hiện tại, dạng --same-version=' + curVersion + ' (đã gõ "' + flag + '"). Chỉ dùng cho bản chưa phát hành.';
+  return null;
+}
+
 function main() {
   process.env.TZ = process.env.TZ || 'Asia/Ho_Chi_Minh';
   const { load } = require('../load');
@@ -97,10 +111,11 @@ function main() {
   miss.forEach(i => console.log('  THIẾU ghi chú: ' + i.group + ' ' + i.key + ' ' + i.kind));
   if (!write) return;
   if (!noteOfCur.length || miss.length) { console.error('Không ghi baseline: ghi chú phát hành chưa phủ hết.'); process.exit(1); }
-  if (items.length && base.version === cur.version && process.argv.indexOf('--same-version') === -1) { console.error('Không ghi baseline: mặc định đổi nhưng APP.VERSION vẫn là ' + cur.version + '. Tăng phiên bản trước (hoặc --same-version nếu bản này chưa phát hành).'); process.exit(1); }
+  const refuse = writeGuard(process.argv, base.version, cur.version, items.length);
+  if (refuse) { console.error(refuse); process.exit(1); }
   fs.writeFileSync(BASELINE, JSON.stringify(cur, null, 1) + '\n');
   console.log('Đã ghi baseline cho bản ' + cur.version);
 }
 
 if (require.main === module) main();
-module.exports = { fingerprint, diff, diffItems, isEmpty, uncovered, invented, BASELINE };
+module.exports = { writeGuard, fingerprint, diff, diffItems, isEmpty, uncovered, invented, BASELINE };
