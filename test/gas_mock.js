@@ -201,6 +201,7 @@ function createGasEnv(opts) {
     // Google trả mảng byte có dấu (Java), như computeDigest.
     computeHmacSha256Signature: (value, key) => Array.from(crypto.createHmac('sha256', String(key)).update(String(value), 'utf8').digest()).map(b => (b > 127 ? b - 256 : b)),
     base64EncodeWebSafe: (x) => Buffer.from(Array.isArray(x) ? x.map(b => (b + 256) % 256) : String(x)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
+    base64Encode: (x) => Buffer.from(Array.isArray(x) ? x.map(b => (b + 256) % 256) : String(x)).toString('base64'),
     base64Decode: (s) => Array.from(Buffer.from(String(s), 'base64')),
     newBlob: (bytes, type, name) => ({ bytes, type, name, getName: () => name, getContentType: () => type, setName(n) { this.name = n; return this; } }),
     sleep: () => {}
@@ -274,6 +275,9 @@ function createGasEnv(opts) {
     return {
       getId: () => f.id, getName: () => f.name, getUrl: () => 'https://drive.google.com/file/d/' + f.id + '/view',
       getOwner: () => ({ getEmail: () => f.owner || state.effectiveUserEmail }),
+      // Google thật: getBlob().getBytes() trả mảng byte có dấu; getSize theo byte; getMimeType là kiểu lưu trên Drive.
+      getMimeType: () => f.mime || '', getSize: () => (f.bytes ? f.bytes.length : 0),
+      getBlob: () => ({ getContentType: () => f.mime || '', getName: () => f.name, getBytes: () => Array.from(f.bytes || []).map(b => (b > 127 ? b - 256 : b)) }),
       getDateCreated: () => f.created, setTrashed: (t) => { f.trashed = t; }, isTrashed: () => !!f.trashed,
       makeCopy: (name, folder) => { const c = { id: nextId('FILE_'), name, parent: folder ? folder.getId() : null, created: new Date(state.counter * 1000), trashed: false }; state.drive.files[c.id] = c; return fileApi(c); },
       setDescription: (d) => { f.description = d; },

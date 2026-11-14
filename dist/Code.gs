@@ -176,6 +176,9 @@ var DEFAULTS_ = {
   BANK_NAME: '',
   BANK_ACCOUNT: '',
   BANK_HOLDER: '',
+  // Ảnh mã QR chuyển khoản (T2): link chia sẻ Google Drive hoặc mã file Drive của ảnh VUÔNG (PNG, JPG, WEBP, GIF, dưới 300 KB).
+  // Để trống = trang không hiện ô QR. Kiểm bằng menu 2; bộ nhớ đệm giữ ảnh tối đa 6 giờ.
+  BANK_QR_IMAGE: '',
 
   // Hạ tầng (Setup ghi)
   LESSON_CALENDAR_ID: '',
@@ -2101,12 +2104,88 @@ function apiPublicInfo() {
         school: cfg_('SCHOOL_NAME'),
         packages: (function () { var bad = brokenPackageCodes_(); return Object.keys(defs).map(function (k) { return defs[k]; }).filter(function (p) { return p.active && !bad[p.code]; }); })()   // 5L: gói trùng mã, sai dòng: ẩn
           .map(function (p) { return { code: p.code, name: p.name, nameEn: p.name_en || p.name, type: p.type, days: p.days, sessions: p.sessions, price: p.price_vnd }; }),
-        bank: { name: cfg_('BANK_NAME'), account: cfg_('BANK_ACCOUNT'), holder: cfg_('BANK_HOLDER') },
+        bank: { name: cfg_('BANK_NAME'), account: cfg_('BANK_ACCOUNT'), holder: cfg_('BANK_HOLDER'), qr: bankQrMarker_() },
         contact: contactInfo_(),
         policyUrl: cfg_('POLICY_URL'),
         cutoffHour: cfg_('BOOKING_CUTOFF_HOUR'), bookingLeadHours: bookingLeadHours_()
       }
     };
+  });
+}
+
+// ── Ảnh mã QR chuyển khoản (T2) ──
+// CONFIG BANK_QR_IMAGE: link chia sẻ Drive hoặc mã file. Ảnh KHÔNG nằm trong apiPublicInfo (giữ trang nhanh): trình duyệt
+// lấy riêng bằng apiBankQr sau khi vẽ khung. Bộ nhớ đệm chia mảnh dưới 100 KB (giới hạn mỗi khoá của Google), hạn 6 giờ.
+var BANK_QR_MAX_BYTES_ = 300 * 1024;
+var BANK_QR_TYPES_ = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+var BANK_QR_CHUNK_ = 90000;
+var BANK_QR_TTL_ = 21600;
+var BANK_QR_BAD_TTL_ = 300;   // lỗi nhớ ngắn để khách đông không dồn vào Drive
+
+/** Lấy mã file Drive từ link /file/d/ID/, ?id=ID, hoặc mã trần. Trả '' nếu không đúng dạng. */
+function bankQrId_(value) {
+  var v = String(value == null ? '' : value).trim(), m;
+  if (!v) return '';
+  if ((m = v.match(/^https:\/\/(?:drive|docs)\.google\.com\/(?:[^?#\s]*\/)?file\/d\/([A-Za-z0-9_-]{10,})(?:[\/?#].*)?$/))) return m[1];
+  if ((m = v.match(/^https:\/\/(?:drive|docs)\.google\.com\/[^?#\s]*\?(?:[^#\s]*&)?id=([A-Za-z0-9_-]{10,})(?:[&#].*)?$/))) return m[1];
+  if (/^[A-Za-z0-9_-]{10,}$/.test(v)) return v;
+  return '';
+}
+/** Dấu ngắn của cấu hình (rỗng khi chưa điền hoặc sai dạng): đổi giá trị CONFIG thì dấu đổi, khoá bộ nhớ đệm đổi theo. */
+function bankQrMarker_() {
+  var id = bankQrId_(cfg_('BANK_QR_IMAGE'));
+  return id ? sha256Hex_('bankqr|' + id).substring(0, 10) : '';
+}
+/** Đọc file Drive, kiểm loại và cỡ. Trả { ok, src, type, kb } hoặc { ok:false, code, fix } (fix: câu hướng dẫn tiếng Việt cho admin). */
+function bankQrRead_(raw) {
+  var id = bankQrId_(raw);
+  if (!id) return { ok: false, code: 'BAD_LINK', fix: 'Giá trị không phải link Drive hoặc mã file. Dùng link dạng https://drive.google.com/file/d/…/view hoặc chỉ mã file.' };
+  var f;
+  try { f = DriveApp.getFileById(id); } catch (e) { return { ok: false, code: 'NO_ACCESS', fix: 'Không mở được file: sai link hoặc file không thuộc tài khoản chủ hệ thống. Tải ảnh lên Drive của tài khoản chủ hệ thống hoặc chia sẻ cho tài khoản đó quyền xem, rồi dán lại link.' }; }
+  try {
+    if (f.isTrashed()) return { ok: false, code: 'TRASHED', fix: 'File đang ở thùng rác: khôi phục hoặc tải ảnh mới.' };
+    var type = String(f.getMimeType() || '').toLowerCase(), size = Number(f.getSize()) || 0;
+    if (BANK_QR_TYPES_.indexOf(type) === -1) return { ok: false, code: 'BAD_TYPE', fix: 'File không phải ảnh PNG, JPG, WEBP hoặc GIF (đang là ' + (type || 'không rõ') + ').' };
+    if (size > BANK_QR_MAX_BYTES_) return { ok: false, code: 'TOO_LARGE', fix: 'Ảnh nặng ' + Math.ceil(size / 1024) + ' KB, quá 300 KB: xuất lại ảnh 600 x 600 px dạng PNG nén.' };
+    var blob = f.getBlob(), bytes = blob.getBytes();
+    if (!bytes || !bytes.length) return { ok: false, code: 'EMPTY', fix: 'File rỗng: tải ảnh lên lại.' };
+    if (bytes.length > BANK_QR_MAX_BYTES_) return { ok: false, code: 'TOO_LARGE', fix: 'Ảnh nặng ' + Math.ceil(bytes.length / 1024) + ' KB, quá 300 KB: xuất lại ảnh 600 x 600 px dạng PNG nén.' };
+    return { ok: true, src: 'data:' + type + ';base64,' + Utilities.base64Encode(bytes), type: type, kb: Math.ceil(bytes.length / 1024) };
+  } catch (e2) { return { ok: false, code: 'READ_FAIL', fix: 'Đọc file lỗi: ' + e2.message }; }
+}
+/** Ảnh QR cho trang: lấy từ bộ nhớ đệm (nhiều mảnh) hoặc Drive. Trả data URI, '' khi chưa cấu hình hoặc hỏng. Không bao giờ ném lỗi, không ghi Sheets, không lấy khoá. */
+function bankQrSrc_() {
+  var mk = bankQrMarker_();
+  if (!mk) return '';
+  var cache = CacheService.getScriptCache(), mkey = 'bq_' + mk;
+  try {
+    var head = cache.get(mkey);
+    if (head) {
+      var h = JSON.parse(head);
+      if (h.bad) return '';
+      var keys = []; for (var i = 0; i < h.n; i++) keys.push(mkey + '_' + i);
+      var got = cache.getAll(keys), parts = [];
+      for (var j = 0; j < keys.length && got[keys[j]] != null; j++) parts.push(got[keys[j]]);
+      if (parts.length === h.n) return parts.join('');
+    }
+  } catch (e) { }
+  var r;
+  try { r = bankQrRead_(cfg_('BANK_QR_IMAGE')); } catch (e2) { r = { ok: false, code: 'READ_FAIL' }; }
+  try {
+    if (!r.ok) cache.put(mkey, JSON.stringify({ bad: r.code }), BANK_QR_BAD_TTL_);
+    else {
+      var chunks = {}, n = Math.ceil(r.src.length / BANK_QR_CHUNK_);
+      for (var k = 0; k < n; k++) chunks[mkey + '_' + k] = r.src.substring(k * BANK_QR_CHUNK_, (k + 1) * BANK_QR_CHUNK_);
+      cache.putAll(chunks, BANK_QR_TTL_);
+      cache.put(mkey, JSON.stringify({ n: n }), BANK_QR_TTL_);
+    }
+  } catch (e3) { }
+  return r.ok ? r.src : '';
+}
+/** Công khai (trang đăng ký, không đăng nhập): chỉ đọc. Chưa cấu hình hoặc file hỏng thì trả src rỗng, trang tự bỏ ô QR; admin thấy lỗi ở menu 2. */
+function apiBankQr() {
+  return apiWrap_('apiBankQr', function () {
+    return { ok: true, data: { qr: bankQrMarker_(), src: bankQrSrc_() } };
   });
 }
 
@@ -5001,7 +5080,8 @@ var DEFAULT_CONTENT_ = {
   'h.pkg_days': ['Không giới hạn số buổi trong {d} ngày, tối đa 1 buổi/ngày', 'Unlimited lessons for {d} days, up to 1 per day', 'Dòng mô tả dưới tên gói theo ngày. {d}: số ngày', 'Danh sách gói ở form đăng ký'],
   'h.pkg_sessions': ['{n} buổi', '{n} lessons', 'Dòng mô tả dưới tên gói theo buổi', 'Danh sách gói ở form đăng ký'],
   'h.bank_title': ['Chuyển khoản', 'Bank transfer', 'Tiêu đề khung thông tin chuyển khoản', 'CONFIG có thông tin ngân hàng'],
-  'h.bank_note': ['Nội dung chuyển khoản: email đăng ký và tên gói. Sau khi gửi form, bạn nhận mã nội dung riêng qua email để đối chiếu.', 'Transfer note: your email and the package name. After sending the form, you get your own reference code by email.', 'Dòng dưới thông tin ngân hàng', 'Cùng khung chuyển khoản'],
+  'h.bank_note': ['Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn.', 'Transfer reference: Please enter only your phone number.', 'Dòng nhấn mạnh dưới thông tin ngân hàng', 'Cùng khung chuyển khoản'],
+  'h.bank_qr_alt': ['Mã QR chuyển khoản ngân hàng', 'Bank transfer QR code', 'Chữ thay thế (alt) của ảnh mã QR trong khung chuyển khoản', 'CONFIG có BANK_QR_IMAGE và ảnh đọc được'],
   'h.hero_th': ['ฝึกพูดภาษาไทย', 'ฝึกพูดภาษาไทย', 'Chữ Thái nhỏ phía trên tiêu đề lớn', 'Luôn hiện'],
   'h.hero_title': ['Luyện nói tiếng Thái 1:1 với người bản xứ', '1:1 Thai speaking practice with native tutors', 'Tiêu đề lớn đầu trang chủ', 'Luôn hiện'],
   'h.hero_sub': ['Chọn giờ rảnh, hệ thống tự xếp tutor và gửi link Google Meet vào email của bạn.', 'Pick a time, the system assigns a tutor and sends the Google Meet link to your email.', 'Dòng giới thiệu dưới tiêu đề lớn', 'Luôn hiện'],
@@ -9961,6 +10041,12 @@ function testSystem(e) { requireOperator_(e);
   // Link hiện trên trang web: chỉ https mới hiện (trang tự ẩn link khác để chống chèn mã), nên báo trước cho admin.
   ['ADMIN_ZALO_URL', 'SCHOOL_SITE_URL', 'POLICY_URL', 'GOOGLE_LOGIN_URL'].forEach(function (k) { var v = String(cfg_(k) || ''); if (v && !/^https:\/\/[^\s"'<>]+$/i.test(v)) warn(k + ' không bắt đầu bằng https:// nên trang web sẽ ẩn link này: ' + v); });
   if (!cfg_('BANK_ACCOUNT')) warn('Chưa điền thông tin ngân hàng (BANK_NAME, BANK_ACCOUNT, BANK_HOLDER)');
+  // T2: ảnh QR chuyển khoản (trống chỉ là thông tin; hỏng thì lỗi, vì trang đang âm thầm bỏ ô QR).
+  try {
+    var qrv = String(cfg_('BANK_QR_IMAGE') || '').trim();
+    if (!qrv) ok('BANK_QR_IMAGE để trống: trang đăng ký không hiện mã QR (không bắt buộc)');
+    else { var qr = bankQrRead_(qrv); if (qr.ok) ok('BANK_QR_IMAGE hợp lệ: ' + qr.type + ', ' + qr.kb + ' KB'); else err('BANK_QR_IMAGE hỏng (' + qr.code + '): ' + qr.fix + ' Trang đăng ký đang ẩn ô QR.'); }
+  } catch (qe) { err('Kiểm BANK_QR_IMAGE lỗi: ' + qe.message); }
   // 5L: kiểm mọi dòng PACKAGES (mã trùng, kiểu, số ngày, số buổi, giá).
   try { var pi = packageIssues_(table_('PACKAGES').all()); pi.errors.forEach(err); pi.warnings.forEach(warn); if (!pi.errors.length) ok('PACKAGES: ' + table_('PACKAGES').all().length + ' dòng hợp lệ'); } catch (pe2) { err('Kiểm PACKAGES lỗi: ' + pe2.message); }
   // Soát T1: key trùng ở EMAIL_TEMPLATES, CONTENT (admin không biết dòng nào đang dùng).

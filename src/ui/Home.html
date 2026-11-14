@@ -65,10 +65,7 @@
         '<span><b>' + T.esc(T.pkgName(p)) + '</b><br><span class="meta">' + T.esc(pkgMeta(p)) + '</span></span></span>' +
         '<span class="price">' + T.money(p.price) + '</span></label>';
     }).join('') + contact.map(T.pkgContact).join('') + (paid.length ? '' : '<div class="alert warn">' + T.t('a.pkg_none') + '</div>');
-    var bank = info.bank && info.bank.account
-      ? '<div class="panel stack"><span class="eyebrow">' + T.t('h.bank_title') + '</span><div class="mono">' + T.esc(info.bank.name) + ' · ' + T.esc(info.bank.account) + '<br>' + T.esc(info.bank.holder) + '</div>' +
-        '<small>' + T.t('h.bank_note') + '</small></div>'
-      : '';
+    var bank = T.bankPanel(info);
     root.innerHTML = T.topbar(topBtn(s)) +
       '<main class="stack-lg">' +
       '<section class="hero"><img class="hero-img" alt="" src="' + HERO_IMG + '"><span class="th-word" lang="th">' + T.t('h.hero_th') + '</span><h1>' + T.t('h.hero_title') + '</h1>' +
@@ -92,6 +89,7 @@
       '<section class="stack"><h3>' + T.t('h.help') + '</h3>' + T.contact(info.contact) + '</section>' +
       '</main>';
     bind(root);
+    T.bankQrFill(root);
     // Chunk 5G (soát R2 T13): đang bảo trì thì báo ngay trên form và khoá nút Gửi, không để khách điền rồi mới biết.
     var mm = T.boot.maint || {};
     if (mm.mode && mm.mode !== 'OFF') {

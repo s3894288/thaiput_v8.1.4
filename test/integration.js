@@ -4631,6 +4631,89 @@ t('I145', 'T1 (f) hồi quy nguyên nhân: ô key có dấu cách thừa ("LOGIN
   assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE').length, 0);
 });
 
+t('I146', 'T2: ảnh QR chuyển khoản. Tách mã từ các dạng link; từ chối sai loại, quá 300 KB; bộ nhớ đệm chia mảnh dưới 100 KB, khoá đổi theo CONFIG; apiBankQr không ghi Sheets, không lấy khoá; menu 2 báo trống, hợp lệ, hỏng', () => {
+  const c = mk(), { api, env } = c;
+  const ID = 'AbC_dEf-1234567890xyz';
+  // 1. Tách mã
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/file/d/' + ID + '/view?usp=sharing'), ID);
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/file/d/' + ID + '/view'), ID);
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/open?id=' + ID), ID);
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/uc?export=view&id=' + ID), ID);
+  assert.strictEqual(api.bankQrId_('  ' + ID + ' '), ID);
+  ['', 'abc', 'https://example.com/file/d/' + ID + '/view', 'https://drive.google.com/drive/folders/' + ID, 'có dấu cách ' + ID, null].forEach(v => assert.strictEqual(api.bankQrId_(v), '', 'không hợp lệ: ' + v));
+  // 2. Trống: không gọi Drive, dấu rỗng
+  assert.strictEqual(api.bankQrMarker_(), '');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(api.apiBankQr())).data, { qr: '', src: '' });
+  assert.strictEqual(api.apiPublicInfo().data.bank.qr, '');
+  // 3. Đọc file: loại, cỡ
+  const put = (id, mime, n) => { env.state.drive.files[id] = { id, name: 'qr', parent: null, created: new Date(2026, 0, 1), trashed: false, mime, bytes: Buffer.alloc(n, 5) }; return id; };
+  put(ID, 'image/png', 3000);
+  const rd = (v) => api.bankQrRead_(v);
+  const good = rd(ID);
+  assert.ok(good.ok && good.type === 'image/png' && good.kb === 3 && good.src === 'data:image/png;base64,' + Buffer.alloc(3000, 5).toString('base64'));
+  ['image/jpeg', 'image/webp', 'image/gif'].forEach(m => { put(ID, m, 100); assert.ok(rd(ID).ok, m); });
+  ['image/svg+xml', 'application/pdf', 'image/bmp', 'text/html', ''].forEach(m => { put(ID, m, 100); assert.strictEqual(rd(ID).code, 'BAD_TYPE', m); });
+  put(ID, 'image/png', 300 * 1024); assert.ok(rd(ID).ok, '300 KB đúng vẫn được');
+  put(ID, 'image/png', 300 * 1024 + 1); assert.strictEqual(rd(ID).code, 'TOO_LARGE');
+  put(ID, 'image/png', 0); assert.strictEqual(rd(ID).code, 'EMPTY');
+  put(ID, 'image/png', 100); env.state.drive.files[ID].trashed = true; assert.strictEqual(rd(ID).code, 'TRASHED');
+  assert.strictEqual(rd('KhongTonTai1234567').code, 'NO_ACCESS');
+  assert.strictEqual(rd('x').code, 'BAD_LINK');
+  // 4. Bộ nhớ đệm chia mảnh, mock giữ giới hạn 100 KB mỗi khoá
+  put(ID, 'image/png', 250 * 1024);
+  cfgSet(c, 'BANK_QR_IMAGE', 'https://drive.google.com/file/d/' + ID + '/view');
+  const m1 = api.bankQrMarker_();
+  assert.ok(/^[a-f0-9]{10}$/.test(m1));
+  const l0 = env.state.lockCalls, sheetsBefore = JSON.stringify(Object.keys(env.state.spreadsheets).map(k => env.state.spreadsheets[k].sheets));
+  const r1 = api.apiBankQr();
+  assert.ok(r1.ok && r1.data.qr === m1 && r1.data.src === 'data:image/png;base64,' + Buffer.alloc(250 * 1024, 5).toString('base64'));
+  const keys = Object.keys(env.state.cache).filter(k => k.indexOf('bq_' + m1) === 0);
+  assert.ok(keys.length >= 5, 'nhiều mảnh: ' + keys.length);
+  keys.forEach(k => assert.ok(Buffer.byteLength(env.state.cache[k]) <= 100 * 1024, k));
+  // Lần hai: đọc từ bộ nhớ đệm, không đụng Drive
+  env.state.drive.files[ID].trashed = true;
+  assert.strictEqual(api.apiBankQr().data.src, r1.data.src, 'lấy từ bộ nhớ đệm');
+  // Mất một mảnh: đọc lại từ Drive (file đang ở thùng rác thì rỗng), không ném lỗi
+  delete env.state.cache['bq_' + m1 + '_1'];
+  assert.strictEqual(api.apiBankQr().data.src, '', 'thiếu mảnh thì không ghép sai');
+  assert.strictEqual(env.state.lockCalls, l0, 'không lấy khoá');
+  assert.strictEqual(JSON.stringify(Object.keys(env.state.spreadsheets).map(k => env.state.spreadsheets[k].sheets)), sheetsBefore, 'không ghi Sheets');
+  assert.strictEqual(c.mailsTo(EMAIL.ADMIN).filter(m => /apiBankQr/.test(m.subject)).length, 0, 'không email admin');
+  // Lỗi nhớ ngắn (không dồn Drive): lần sau vẫn rỗng dù file đã khôi phục, tới khi hết hạn nhớ lỗi
+  env.state.drive.files[ID].trashed = false;
+  assert.strictEqual(api.apiBankQr().data.src, '', 'lỗi nhớ ngắn');
+  // Khoá đổi theo CONFIG
+  const ID2 = 'ZzZ_second-file-0987654';
+  put(ID2, 'image/jpeg', 2000);
+  cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  const m2 = api.bankQrMarker_();
+  assert.notStrictEqual(m2, m1);
+  assert.ok(api.apiBankQr().data.src.indexOf('data:image/jpeg;base64,') === 0, 'đổi CONFIG: ảnh mới, không dính bộ nhớ cũ');
+  assert.strictEqual(api.apiPublicInfo().data.bank.qr, m2);
+  // CONFIG sai dạng: dấu rỗng
+  cfgSet(c, 'BANK_QR_IMAGE', 'không phải link'); assert.strictEqual(api.bankQrMarker_(), ''); assert.strictEqual(api.apiBankQr().data.src, '');
+  // 5. Menu 2
+  const text = () => api.testSystem().lines.join('\n');
+  cfgSet(c, 'BANK_QR_IMAGE', '');
+  assert.ok(/ĐẠT\s+BANK_QR_IMAGE để trống/.test(text()), 'trống: chỉ thông tin');
+  assert.ok(!/BANK_QR_IMAGE hỏng/.test(text()));
+  cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  assert.ok(/ĐẠT\s+BANK_QR_IMAGE hợp lệ: image\/jpeg, 2 KB/.test(text()), text().split('\n').filter(x => /QR/.test(x)).join('|'));
+  put(ID2, 'application/pdf', 100); cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  assert.ok(/BANK_QR_IMAGE hỏng \(BAD_TYPE\).*không phải ảnh PNG/.test(text()));
+  put(ID2, 'image/png', 400 * 1024); cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  assert.ok(/BANK_QR_IMAGE hỏng \(TOO_LARGE\).*quá 300 KB/.test(text()));
+  cfgSet(c, 'BANK_QR_IMAGE', 'KhongCoFileNay12345');
+  assert.ok(/BANK_QR_IMAGE hỏng \(NO_ACCESS\).*chia sẻ/.test(text()));
+  cfgSet(c, 'BANK_QR_IMAGE', 'abc');
+  assert.ok(/BANK_QR_IMAGE hỏng \(BAD_LINK\).*link Drive/.test(text()));
+  // 6. Mặc định và ghi chú đã đủ: CONFIG có khoá, mặc định rỗng; chữ web đủ 4 phần
+  assert.strictEqual(api.DEFAULTS_.BANK_QR_IMAGE, '');
+  assert.ok(api.DEFAULT_CONTENT_['h.bank_qr_alt'].length >= 4 && api.DEFAULT_CONTENT_['h.bank_qr_alt'][1]);
+  assert.deepStrictEqual(api.DEFAULT_CONTENT_['h.bank_note'].slice(0, 2), ['Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn.', 'Transfer reference: Please enter only your phone number.']);
+  assert.ok(/apiBankQr: 1/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'ui', 'App.html'), 'utf8').match(/var READ_APIS = (\{[\s\S]*?\});/)[1]), 'trình duyệt tự thử lại theo READ_APIS');
+});
+
 module.exports = { results };
 if (require.main === module) {
   results.forEach(r => console.log((r.ok ? '  ĐẠT       ' : '  KHÔNG ĐẠT ') + r.id + '  ' + r.title + (r.ok ? '' : '\n              ' + r.err)));

@@ -111,6 +111,18 @@ body:has(.actionbar:not([hidden])) #app { padding-bottom: 228px; }
 .card.flush { padding: 0; overflow: hidden; }
 .panel { background: var(--surface-2); border-radius: var(--radius); padding: 14px 16px; color: var(--ink-2); }
 .card .panel, .sheet .panel { background: var(--surface-2); }
+/* T2: khung chuyển khoản. Điện thoại: chữ, QR 200px giữa, lưu ý. Từ 900px: chữ bên trái, QR 184px bên phải giữa theo chiều dọc. */
+.bank { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "note"; gap: 12px; padding: 16px; }
+.bank.has-qr { grid-template-areas: "head" "qr" "note"; }
+.bank-head { grid-area: head; display: grid; gap: 4px; align-self: end; }
+.bank-qr { grid-area: qr; justify-self: center; width: 200px; height: 200px; aspect-ratio: 1 / 1; box-sizing: border-box; padding: 8px; background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow); }
+.bank-qr .skeleton { height: 100%; border-radius: var(--radius-xs); }
+.bank-qr img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.bank-note { grid-area: note; align-self: start; margin: 0; padding: 10px 14px; border-radius: var(--radius-xs); background: var(--butter); box-shadow: inset 4px 0 0 var(--yellow); color: var(--ink); font-size: 1.05rem; font-weight: 700; line-height: 1.4; letter-spacing: -.005em; }
+@media (min-width: 900px) {
+  .bank.has-qr { grid-template-columns: minmax(0, 1fr) 184px; grid-template-areas: "head qr" "note qr"; column-gap: 24px; }
+  .bank-qr { justify-self: end; align-self: center; width: 184px; height: 184px; }
+}
 .note { background: var(--butter); border-radius: var(--radius-sm); padding: 12px 14px; font-size: .9rem; color: var(--ink-2); }
 .alert { border-radius: var(--radius-sm); padding: 12px 14px; font-size: .92rem; border: 0; background: var(--surface-2); color: var(--ink-2); }
 .alert.bad { background: var(--bad-soft); color: var(--bad); }

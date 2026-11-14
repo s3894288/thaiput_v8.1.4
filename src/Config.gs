@@ -169,6 +169,9 @@ var DEFAULTS_ = {
   BANK_NAME: '',
   BANK_ACCOUNT: '',
   BANK_HOLDER: '',
+  // Ảnh mã QR chuyển khoản (T2): link chia sẻ Google Drive hoặc mã file Drive của ảnh VUÔNG (PNG, JPG, WEBP, GIF, dưới 300 KB).
+  // Để trống = trang không hiện ô QR. Kiểm bằng menu 2; bộ nhớ đệm giữ ảnh tối đa 6 giờ.
+  BANK_QR_IMAGE: '',
 
   // Hạ tầng (Setup ghi)
   LESSON_CALENDAR_ID: '',

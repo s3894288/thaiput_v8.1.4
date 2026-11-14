@@ -122,6 +122,18 @@ body:has(.actionbar:not([hidden])) #app { padding-bottom: 228px; }
 .card.flush { padding: 0; overflow: hidden; }
 .panel { background: var(--surface-2); border-radius: var(--radius); padding: 14px 16px; color: var(--ink-2); }
 .card .panel, .sheet .panel { background: var(--surface-2); }
+/* T2: khung chuyển khoản. Điện thoại: chữ, QR 200px giữa, lưu ý. Từ 900px: chữ bên trái, QR 184px bên phải giữa theo chiều dọc. */
+.bank { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "note"; gap: 12px; padding: 16px; }
+.bank.has-qr { grid-template-areas: "head" "qr" "note"; }
+.bank-head { grid-area: head; display: grid; gap: 4px; align-self: end; }
+.bank-qr { grid-area: qr; justify-self: center; width: 200px; height: 200px; aspect-ratio: 1 / 1; box-sizing: border-box; padding: 8px; background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow); }
+.bank-qr .skeleton { height: 100%; border-radius: var(--radius-xs); }
+.bank-qr img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.bank-note { grid-area: note; align-self: start; margin: 0; padding: 10px 14px; border-radius: var(--radius-xs); background: var(--butter); box-shadow: inset 4px 0 0 var(--yellow); color: var(--ink); font-size: 1.05rem; font-weight: 700; line-height: 1.4; letter-spacing: -.005em; }
+@media (min-width: 900px) {
+  .bank.has-qr { grid-template-columns: minmax(0, 1fr) 184px; grid-template-areas: "head qr" "note qr"; column-gap: 24px; }
+  .bank-qr { justify-self: end; align-self: center; width: 184px; height: 184px; }
+}
 .note { background: var(--butter); border-radius: var(--radius-sm); padding: 12px 14px; font-size: .9rem; color: var(--ink-2); }
 .alert { border-radius: var(--radius-sm); padding: 12px 14px; font-size: .92rem; border: 0; background: var(--surface-2); color: var(--ink-2); }
 .alert.bad { background: var(--bad-soft); color: var(--bad); }
@@ -590,7 +602,7 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
   //   Lượt chỉ đọc: tối đa 4 lần. Lượt ghi có mã chống gửi trùng (rid): tối đa 3 lần, cùng một mã, nên không đặt hay huỷ 2 lần.
   //   Lượt ghi khác: chỉ thử lại khi máy chủ báo bận (máy chủ báo bận nghĩa là chưa ghi gì).
   //   Chờ tăng dần cộng ngẫu nhiên, để nhiều người cùng thử lại không dồn vào cùng một giây.
-  var READ_APIS = { apiPublicInfo: 1, apiStudentHome: 1, apiStudentSlots: 1, apiTutorHome: 1, apiTutorAvailability: 1, apiTutorStats: 1,
+  var READ_APIS = { apiPublicInfo: 1, apiBankQr: 1, apiStudentHome: 1, apiStudentSlots: 1, apiTutorHome: 1, apiTutorAvailability: 1, apiTutorStats: 1,
     apiAdminHome: 1, apiAdminNotifications: 1, apiAdminPeople: 1, apiAdminPerson: 1, apiAdminBooking: 1, apiAdminSlots: 1, apiAdminLog: 1, apiAdminLessons: 1, apiAdminLogEntry: 1 };
   var RID_APIS = { apiStudentBook: 1, apiStudentCancel: 1, apiTutorSetAvailability: 1, apiTutorSubmitResult: 1, apiTutorSubmitResults: 1,
     apiAdminBook: 1, apiAdminCancel: 1, apiExchangeToken: 1, apiGoogleExchange: 1 };
@@ -771,6 +783,48 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
     return '<div class="contact">' +
       (zalo ? '<a class="btn btn-ghost zalo" href="' + T.esc(zalo) + '" target="_blank" rel="noopener">' + T.t('a.zalo') + '</a>' : '') +
       (site ? '<a class="btn btn-ghost" href="' + T.esc(site) + '" target="_blank" rel="noopener">' + T.t('a.website') + '</a>' : '') + '</div>';
+  };
+
+  /** T2: khung chuyển khoản dùng chung cho trang đăng ký và gia hạn. Có dấu qr thì chừa sẵn khung vuông (không nhảy bố cục),
+   *  ảnh nạp riêng bằng T.bankQrFill sau khi khung đã vẽ. Không có QR thì một cột gọn, không ô trống. */
+  T.bankPanel = function (info) {
+    var b = info && info.bank;
+    if (!b || !b.account) return '';
+    var qr = b.qr ? String(b.qr) : '';
+    return '<div class="panel bank' + (qr ? ' has-qr' : '') + '">' +
+      '<div class="bank-head"><span class="eyebrow">' + T.t('h.bank_title') + '</span><div class="mono">' + T.esc(b.name) + ' · ' + T.esc(b.account) + '<br>' + T.esc(b.holder) + '</div></div>' +
+      (qr ? '<div class="bank-qr" data-qr="' + T.esc(qr) + '"><div class="skeleton" aria-hidden="true"></div></div>' : '') +
+      '<p class="bank-note">' + T.t('h.bank_note') + '</p></div>';
+  };
+  var bankQrMem = {}, bankQrReq = {};
+  /** Ảnh QR theo dấu: nhớ trong trang và trong T.store (cùng dấu thì không gọi lại máy chủ, đổi ngôn ngữ cũng không gọi lại). Trả chuỗi rỗng khi không có. */
+  T.bankQr = function (marker) {
+    if (!marker) return Promise.resolve('');
+    if (marker in bankQrMem) return Promise.resolve(bankQrMem[marker]);
+    var k = 'thaiput_bankqr_' + marker, v = T.store.tab.get(k);
+    if (v && /^data:image\//.test(v)) { bankQrMem[marker] = v; return Promise.resolve(v); }
+    if (bankQrReq[marker]) return bankQrReq[marker];
+    return (bankQrReq[marker] = T.api('apiBankQr').then(function (r) {
+      delete bankQrReq[marker];
+      var src = r && r.ok && r.data && /^data:image\//.test(r.data.src || '') ? r.data.src : '';
+      bankQrMem[marker] = src;   // rỗng cũng nhớ trong trang này, khỏi gọi lại
+      if (src) T.store.tab.set(k, src);
+      return src;
+    }, function () { delete bankQrReq[marker]; return ''; }));
+  };
+  /** Đưa ảnh vào khung QR của T.bankPanel; rỗng hoặc lỗi thì gỡ khung, panel về một cột. */
+  T.bankQrFill = function (root) {
+    var box = T.$('.bank-qr', root);
+    if (!box) return;
+    var marker = box.getAttribute('data-qr');
+    var done = function (src) {
+      var b = T.$('.bank-qr', root);
+      if (!b || b.getAttribute('data-qr') !== marker) return;   // đã vẽ lại hoặc rời trang
+      if (!src) { if (b.parentNode) b.parentNode.classList.remove('has-qr'); b.parentNode.removeChild(b); return; }
+      b.innerHTML = '<img src="' + T.esc(src) + '" alt="' + T.esc(T.t('h.bank_qr_alt')) + '" width="184" height="184" decoding="async">';
+      b.classList.add('ready');
+    };
+    if (marker in bankQrMem) done(bankQrMem[marker]); else T.bankQr(marker).then(done);
   };
 
   /** 5K (BL06): gói giá 0 không chọn được trên web; hiện thẻ gói kèm nút Zalo admin. */
@@ -968,10 +1022,7 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
         '<span><b>' + T.esc(T.pkgName(p)) + '</b><br><span class="meta">' + T.esc(pkgMeta(p)) + '</span></span></span>' +
         '<span class="price">' + T.money(p.price) + '</span></label>';
     }).join('') + contact.map(T.pkgContact).join('') + (paid.length ? '' : '<div class="alert warn">' + T.t('a.pkg_none') + '</div>');
-    var bank = info.bank && info.bank.account
-      ? '<div class="panel stack"><span class="eyebrow">' + T.t('h.bank_title') + '</span><div class="mono">' + T.esc(info.bank.name) + ' · ' + T.esc(info.bank.account) + '<br>' + T.esc(info.bank.holder) + '</div>' +
-        '<small>' + T.t('h.bank_note') + '</small></div>'
-      : '';
+    var bank = T.bankPanel(info);
     root.innerHTML = T.topbar(topBtn(s)) +
       '<main class="stack-lg">' +
       '<section class="hero"><img class="hero-img" alt="" src="' + HERO_IMG + '"><span class="th-word" lang="th">' + T.t('h.hero_th') + '</span><h1>' + T.t('h.hero_title') + '</h1>' +
@@ -995,6 +1046,7 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
       '<section class="stack"><h3>' + T.t('h.help') + '</h3>' + T.contact(info.contact) + '</section>' +
       '</main>';
     bind(root);
+    T.bankQrFill(root);
     // Chunk 5G (soát R2 T13): đang bảo trì thì báo ngay trên form và khoá nút Gửi, không để khách điền rồi mới biết.
     var mm = T.boot.maint || {};
     if (mm.mode && mm.mode !== 'OFF') {
@@ -1436,7 +1488,8 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
         return '<label class="pkg' + (k === 0 ? ' on' : '') + '" for="r-' + x.code + '"><span class="row" style="flex-wrap:nowrap;gap:12px"><input type="radio" name="rpkg" id="r-' + x.code + '" value="' + x.code + '"' + (k === 0 ? ' checked' : '') + '><b>' + T.esc(T.pkgName(x)) + '</b></span><span class="price">' + T.money(x.price) + '</span></label>';
       }).join('') + rp.filter(function (x) { return !(x.price > 0); }).map(T.pkgContact).join('') + (rpaid.length ? '' : '<div class="alert warn">' + T.t('a.pkg_none') + '</div>') + '</div>';
       T.$$('#renew-pkgs input', body).forEach(function (r) { r.onchange = function () { T.$$('#renew-pkgs .pkg', body).forEach(function (l) { l.classList.toggle('on', l.contains(T.$('input:checked', l))); }); }; });
-      if (i.bank && i.bank.account) T.$('#renew-bank', body).innerHTML = '<div class="panel mono">' + T.esc(i.bank.name) + ' · ' + T.esc(i.bank.account) + '<br>' + T.esc(i.bank.holder) + '</div>';
+      T.$('#renew-bank', body).innerHTML = T.bankPanel(i);
+      T.bankQrFill(T.$('#renew-bank', body));
     };
     if (info) withInfo(info); else T.api('apiPublicInfo').then(function (r) { if (r.ok) withInfo(r.data); });
     T.$('#renew', body).onsubmit = function (e) {

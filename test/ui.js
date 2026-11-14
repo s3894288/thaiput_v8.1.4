@@ -1542,6 +1542,73 @@ t('U50', '5O (BL22): gửi form đăng ký thiếu thì viền đỏ ĐÚNG từ
   assert.strictEqual(c.rows('REGISTRATIONS').length, 1, 'đã gửi lên máy chủ');
 });
 
+// ═══ T2: khung chuyển khoản có ô QR ═══
+function qrSetup(c, over) {
+  const id = 'QRFILE_ABCDEF123456';
+  c.env.state.drive.files[id] = Object.assign({ id, name: 'qr.png', parent: null, created: new Date(2026, 0, 1), trashed: false, mime: 'image/png', bytes: Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(2000, 7)]) }, over || {});
+  c.api.withLock_(() => { const t = c.api.table_('CONFIG'), r = t.byId('BANK_QR_IMAGE'); if (r) t.update(r, { value: 'https://drive.google.com/file/d/' + id + '/view?usp=sharing' }); else t.insert({ key: 'BANK_QR_IMAGE', value: 'https://drive.google.com/file/d/' + id + '/view?usp=sharing' }); });
+  c.api.clearConfigCache_();
+  return id;
+}
+t('U51', 'T2: khung chuyển khoản. Không QR: một cột, không ô trống, không gọi apiBankQr. Có QR: chừa khung vuông, nạp ảnh sau, đổi VI/EN không gọi lại; ảnh rỗng thì gỡ khung; lưu ý là khung nhấn (đậm, lớn); gia hạn dùng cùng bộ vẽ', async () => {
+  // Không cấu hình
+  let c = mk(), p = open(c, { page: 'home' });
+  await p.flush(); p.clean();
+  assert.ok(p.$('.panel.bank') && !p.$('.bank-qr') && !p.$('.bank.has-qr'), 'không QR: không ô trống');
+  assert.ok(p.$('.bank .bank-note') && /chỉ ghi số điện thoại/.test(p.text('.bank-note')), p.text('.bank-note'));
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 0, 'không có QR thì không gọi');
+  assert.strictEqual(p.calls.find(x => x.name === 'apiPublicInfo').result.data.bank.qr, '', 'dấu rỗng');
+  // CSS: lưu ý đậm, lớn hơn chữ thường, nền vàng bơ, vạch vàng; khung QR 200 và 184
+  const css = p.$('style').textContent;
+  assert.ok(/\.bank-note \{[^}]*font-size: 1\.05rem[^}]*font-weight: 700/.test(css) || /\.bank-note \{[^}]*font-weight: 700[^}]*font-size: 1\.05rem/.test(css), 'khung lưu ý đậm, lớn');
+  assert.ok(/\.bank-note \{[^}]*var\(--yellow\)/.test(css) && /\.bank-qr \{[^}]*width: 200px[^}]*aspect-ratio: 1 \/ 1/.test(css) && /@media \(min-width: 900px\) \{[^@]*\.bank-qr \{[^}]*width: 184px; height: 184px/.test(css), 'kích thước QR 200 và 184');
+
+  // Có QR
+  c = mk(); qrSetup(c);
+  p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  const mk1 = p.calls.find(x => x.name === 'apiPublicInfo').result.data.bank.qr;
+  assert.ok(/^[a-f0-9]{10}$/.test(mk1), 'có dấu: ' + mk1);
+  assert.ok(!JSON.stringify(p.calls.find(x => x.name === 'apiPublicInfo').result).includes('data:image'), 'ảnh không nằm trong apiPublicInfo');
+  assert.ok(p.$('.bank.has-qr .bank-qr img'), 'ảnh đã vào khung');
+  assert.ok(/^data:image\/png;base64,/.test(p.$('.bank-qr img').getAttribute('src')), 'src là data URI');
+  assert.strictEqual(p.$('.bank-qr img').getAttribute('alt'), 'Mã QR chuyển khoản ngân hàng');
+  assert.ok(p.$('.bank-qr img').getAttribute('width') && p.$('.bank-qr img').getAttribute('height'), 'có width, height');
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 1);
+  // Thứ tự trong khung: chữ ngân hàng, QR, lưu ý
+  const kids = Array.from(p.$('.bank').children).map(e => e.className.split(' ')[0]);
+  assert.deepStrictEqual(kids, ['bank-head', 'bank-qr', 'bank-note']);
+  // Đổi ngôn ngữ: không gọi lại, ảnh giữ, chữ đổi
+  p.click('[data-langsw]'); await p.flush(20);
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 1, 'đổi ngôn ngữ không gọi lại ảnh');
+  assert.ok(p.$('.bank-qr img'), 'ảnh vẫn còn sau khi đổi ngôn ngữ');
+  assert.strictEqual(p.text('.bank-note'), 'Transfer reference: Please enter only your phone number.');
+  assert.strictEqual(p.$('.bank-qr img').getAttribute('alt'), 'Bank transfer QR code');
+  p.clean();
+
+  // File hỏng (quá lớn): server trả ảnh rỗng, trang gỡ khung, panel về một cột
+  c = mk(); qrSetup(c, { bytes: Buffer.alloc(310 * 1024, 1) });
+  p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 1);
+  assert.ok(p.calls.find(x => x.name === 'apiBankQr').result.ok && p.calls.find(x => x.name === 'apiBankQr').result.data.src === '');
+  assert.ok(!p.$('.bank-qr') && !p.$('.bank.has-qr') && p.$('.bank .bank-note'), 'khung QR đã gỡ gọn');
+
+  // Gia hạn dùng cùng bộ vẽ
+  c = mk(); qrSetup(c);
+  const { session } = await uiLogin(c, 'S003');
+  p = open(c, { page: 'renew' }, { session });
+  await p.flush(60);
+  p.click('.tab[data-tab="account"]'); await p.flush(40);
+  p.clean();
+  assert.ok(p.$('#renew-bank .panel.bank.has-qr .bank-qr img') && p.$('#renew-bank .bank-note') && p.$('#renew-bank .eyebrow'), 'gia hạn: cùng khung, có QR, có lưu ý');
+  const nq = p.calls.filter(x => x.name === 'apiBankQr').length;
+  p.click('[data-langsw]'); await p.flush(20);
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, nq, 'đổi ngôn ngữ ở gia hạn không gọi lại');
+  assert.ok(p.$('#renew-bank .bank-qr img'));
+  p.clean();
+});
+
 module.exports = { run };
 if (require.main === module) {
   run().then(r => { r.forEach(x => console.log((x.ok ? 'ĐẠT  ' : 'TRƯỢT ') + x.id + ' ' + x.title + (x.ok ? '' : '\n      ' + x.err))); process.exit(r.every(x => x.ok) ? 0 : 1); });

@@ -634,6 +634,12 @@ function testSystem(e) { requireOperator_(e);
   // Link hiện trên trang web: chỉ https mới hiện (trang tự ẩn link khác để chống chèn mã), nên báo trước cho admin.
   ['ADMIN_ZALO_URL', 'SCHOOL_SITE_URL', 'POLICY_URL', 'GOOGLE_LOGIN_URL'].forEach(function (k) { var v = String(cfg_(k) || ''); if (v && !/^https:\/\/[^\s"'<>]+$/i.test(v)) warn(k + ' không bắt đầu bằng https:// nên trang web sẽ ẩn link này: ' + v); });
   if (!cfg_('BANK_ACCOUNT')) warn('Chưa điền thông tin ngân hàng (BANK_NAME, BANK_ACCOUNT, BANK_HOLDER)');
+  // T2: ảnh QR chuyển khoản (trống chỉ là thông tin; hỏng thì lỗi, vì trang đang âm thầm bỏ ô QR).
+  try {
+    var qrv = String(cfg_('BANK_QR_IMAGE') || '').trim();
+    if (!qrv) ok('BANK_QR_IMAGE để trống: trang đăng ký không hiện mã QR (không bắt buộc)');
+    else { var qr = bankQrRead_(qrv); if (qr.ok) ok('BANK_QR_IMAGE hợp lệ: ' + qr.type + ', ' + qr.kb + ' KB'); else err('BANK_QR_IMAGE hỏng (' + qr.code + '): ' + qr.fix + ' Trang đăng ký đang ẩn ô QR.'); }
+  } catch (qe) { err('Kiểm BANK_QR_IMAGE lỗi: ' + qe.message); }
   // 5L: kiểm mọi dòng PACKAGES (mã trùng, kiểu, số ngày, số buổi, giá).
   try { var pi = packageIssues_(table_('PACKAGES').all()); pi.errors.forEach(err); pi.warnings.forEach(warn); if (!pi.errors.length) ok('PACKAGES: ' + table_('PACKAGES').all().length + ' dòng hợp lệ'); } catch (pe2) { err('Kiểm PACKAGES lỗi: ' + pe2.message); }
   // Soát T1: key trùng ở EMAIL_TEMPLATES, CONTENT (admin không biết dòng nào đang dùng).
