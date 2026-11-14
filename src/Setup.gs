@@ -53,12 +53,21 @@ function setupCore_(ss) {
   var oldContent = contentDetachOld_(ss);
   if (oldContent) lines.push('Tab CONTENT bản cũ đổi tên thành ' + oldContent + ' (ẩn, giữ nguyên để đối chiếu)');
 
-  // 1. Tab và cột
+  // 1. Tab và cột. Soát X2 (FIX B): đọc hết tiêu đề và GHI BỀN số đo TRƯỚC khi đổi cấu trúc (ghi trước khi làm): bị cắt ngay sau khi tạo tab hay thêm cột thì
+  // lượt sau không còn thấy gì để đo, nhưng số đo đã nằm trong RELEASE_PENDING.
+  var plan1 = {};
   Object.keys(SCHEMA).forEach(function (name) {
     var sh = ss.getSheetByName(name), cols = SCHEMA[name].cols;
-    if (!sh) { sh = ss.insertSheet(name); lines.push('Tạo tab ' + name); upgradeAdd_('TAB_ADDED', name, 'Tab mới ' + name + ' (' + cols.length + ' cột)', 'New tab ' + name + ' (' + cols.length + ' columns)'); }
-    var header = sh.getLastColumn() ? sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String) : [];
+    var header = sh && sh.getLastColumn() ? sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String) : [];
     var missing = cols.filter(function (c) { return header.indexOf(c) === -1; });
+    plan1[name] = { header: header, missing: missing };
+    if (!sh) upgradeAdd_('TAB_ADDED', name, 'Tab mới ' + name + ' (' + cols.length + ' cột)', 'New tab ' + name + ' (' + cols.length + ' columns)');
+    else if (missing.length && header.length) missing.forEach(function (c) { upgradeAdd_('COLUMN_ADDED', name + '.' + c, 'Cột mới ' + name + '.' + c + ' (thêm ở bên phải, dòng cũ để trống)', 'New column ' + name + '.' + c + ' (added on the right, old rows empty)'); });
+  });
+  releasePersist_();
+  Object.keys(SCHEMA).forEach(function (name) {
+    var sh = ss.getSheetByName(name), cols = SCHEMA[name].cols, header = plan1[name].header, missing = plan1[name].missing;
+    if (!sh) { sh = ss.insertSheet(name); lines.push('Tạo tab ' + name); }
     if (missing.length) {
       // Ghi sau cột tiêu đề cuối cùng có chữ (không đếm số ô có chữ: có ô tiêu đề trống ở giữa sẽ ghi đè cột thật).
       var lastNonEmpty = 0; header.forEach(function (h, i) { if (String(h).trim() !== '') lastNonEmpty = i + 1; });
@@ -66,7 +75,7 @@ function setupCore_(ss) {
       // Chunk 5M: tab mới của Google chỉ có 26 cột (A đến Z); BOOKINGS từ 8.1.0 có 27 cột. Thêm cột trước khi ghi tiêu đề.
       if (sh.getMaxColumns() < need) sh.insertColumnsAfter(sh.getMaxColumns(), need - sh.getMaxColumns());
       sh.getRange(1, start, 1, missing.length).setValues([missing]);
-      if (header.length) { lines.push('Thêm cột vào ' + name + ': ' + missing.join(', ')); missing.forEach(function (c) { upgradeAdd_('COLUMN_ADDED', name + '.' + c, 'Cột mới ' + name + '.' + c + ' (thêm ở bên phải, dòng cũ để trống)', 'New column ' + name + '.' + c + ' (added on the right, old rows empty)'); }); }
+      if (header.length) lines.push('Thêm cột vào ' + name + ': ' + missing.join(', '));
     }
     try { sh.setFrozenRows(1); } catch (e) { }
     var full = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
@@ -81,52 +90,70 @@ function setupCore_(ss) {
 
   // 2b. Gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT TRƯỚC khi gieo chữ gốc (soát T1): một key một dòng, không mất chữ admin sửa.
   // Chữ admin bị bỏ luôn được ghi đủ vào ACTIVITY_LOG (TEMPLATE_DEDUPE_TEXT) trước khi ghi đè. Sao lưu trước cập nhật hỏng: không gộp key nào sẽ bỏ chữ admin.
+  // Soát X2 (FIX D): lần bỏ dòng bị cắt (mốc PURGE_OPEN_<tab>) còn sót thì dọn bằng đúng cách phục hồi của purgeRows_ (so dấu vân tay) trước khi gộp.
+  try { withLock_(function () { purgeRecoverAll_(); }); } catch (pe) { lines.push('LƯU Ý: chưa dọn được lần bỏ dòng dở (' + pe.message + '); chạy lại menu 1 hoặc chờ job mỗi giờ.'); }
   var dupRep = [], dupFail = null;
-  try { dupRep = dedupeDuplicateKeys_({ protectText: RELEASE_SNAPSHOT_FAILED_ }); }
+  // onPlan: số đo gộp key được ghi bền TRƯỚC khi sửa tab (ghi trước khi làm): bị cắt giữa lúc gộp thì lượt sau thấy tab đã gộp xong mà vẫn có dòng đo.
+  try { dupRep = dedupeDuplicateKeys_({ protectText: RELEASE_SNAPSHOT_FAILED_, onPlan: function (plan) { try { dupRecordItems_(plan); releasePersist_(); } catch (pe2) { } } }); }
   catch (de) { dupFail = de; dupRep = de.partial || []; }
   try {
-    var dupLines = dupReportLines_(dupRep);
+    var dupLines = dupRecordItems_(dupRep);
     dupLines.forEach(function (l) { lines.push(l); });
-    dupRep.forEach(function (p, i) {
-      if (p.skipped) { upgradeAdd_('DUP_SKIPPED', p.tab + '.' + p.key, dupLines[i], 'NOT merged: key ' + p.key + ' in ' + p.tab + ' (rows ' + p.rows.join(', ') + ') because the pre-upgrade backup failed and the merge would discard admin text; rows left as they are.'); return; }
-      upgradeAdd_('DUP_MERGED', p.tab + '.' + p.key, dupLines[i], 'Merged ' + p.rows.length + ' duplicate rows of key ' + p.key + ' in ' + p.tab + ' into one (rows ' + p.rows.join(', ') + '); admin edits kept.');
-    });
     // Mâu thuẫn ở ô active: dòng riêng, nổi bật (không chôn trong dòng gộp dài), và có trong tóm tắt cập nhật.
-    dupActiveWarnings_(dupRep).forEach(function (w) { lines.push(w.vi); upgradeAdd_('DUP_ACTIVE', w.tab + '.' + w.key, w.vi, w.en); });
+    dupActiveWarnings_(dupRep).forEach(function (w) { lines.push(w.vi); });
   } catch (de3) { lines.push('LƯU Ý: chưa lập được dòng báo gộp key trùng (' + de3.message + ').'); }
   if (dupFail) lines.push('CẢNH BÁO: chưa gộp được dòng trùng key ở EMAIL_TEMPLATES, CONTENT (' + dupFail.message + '). Menu 2 vẫn báo key trùng; chạy lại menu 1 sau khi xem tab.');
+  releasePersist_();
 
   // 3. CONFIG: thêm khoá còn thiếu với giá trị mặc định
   clearDbCache_();
-  var cfgT = table_('CONFIG'), have = {};
-  cfgT.all().forEach(function (r) { have[r.key] = r; });
+  var cfgT = table_('CONFIG');
+  // Soát X2 (FIX C): khoá có dấu cách thừa ("BANK_NAME ") vẫn là khoá BANK_NAME khi đọc (loadConfigTab_ cắt khoảng trắng). Khoá khớp theo dạng đã cắt, nếu không menu 1 thêm
+  // một dòng mặc định trống và dòng đó (nằm sau) thắng, làm giá trị admin biến mất khỏi trang. have: khoá đã cắt → dòng (dòng cuối thắng, đúng như cfg_).
+  var keyPlan = cfgKeyPlan_(cfgT.all()), have = keyPlan.have;
+  keyPlan.trim.forEach(function (x) { upgradeAdd_('CONFIG_KEY_TRIMMED', x.to, 'Khoá CONFIG ' + JSON.stringify(x.from) + ' (hàng ' + x.row._row + ') có dấu cách thừa nên đổi thành ' + JSON.stringify(x.to) + '; giá trị giữ nguyên.', 'CONFIG key ' + JSON.stringify(x.from) + ' (row ' + x.row._row + ') had stray whitespace so it was renamed ' + JSON.stringify(x.to) + '; the value is kept.'); });
+  keyPlan.twins.forEach(function (w) { upgradeAdd_('CONFIG_KEY_TWIN', w.key, cfgTwinText_(w, false), cfgTwinText_(w, true)); });
   var me = ''; try { me = Session.getEffectiveUser().getEmail(); } catch (e) { }
   var added = 0;
   // 5R: lượt cập nhật phiên bản trên file đã có dữ liệu thì khoá CONFIG thêm mới được ghi chú "Mới ở <bản>: ..." (không bao giờ ghi đè ô có sẵn).
   var upgrading = !!UPGRADE_RUN_ && !UPGRADE_RUN_.fresh && props_().getProperty('APP_VERSION_LAST') !== APP.VERSION;
-  // Chunk 5J: khoá đổi tên. Khoá cũ admin đã chỉnh (khác mặc định cũ): chép sang khoá mới TRƯỚC bước thêm mặc định; ghi chú khoá cũ.
+  // Kế hoạch (chưa ghi): khoá đổi tên chép từ khoá cũ, rồi khoá mặc định còn thiếu. Số đo ghi bền TRƯỚC khi chèn dòng (ghi trước khi làm, soát X2 FIX B).
+  var renamePlan = [], haveP = Object.create(null);
+  Object.keys(have).forEach(function (k) { haveP[k] = true; });
+  Object.keys(CFG_RENAMED_).forEach(function (k) {
+    var r = CFG_RENAMED_[k], old = have[r[0]];
+    if (haveP[k] || !old) return;
+    var v = coerceCfg_(old.value, r[1]);
+    if (v === r[1]) return;
+    renamePlan.push({ key: k, value: v, from: r[0], ver: r[2] || '8.1.1' }); haveP[k] = true;
+  });
+  var defaultPlan = [];
+  Object.keys(DEFAULTS_).forEach(function (k) {
+    if (haveP[k]) return;
+    var v = DEFAULTS_[k];
+    if (k === 'ADMIN_EMAIL' && me) v = me;
+    if (k === 'ALLOW_DATA_RESET') v = env !== 'PRODUCTION';   // STAGING: được xoá dữ liệu test; PRODUCTION: không
+    defaultPlan.push({ key: k, value: v });
+  });
+  renamePlan.forEach(function (x) { upgradeAdd_('CONFIG_RENAMED', x.key, 'Khoá ' + x.key + ' chép từ ' + x.from + ' (admin đã chỉnh khoá cũ), giá trị ' + String(x.value), 'Key ' + x.key + ' copied from ' + x.from + ' (admin had changed the old key), value ' + String(x.value)); });
+  defaultPlan.forEach(function (x) {
+    var shown = String(x.value === '' ? 'trống' : x.value).substring(0, 80), shownEn = String(x.value === '' ? 'empty' : x.value).substring(0, 80);
+    upgradeAdd_('CONFIG_ADDED', x.key, 'Khoá CONFIG mới ' + x.key + ', giá trị mặc định: ' + shown, 'New CONFIG key ' + x.key + ', default value: ' + shownEn);
+  });
+  releasePersist_();
+  // Thực hiện: cắt khoá có dấu cách thừa (DbTable.update, luật 42; key là ô ghi cuối cùng của dòng), rồi đổi tên và thêm mặc định.
+  keyPlan.trim.forEach(function (x) { cfgT.update(x.row, { key: x.to }); lines.push('Sửa khoá CONFIG có dấu cách thừa: ' + JSON.stringify(x.from) + ' thành ' + JSON.stringify(x.to) + ' (hàng ' + x.row._row + ', giá trị giữ nguyên)'); });
+  keyPlan.twins.forEach(function (w) { lines.push('CẢNH BÁO: ' + cfgTwinText_(w, false)); });
   Object.keys(CFG_RENAMED_).forEach(function (k) {
     var r = CFG_RENAMED_[k], old = have[r[0]];
     if (old && !String(old.note || '').trim()) cfgT.update(old, { note: 'Không dùng từ ' + (r[2] || '8.1.1') + ', thay bằng ' + Object.keys(CFG_RENAMED_).filter(function (x) { return CFG_RENAMED_[x][0] === r[0]; }).join(', ') });
-    if (have[k] || !old) return;
-    var v = coerceCfg_(old.value, r[1]);
-    if (v === r[1]) return;
-    have[k] = cfgT.insert({ key: k, value: v, note: 'Chép từ ' + r[0] + ' (bản ' + (r[2] || '8.1.1') + ')' }); added++;
-    upgradeAdd_('CONFIG_RENAMED', k, 'Khoá ' + k + ' chép từ ' + r[0] + ' (admin đã chỉnh khoá cũ), giá trị ' + String(v), 'Key ' + k + ' copied from ' + r[0] + ' (admin had changed the old key), value ' + String(v));
   });
+  renamePlan.forEach(function (x) { have[x.key] = cfgT.insert({ key: x.key, value: x.value, note: 'Chép từ ' + x.from + ' (bản ' + x.ver + ')' }); added++; });
   ['TUTOR_DEADLINE_HOUR', 'TUTOR_REMIND_HOURS', 'LOGIN_LINK_MAX_PER_WINDOW', 'LOGIN_LINK_WINDOW_MINUTES'].forEach(function (k) {
     if (have[k] && !String(have[k].note || '').trim()) cfgT.update(have[k], { note: 'Không dùng từ 8.1.1 (xem TUTOR_REMIND_AT, TUTOR_DEADLINE_AT, LOGIN_LINK_COOLDOWN_MINUTES)' });
   });
   if (have.ARCHIVE_LOG_KEEP_MONTHS && !String(have.ARCHIVE_LOG_KEEP_MONTHS.note || '').trim()) cfgT.update(have.ARCHIVE_LOG_KEEP_MONTHS, { note: 'Không dùng từ 8.1.2 (xem LOG_KEEP_DAYS)' });
-  Object.keys(DEFAULTS_).forEach(function (k) {
-    if (have[k]) return;
-    var v = DEFAULTS_[k];
-    if (k === 'ADMIN_EMAIL' && me) v = me;
-    if (k === 'ALLOW_DATA_RESET') v = env !== 'PRODUCTION';   // STAGING: được xoá dữ liệu test; PRODUCTION: không
-    cfgT.insert({ key: k, value: v, note: upgrading ? releaseConfigNote_(k, APP.VERSION) : '' }); added++;
-    var shown = String(v === '' ? 'trống' : v).substring(0, 80), shownEn = String(v === '' ? 'empty' : v).substring(0, 80);
-    upgradeAdd_('CONFIG_ADDED', k, 'Khoá CONFIG mới ' + k + ', giá trị mặc định: ' + shown, 'New CONFIG key ' + k + ', default value: ' + shownEn);
-  });
+  defaultPlan.forEach(function (x) { cfgT.insert({ key: x.key, value: x.value, note: upgrading ? releaseConfigNote_(x.key, APP.VERSION) : '' }); added++; });
   try { upgradeUnknownConfig_(cfgT.all()); } catch (ue) { }
   if (added) lines.push('Thêm ' + added + ' khoá cấu hình vào CONFIG');
   // 15/10: bỏ email nhắc 8:00 sáng (quyết định anh Chris). Chỉ đổi 1 lần, và chỉ khi ô còn giá trị mặc định cũ 8.
@@ -171,21 +198,18 @@ function setupCore_(ss) {
     lines.slice(n1610).forEach(function (l) { upgradeAdd_('MIGRATION', 'MIG_1610', l, l); });   // 5R: đo đúng những gì bước này làm
   }
 
-  // 3b. Luật thông báo cho admin (chunk 5B): thêm sự kiện còn thiếu, không ghi đè dòng admin đã sửa
-  var nr = table_('NOTIFY_RULES'), nAdded = 0;
-  Object.keys(DEFAULT_NOTIFY_RULES_).forEach(function (ev) {
-    if (nr.byId(ev)) return;
-    var d = DEFAULT_NOTIFY_RULES_[ev];
-    nr.insert({ event: ev, level: d[0], channel: d[1], note: d[2] }); nAdded++;
-    upgradeAdd_('NOTIFY_RULE_ADDED', ev, 'Luật thông báo mới ' + ev + ' (' + d[0] + ', ' + d[1] + ')', 'New notification rule ' + ev + ' (' + d[0] + ', ' + d[1] + ')');
-  });
+  releasePersist_();
+  // 3b. Luật thông báo cho admin (chunk 5B): thêm sự kiện còn thiếu, không ghi đè dòng admin đã sửa.
+  // Soát X2 (FIX B): lập kế hoạch và ghi bền số đo (luật thông báo, chữ web, mẫu email) TRƯỚC khi ghi (seedContent_ chạy khô trước, không ghi gì).
+  var nr = table_('NOTIFY_RULES'), nAdded = 0, rulePlan = Object.keys(DEFAULT_NOTIFY_RULES_).filter(function (ev) { return !nr.byId(ev); });
+  var dry = seedContent_({ dry: true });
+  rulePlan.forEach(function (ev) { var d = DEFAULT_NOTIFY_RULES_[ev]; upgradeAdd_('NOTIFY_RULE_ADDED', ev, 'Luật thông báo mới ' + ev + ' (' + d[0] + ', ' + d[1] + ')', 'New notification rule ' + ev + ' (' + d[0] + ', ' + d[1] + ')'); });
+  seedContentItems_(dry);
+  releasePersist_();
+  rulePlan.forEach(function (ev) { var d = DEFAULT_NOTIFY_RULES_[ev]; nr.insert({ event: ev, level: d[0], channel: d[1], note: d[2] }); nAdded++; });
   if (nAdded) lines.push('Thêm ' + nAdded + ' luật thông báo vào NOTIFY_RULES');
   var cs = seedContent_();
-  (cs.contentKeys || []).forEach(function (k) { upgradeAdd_('CONTENT_ADDED', k, 'Dòng chữ web mới ' + k, 'New web text row ' + k); });
-  (cs.templateKeys || []).forEach(function (k) { upgradeAdd_('TEMPLATE_ADDED', k, 'Mẫu email mới ' + k, 'New email template ' + k); });
-  (cs.refreshed || []).forEach(function (x) { upgradeAdd_('CONTENT_REFRESHED', x.key + ' (' + x.col + ')', 'Ô ' + x.col + ' của ' + x.key + ' chưa bị sửa nên nâng lên chữ gốc mới', 'Cell ' + x.col + ' of ' + x.key + ' was not edited so it was upgraded to the new default'); });
-  (cs.kept || []).forEach(function (x) { upgradeAdd_('CONTENT_KEPT', x.key + ' (' + x.col + ')', 'Ô ' + x.col + ' của ' + x.key + ' bạn đã sửa nên GIỮ nguyên dù chữ gốc đổi; chữ gốc mới nằm ở cột default_' + x.col, 'Cell ' + x.col + ' of ' + x.key + ' was edited by you so it is KEPT although the default changed; the new default is in column default_' + x.col); });
-  (cs.templatesUpgraded || []).forEach(function (x) { upgradeAdd_('TEMPLATE_UPGRADED', x.key, 'Mẫu email ' + x.key + ' còn chữ gốc cũ nên nâng lên chữ gốc mới (ô: ' + x.cols.join(', ') + ')', 'Email template ' + x.key + ' still had the old default so it was upgraded (cells: ' + x.cols.join(', ') + ')'); });
+  seedContentItems_(cs);
   if (cs.content || cs.templates) lines.push('Thêm ' + cs.content + ' dòng chữ web vào CONTENT, ' + cs.templates + ' mẫu email vào EMAIL_TEMPLATES');
   var carried = contentCarryPending_(ss);
   if (carried) {
@@ -218,6 +242,7 @@ function setupCore_(ss) {
   // 4c. Chunk 5L: ghi tab META (phiên bản, mốc mã tự sinh) mỗi lần chạy menu 1, để chuyển hệ thống đọc được.
   try { withLock_(function () { writeMetaInLock_(); }); } catch (me) { lines.push('LƯU Ý: chưa ghi được tab META (' + me.message + ')'); }
   protectPackageCols_(ss, lines);
+  releasePersist_();
 
   // 5. Thư mục Drive và lịch Calendar
   clearConfigCache_();
@@ -237,6 +262,7 @@ function setupCore_(ss) {
   // Chỉ nhận link /exec (bản đã deploy). Chạy từ trình soạn thảo, Google có thể trả link /dev chỉ người sửa code mở được.
   try { var url = ScriptApp.getService().getUrl(); if (url && /\/exec$/.test(url) && !cfg_('WEBAPP_URL')) { setCfg('WEBAPP_URL', url); lines.push('Ghi WEBAPP_URL'); } } catch (e) { }
 
+  releasePersist_();
   // 6. Trigger
   lines.push('Trigger: ' + createTriggers_(ss) + ' cái');
   SpreadsheetApp.flush();
@@ -363,11 +389,21 @@ function applyHighlights_(ss) {
   }
 }
 
+/** Ghi số đo (UPGRADE_RUN_) từ kết quả seedContent_ (thật hay chạy khô). Gọi hai lần với cùng kết quả vẫn chỉ một mục mỗi việc. */
+function seedContentItems_(cs) {
+  (cs.contentKeys || []).forEach(function (k) { upgradeAdd_('CONTENT_ADDED', k, 'Dòng chữ web mới ' + k, 'New web text row ' + k); });
+  (cs.templateKeys || []).forEach(function (k) { upgradeAdd_('TEMPLATE_ADDED', k, 'Mẫu email mới ' + k, 'New email template ' + k); });
+  (cs.refreshed || []).forEach(function (x) { upgradeAdd_('CONTENT_REFRESHED', x.key + ' (' + x.col + ')', 'Ô ' + x.col + ' của ' + x.key + ' chưa bị sửa nên nâng lên chữ gốc mới', 'Cell ' + x.col + ' of ' + x.key + ' was not edited so it was upgraded to the new default'); });
+  (cs.kept || []).forEach(function (x) { upgradeAdd_('CONTENT_KEPT', x.key + ' (' + x.col + ')', 'Ô ' + x.col + ' của ' + x.key + ' bạn đã sửa nên GIỮ nguyên dù chữ gốc đổi; chữ gốc mới nằm ở cột default_' + x.col, 'Cell ' + x.col + ' of ' + x.key + ' was edited by you so it is KEPT although the default changed; the new default is in column default_' + x.col); });
+  (cs.templatesUpgraded || []).forEach(function (x) { upgradeAdd_('TEMPLATE_UPGRADED', x.key, 'Mẫu email ' + x.key + ' còn chữ gốc cũ nên nâng lên chữ gốc mới (ô: ' + x.cols.join(', ') + ')', 'Email template ' + x.key + ' still had the old default so it was upgraded (cells: ' + x.cols.join(', ') + ')'); });
+}
+
 /**
  * Đưa chữ web và mẫu email gốc vào 2 tab (chunk 5C, song ngữ 5H). Dòng CONTENT đã có: giữ nguyên chữ admin đã sửa (vi, en, note),
  * chỉ ghi lại các cột code quản lý. Dòng chưa có: thêm với chữ gốc, admin thấy và sửa trực tiếp.
  */
-function seedContent_() {
+function seedContent_(opts) {
+  var dry = !!(opts && opts.dry);   // soát X2: chạy khô = chỉ tính kết quả (cho số đo ghi trước), không ghi gì
   return withLock_(function () {
   var ct = table_('CONTENT'), et = table_('EMAIL_TEMPLATES'), nc = 0, ne = 0, nm = 0, nu = 0;
   // 5R: danh sách những gì seedContent_ thực sự làm, cho tóm tắt cập nhật (Release.gs). Chỉ đọc thêm, không đổi cách gieo.
@@ -380,7 +416,7 @@ function seedContent_() {
   // cột code quản lý (page, position, shown_when, default_vi, default_en), không đụng chữ admin đã sửa.
   Object.keys(defs).forEach(function (k) {
     var d = defs[k], r = ctBy[k] || null, meta = { page: d.page, position: d.position, shown_when: d.shown_when, default_vi: d.vi, default_en: d.en };
-    if (!r) { ctBy[k] = ct.insert(Object.assign({ key: k, vi: d.vi, en: d.en, note: '' }, meta)); nc++; contentKeys.push(k); return; }
+    if (!r) { ctBy[k] = dry ? { key: k } : ct.insert(Object.assign({ key: k, vi: d.vi, en: d.en, note: '' }, meta)); nc++; contentKeys.push(k); return; }
     var patch = {}; Object.keys(meta).forEach(function (c) { if (String(r[c] === undefined || r[c] === null ? '' : r[c]) !== meta[c]) patch[c] = meta[c]; });
     // Chunk 5J: chữ gốc đổi mà ô vi hoặc en còn đúng chữ gốc cũ (admin chưa sửa): thay bằng chữ gốc mới. Ô admin đã sửa giữ nguyên.
     [['vi', 'default_vi'], ['en', 'default_en']].forEach(function (x) {
@@ -388,24 +424,24 @@ function seedContent_() {
       if (old && cur === old && old !== meta[x[1]]) { patch[x[0]] = meta[x[1]]; nu++; refreshed.push({ key: k, col: x[0] }); }
       else if (old && old !== meta[x[1]] && cur !== meta[x[1]]) kept.push({ key: k, col: x[0] });   // chữ gốc đổi, ô admin đã sửa: giữ, báo để admin biết có chữ gốc mới
     });
-    if (Object.keys(patch).length) ct.update(r, patch);
+    if (Object.keys(patch).length && !dry) ct.update(r, patch);
   });
   Object.keys(DEFAULT_EMAIL_TEMPLATES_).forEach(function (k) {
     var cur = etBy[k] || null;
     if (cur && TEMPLATE_UPGRADES_[k]) {
       var up = {}, olds = TEMPLATE_UPGRADES_[k], dd = DEFAULT_EMAIL_TEMPLATES_[k];
       Object.keys(olds).forEach(function (c) { if (String(cur[c]) === olds[c]) up[c] = dd[TEMPLATE_COLS_.indexOf(c)]; });
-      if (Object.keys(up).length) { et.update(cur, up); nu++; templatesUpgraded.push({ key: k, cols: Object.keys(up) }); }
+      if (Object.keys(up).length) { if (!dry) et.update(cur, up); nu++; templatesUpgraded.push({ key: k, cols: Object.keys(up) }); }
     }
     if (cur) return;
     var d = DEFAULT_EMAIL_TEMPLATES_[k];
-    etBy[k] = et.insert({ key: k, audience: d[0], active: true, subject_vi: d[1], title_vi: d[2], body_vi: d[3], subject_en: d[4], title_en: d[5], body_en: d[6], variables: d[7], note: '' });
+    etBy[k] = dry ? { key: k } : et.insert({ key: k, audience: d[0], active: true, subject_vi: d[1], title_vi: d[2], body_vi: d[3], subject_en: d[4], title_en: d[5], body_en: d[6], variables: d[7], note: '' });
     ne++; templateKeys.push(k);
   });
   // Email marketing: một dòng ví dụ khi tab còn trống, để admin thấy cách viết (DRAFT: menu gửi từ chối).
   var mt = table_('MARKETING_EMAILS');
-  if (!mt.all().length) { mt.insert(MARKETING_EXAMPLE_); nm++; }
-  clearContentCache_();
+  if (!mt.all().length) { if (!dry) mt.insert(MARKETING_EXAMPLE_); nm++; }
+  if (!dry) clearContentCache_();
   return { content: nc, templates: ne, marketing: nm, upgraded: nu, contentKeys: contentKeys, templateKeys: templateKeys, refreshed: refreshed, kept: kept, templatesUpgraded: templatesUpgraded };
   });
 }
@@ -609,6 +645,7 @@ function dedupeDuplicateKeys_(opts) {
         plan.forEach(function (p) { dupTextLogRows_(p).forEach(function (r) { logActivity_(adminActor_(), 'TEMPLATE_DEDUPE_TEXT', r.tab, r.key, r.detail); }); });
         // Nhật ký (kể cả chữ admin sắp bị bỏ) phải nằm trong Sheets TRƯỚC khi ghi đè dòng đầu: ghi ngay, không chờ purgeRows_. Ghi lỗi thì dừng, chưa đụng tab.
         flushDb_(); SpreadsheetApp.flush();
+        if (opts.onPlan) { try { opts.onPlan(plan); } catch (pe) { } }   // soát X2: báo kế hoạch (cho số đo cập nhật) TRƯỚC khi sửa tab
         plan.forEach(function (p) {
           if (!Object.keys(p.patch).length) return;
           // Ô key ghi sau cùng: DbTable.update kiểm lại khoá dòng bằng chính cột key.
@@ -670,6 +707,17 @@ function dupActiveWarnings_(report) {
       en: 'IMPORTANT: email template ' + p.key + ' had several rows that disagreed about the active cell. Kept the state of the last row (row ' + a.kept_row + '): ' + (on ? 'SENDING' : 'OFF') +
         ', exactly what the system was doing before the merge; the row(s) at ' + rows + ' said the opposite (' + (on ? 'off' : 'on') + '). To change it, edit the active cell of ' + p.key + ' in the EMAIL_TEMPLATES tab.' };
   });
+}
+
+/** Ghi số đo của báo cáo gộp key (UPGRADE_RUN_) và trả các dòng chữ cho menu 1. Gọi hai lần với cùng báo cáo (trước khi sửa tab và sau khi xong) vẫn chỉ một mục mỗi việc (upgradeAdd_ bỏ trùng). */
+function dupRecordItems_(rep) {
+  var dupLines = dupReportLines_(rep);
+  rep.forEach(function (p, i) {
+    if (p.skipped) { upgradeAdd_('DUP_SKIPPED', p.tab + '.' + p.key, dupLines[i], 'NOT merged: key ' + p.key + ' in ' + p.tab + ' (rows ' + p.rows.join(', ') + ') because the pre-upgrade backup failed and the merge would discard admin text; rows left as they are.'); return; }
+    upgradeAdd_('DUP_MERGED', p.tab + '.' + p.key, dupLines[i], 'Merged ' + p.rows.length + ' duplicate rows of key ' + p.key + ' in ' + p.tab + ' into one (rows ' + p.rows.join(', ') + '); admin edits kept.');
+  });
+  dupActiveWarnings_(rep).forEach(function (w) { upgradeAdd_('DUP_ACTIVE', w.tab + '.' + w.key, w.vi, w.en); });
+  return dupLines;
 }
 
 /**
@@ -790,6 +838,7 @@ function testSystem(e) { requireOperator_(e);
   try { var pi = packageIssues_(table_('PACKAGES').all()); pi.errors.forEach(err); pi.warnings.forEach(warn); if (!pi.errors.length) ok('PACKAGES: ' + table_('PACKAGES').all().length + ' dòng hợp lệ'); } catch (pe2) { err('Kiểm PACKAGES lỗi: ' + pe2.message); }
   // Soát T1: key trùng ở EMAIL_TEMPLATES, CONTENT (admin không biết dòng nào đang dùng).
   try { dupKeyWarnings_().forEach(warn); } catch (de2) { err('Kiểm key trùng EMAIL_TEMPLATES, CONTENT lỗi: ' + de2.message); }
+  try { cfgKeyWarnings_().forEach(warn); } catch (ce2) { err('Kiểm khoá CONFIG trùng lỗi: ' + ce2.message); }
   if (!activeTutors_().length) warn('Chưa có tutor: dùng menu Thêm tutor');
   if (cfg_('MEET_MODE') === 'TUTOR_ROOM' && activeTutors_().some(function (t) { return t.status === USER_STATUS.ACTIVE && !t.meet_room; })) err('MEET_MODE = TUTOR_ROOM nhưng có tutor chưa có meet_room');
   try { if (props_().getProperty('SIM_NOW')) warn('Đang bật giả lập thời gian: ' + fmtDateTime_(getNow_())); } catch (e) { }

@@ -1644,10 +1644,13 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
     return pre && pre.tok && pre.tok === T.token() && Date.now() - pre.t < PRE_MAX_MS ? pre.p : null;
   }
 
+  var availGen = 0;
   function drawAvail(body, root) {
     body.innerHTML = '<h2>' + T.t('t.avail_title') + '</h2>' + T.skeleton(3);
-    var pre = takePre();
+    var pre = takePre(), gen = ++availGen;
     (pre ? pre.then(function (r) { return r || T.authed('apiTutorAvailability', '', 14); }) : T.authed('apiTutorAvailability', '', 14)).then(function (r) {
+      // Soát X2: phản hồi tới muộn của một lượt vẽ cũ (tutor đã đổi tab rồi mở lại, đã chọn giờ chưa lưu) không được đụng st.av, st.dirty: bỏ nếu có lượt vẽ mới hơn hoặc khung này không còn.
+      if (gen !== availGen || st.tab !== 'avail' || T.$('#tab-body', root) !== body) return;
       if (!r.ok) { body.innerHTML = '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
       st.av = r.data; st.dirty = {};
       renderAvail(body, root);

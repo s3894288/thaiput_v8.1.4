@@ -423,6 +423,37 @@ function loadConfigTab_() {
   return out;
 }
 
+/**
+ * Soát X2 (FIX C), hàm thuần: kế hoạch khoá của tab CONFIG. loadConfigTab_ cắt khoảng trắng khoá và dòng CUỐI thắng khi trùng, nên "have" (khoá đã cắt → dòng) theo đúng cách đó.
+ *   trim: dòng có khoá thừa dấu cách và KHÔNG có dòng nào khác cùng khoá đã cắt → [{ row, from, to }] (menu 1 cắt qua DbTable.update);
+ *   twins: nhóm có hai dòng trở lên cùng khoá đã cắt mà có dòng thừa dấu cách → [{ key, rows, keys, effective }]: không xoá, không đoán, chỉ báo (dòng cuối đang có hiệu lực).
+ */
+function cfgKeyPlan_(rows) {
+  var groups = Object.create(null), order = [], have = Object.create(null), trim = [], twins = [];
+  rows.forEach(function (r) {
+    var k = String(r.key === undefined || r.key === null ? '' : r.key).trim();
+    if (!k) return;
+    if (!groups[k]) { groups[k] = []; order.push(k); }
+    groups[k].push(r);
+  });
+  order.forEach(function (k) {
+    var g = groups[k], stray = g.filter(function (r) { return String(r.key) !== k; });
+    have[k] = g[g.length - 1];
+    if (!stray.length) return;
+    if (g.length === 1) trim.push({ row: g[0], from: String(g[0].key), to: k });
+    else twins.push({ key: k, rows: g.map(function (r) { return r._row; }), keys: g.map(function (r) { return String(r.key); }), effective: g[g.length - 1]._row });
+  });
+  return { have: have, trim: trim, twins: twins };
+}
+/** Hàm thuần: câu báo nhóm khoá CONFIG trùng chỉ khác dấu cách (menu 1, menu 2, RELEASE_LOG). en: tiếng Anh. Không in giá trị (CONFIG có thể chứa khoá bí mật). */
+function cfgTwinText_(w, en) {
+  var parts = w.rows.map(function (r, i) { return (en ? 'row ' : 'hàng ') + r + ' ' + JSON.stringify(w.keys[i]); }).join(', ');
+  return en ? 'CONFIG key "' + w.key + '" has ' + w.rows.length + ' rows that differ only by whitespace (' + parts + '). Not deleted and not guessed. In effect: the LAST row (row ' + w.effective + '), even if its value cell is empty (then the built-in default is used). Delete the extra row, or copy the right value into the last row.'
+    : 'khoá CONFIG "' + w.key + '" có ' + w.rows.length + ' dòng chỉ khác nhau ở dấu cách (' + parts + '). KHÔNG xoá, KHÔNG đoán. Đang có hiệu lực: dòng CUỐI (hàng ' + w.effective + '), kể cả khi ô giá trị của dòng đó trống (khi đó dùng mặc định trong code). Xoá dòng thừa, hoặc chép giá trị đúng sang dòng cuối.';
+}
+/** Menu 2: cảnh báo cho khoá CONFIG trùng chỉ khác dấu cách. */
+function cfgKeyWarnings_() { return cfgKeyPlan_(table_('CONFIG').all()).twins.map(function (w) { return 'CONFIG: ' + cfgTwinText_(w, false); }); }
+
 /** Bỏ bộ đệm CONFIG dùng chung (CacheService); lần đọc sau mở lại tab. Không đụng bộ nhớ của lần chạy hiện tại. */
 function dropConfigCache_() { try { var c = CacheService.getScriptCache(); c.put('cfg_ver', String(Date.now()) + Math.floor(Math.random() * 1000), 21600); c.remove(cfgCacheKey_()); } catch (e) { } }
 

@@ -342,6 +342,7 @@ function purgeClearTail_(sh, schema, header, fromRow, n, width) {
  * Lần purgeRows_ trước bị cắt (mốc PURGE_OPEN_<tab> còn). Đọc lại tab, so dấu vân tay:
  *   phần giữ đã ghi xong, đuôi còn nguyên như lúc hỏng → xoá đúng đuôi (hàng keep+2 tới hàng cuối cũ);
  *   tab còn nguyên như trước khi ghi (lệnh ghi không chạy) → chỉ bỏ mốc;
+ *   phần giữ đúng và đuôi đã xoá sạch (xong cả, chỉ sót mốc) → chỉ bỏ mốc, KHÔNG báo (soát X2);
  *   khác cả hai (admin đã sắp xếp, sửa tay sau khi hỏng) → KHÔNG xoá gì, báo Khẩn để admin kiểm dòng trùng.
  * Dòng thêm sau khi hỏng nằm sau hàng cuối cũ nên không bao giờ bị đụng. Phải gọi trong withLock_. Trả số hàng đã dọn.
  */
@@ -355,6 +356,8 @@ function purgeRecover_(name) {
     else if (purgeHash_(cur.slice(0, o.keep)) === o.kept && purgeHash_(cur.slice(o.keep)) === o.tail) {
       if (n > 0) { var header = sh.getRange(1, 1, 1, width).getValues()[0].map(function (h) { return String(h).trim(); }); purgeClearTail_(sh, SCHEMA[name], header, o.keep + 2, n, width); cleared = n; }
       outcome = 'cleared';
+    } else if (purgeHash_(cur.slice(0, o.keep)) === o.kept && cur.slice(o.keep).every(function (line) { return line.every(function (v) { return v === '' || v === null || v === undefined; }); })) {
+      outcome = 'completed';   // soát X2 (FIX D): lần bỏ dòng đã xong (phần giữ đúng, đuôi đã xoá), chỉ chưa kịp xoá mốc: tab nhất quán, không phải "sửa tay"
     } else outcome = 'changed';
   }
   props.deleteProperty(key);
@@ -366,6 +369,16 @@ function purgeRecover_(name) {
   try { logActivity_('SYSTEM', 'PURGE_RECOVERED', 'SHEET', name, JSON.stringify({ outcome: outcome, cleared: cleared })); } catch (e) { }
   if (cleared && (name === 'BOOKINGS' || name === 'AVAILABILITY')) markSlotsDirty_();
   return cleared;
+}
+
+/**
+ * Dọn MỌI mốc PURGE_OPEN_<tab> còn sót (lần bỏ dòng bị cắt giữa chừng) bằng đúng cách phục hồi của purgeRecover_ (so dấu vân tay, không bao giờ xoá khi tab đã bị sửa tay).
+ * Job mỗi giờ và menu 1 gọi. Phải gọi trong withLock_. Trả số tab đã xử lý.
+ */
+function purgeRecoverAll_() {
+  var n = 0, pp = props_().getProperties();
+  Object.keys(pp).forEach(function (k) { var tn = k.replace(/^PURGE_OPEN_/, ''); if (k !== tn && SCHEMA[tn]) { purgeRecover_(tn); n++; } });
+  return n;
 }
 
 /**

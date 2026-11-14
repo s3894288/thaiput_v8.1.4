@@ -168,24 +168,52 @@ function createGasEnv(opts) {
     },
     deleteProperty: (k) => { delete state.props[k]; return store; },
     getProperties: () => Object.assign({}, state.props),
-    setProperties: (o) => { Object.assign(state.props, o); return store; }
+    // Cùng giới hạn như setProperty (mỗi giá trị 9 KB tính cả tên khoá, cả kho 500 KB); hỏng thì không ghi gì (một lệnh, tất cả hoặc không).
+    setProperties: (o) => {
+      const next = Object.assign({}, state.props);
+      Object.keys(o).forEach(k => { const v = String(o[k]); if (Buffer.byteLength(k + v, 'utf8') > 9 * 1024) throw new Error('Exception: Argument too large: value (Script Properties 9 KB)'); next[k] = v; });
+      if (Object.keys(next).reduce((n, x) => n + Buffer.byteLength(x + next[x], 'utf8'), 0) > 500 * 1024) throw new Error('Exception: You have exceeded the property storage quota.');
+      Object.assign(state.props, next); return store;
+    }
   };
   const PropertiesService = { getScriptProperties: () => store };
   const LockService = { getScriptLock: () => ({ tryLock: () => { state.lockCalls++; if (state.lockBusy) return false; state.lockHeld = true; return true; }, waitLock: () => { state.lockCalls++; state.lockHeld = true; }, releaseLock: () => { state.lockHeld = false; } }) };
-  const cacheApi = {
-    get: (k) => (k in state.cache ? state.cache[k] : null),
-    // Giới hạn như Google thật (soát R1 C2): hạn tối đa 21600 giây, giá trị tối đa 100 KB, khoá tối đa 250 ký tự.
-    put: (k, v, ttl) => { checkCache(k, v, ttl); state.cache[k] = String(v); },
-    remove: (k) => { delete state.cache[k]; },
-    removeAll: (ks) => { ks.forEach(k => { delete state.cache[k]; }); },
-    getAll: (ks) => { const o = {}; ks.forEach(k => { if (k in state.cache) o[k] = state.cache[k]; }); return o; },
-    putAll: (o, ttl) => { Object.keys(o).forEach(k => { checkCache(k, o[k], ttl); state.cache[k] = String(o[k]); }); }
+  // CacheService (luật 14: không "tốt bụng" hơn Google). Google thật: giá trị phải là CHỮ (put số hoặc đối tượng thì báo lỗi), khoá không trống, tối đa 250 ký tự,
+  // giá trị tối đa 100 KB, hạn tối thiểu 1 và tối đa 21600 giây (mặc định 600), mục HẾT HẠN thì get trả null. Hạn tính theo đồng hồ THẬT (Date.now, luật 1):
+  // test dời đồng hồ thật bằng cách gán Date.now (như các test khác), hoặc state.cacheClockMs += mili giây. state.cache (khoá → chữ) vẫn đọc ghi trực tiếp được cho test;
+  // mục test ghi tay không có hạn. Hạn nằm ở state.cacheExp (khoá → { exp, v }); chỉ có hiệu lực khi v còn đúng giá trị đã put.
+  state.cacheExp = {}; state.cacheClockMs = 0;
+  const cacheNow = () => Date.now() + state.cacheClockMs;
+  const cacheAlive = (k) => {
+    const e = state.cacheExp[k];
+    if (e && e.v === state.cache[k] && cacheNow() >= e.exp) { delete state.cache[k]; delete state.cacheExp[k]; }
+    return k in state.cache;
   };
-  function checkCache(k, v, ttl) {
-    if (ttl !== undefined && ttl > 21600) throw new Error('Exception: Argument too large: expirationInSeconds');
-    if (String(k).length > 250) throw new Error('Exception: Argument too large: key');
-    if (Buffer.byteLength(String(v), 'utf8') > 102400) throw new Error('Exception: Argument too large: value');
-  }
+  const cacheKey = (k) => {
+    if (typeof k !== 'string' || k === '') throw new Error('Exception: Invalid argument: key');
+    if (k.length > 250) throw new Error('Exception: Argument too large: key');
+    return k;
+  };
+  const cachePut = (k, v, ttl) => {
+    cacheKey(k);
+    if (typeof v !== 'string') throw new Error('Exception: Invalid argument: value');
+    if (ttl !== undefined && ttl !== null) {
+      if (typeof ttl !== 'number' || isNaN(ttl)) throw new Error('Exception: Invalid argument: expirationInSeconds');
+      if (ttl < 1) throw new Error('Exception: Invalid argument: expirationInSeconds (tối thiểu 1 giây)');
+      if (ttl > 21600) throw new Error('Exception: Argument too large: expirationInSeconds');
+    }
+    if (Buffer.byteLength(v, 'utf8') > 102400) throw new Error('Exception: Argument too large: value');
+    state.cache[k] = v; state.cacheExp[k] = { exp: cacheNow() + (ttl === undefined || ttl === null ? 600 : ttl) * 1000, v };
+  };
+  const cacheApi = {
+    get: (k) => (cacheAlive(cacheKey(k)) ? state.cache[k] : null),
+    put: (k, v, ttl) => { cachePut(k, v, ttl); },
+    remove: (k) => { cacheKey(k); delete state.cache[k]; delete state.cacheExp[k]; },
+    removeAll: (ks) => { ks.forEach(k => { cacheKey(k); delete state.cache[k]; delete state.cacheExp[k]; }); },
+    getAll: (ks) => { const o = {}; ks.forEach(k => { if (cacheAlive(cacheKey(k))) o[k] = state.cache[k]; }); return o; },
+    // Kiểm hết mọi cặp trước khi ghi (putAll hỏng thì không ghi gì).
+    putAll: (o, ttl) => { Object.keys(o).forEach(k => { cacheKey(k); if (typeof o[k] !== 'string') throw new Error('Exception: Invalid argument: value'); }); Object.keys(o).forEach(k => cachePut(k, o[k], ttl)); }
+  };
   const CacheService = { getScriptCache: () => cacheApi };
 
   // ── Utilities ──

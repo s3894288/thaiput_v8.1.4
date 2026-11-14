@@ -295,7 +295,9 @@ function hourlyJob(e) { requireOperator_(e);
   var logQueued = [];
   var res = runJob_('hourlyJob', function () {
     // Chunk 5G (soát R3 N5): dọn lần bỏ dòng dở TRƯỚC mọi bước khác, để đối soát không thấy dòng trùng ở đuôi.
-    try { var pp = props_().getProperties(); Object.keys(pp).forEach(function (k) { var tn = k.replace(/^PURGE_OPEN_/, ''); if (k !== tn && SCHEMA[tn]) purgeRecover_(tn); }); } catch (pe) { Logger.log('Dọn lần bỏ dòng dở lỗi: ' + pe.message); }
+    try { purgeRecoverAll_(); } catch (pe) { Logger.log('Dọn lần bỏ dòng dở lỗi: ' + pe.message); }
+    // Soát X2 (FIX A): tóm tắt cập nhật đã ghi nhận phiên bản nhưng giao dở (khoá bận, bị cắt, email lỗi): làm nốt phần còn thiếu, có giới hạn số lần thử (Release.gs).
+    try { releaseResumeInLock_(); } catch (re) { Logger.log('Giao nốt tóm tắt cập nhật lỗi: ' + re.message); }
     logQueued = drainLogQueue_(true);   // chunk 5I: nhật ký từng gặp khoá bận; xoá hàng chờ sau khi ra khỏi khoá
     // Làm đầu tiên: bước sau có lỗi thì phiên của tài khoản DISABLED vẫn bị huỷ.
     var revoked = revokeDisabledSessionsInLock_(getNow_());
