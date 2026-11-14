@@ -20,10 +20,13 @@ const { combinedSource, sourceFiles } = require('./load');
 
 const ROOT = path.join(__dirname, '..'), DIST = path.join(ROOT, 'dist');
 fs.mkdirSync(DIST, { recursive: true });
-const version = (fs.readFileSync(path.join(ROOT, 'src', 'Config.gs'), 'utf8').match(/VERSION:\s*'([^']+)'/) || [])[1];
+const cfgSrc = fs.readFileSync(path.join(ROOT, 'src', 'Config.gs'), 'utf8');
+const version = (cfgSrc.match(/VERSION:\s*'([^']+)'/) || [])[1];
+const versionDate = (cfgSrc.match(/VERSION_DATE:\s*'([^']+)'/) || [])[1] || '';
+const vtag = 'v' + version + (versionDate ? ' (' + versionDate + ')' : '');
 const head = [
   '/**',
-  ' * THAIPUT v' + version + ' · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)',
+  ' * THAIPUT ' + vtag + ' · Code.gs (bản gộp để dán tay vào trình soạn thảo Apps Script)',
   ' * Gộp từ ' + sourceFiles().length + ' file trong src/: ' + sourceFiles().join(', '),
   ' * Không sửa file này: sửa src/ rồi chạy node test/build_dist.js. Hướng dẫn cập nhật: HUONG_DAN_PHAT_HANH.md.',
   ' * Gửi email cố định từ 8.1.4 (MailTransport.gs, GmailApp): KHÔNG cần file MailFix, KHÔNG tìm và thay. Có file MailFix.gs cũ thì xoá.',
@@ -54,10 +57,10 @@ if (process.argv.indexOf('--production') !== -1) {
   const OUT = process.env.TP_PROD_OUT || path.join(ROOT, 'dist_production');
   fs.mkdirSync(OUT, { recursive: true });
   fs.readdirSync(OUT).forEach(f => fs.unlinkSync(path.join(OUT, f)));
-  const man = ['THAIPUT v' + version + ' · bản PRODUCTION chia file', 'Tạo lúc ' + new Date().toISOString(), '', 'Dán từng file vào trình soạn Apps Script (tên file giữ nguyên, bỏ đuôi .gs khi tạo file mới).', 'Thứ tự file không ảnh hưởng (test I88).', ''];
+  const man = ['THAIPUT ' + vtag + ' · bản PRODUCTION chia file', 'Tạo lúc ' + new Date().toISOString(), '', 'Dán từng file vào trình soạn Apps Script (tên file giữ nguyên, bỏ đuôi .gs khi tạo file mới).', 'Thứ tự file không ảnh hưởng (test I88).', ''];
   const sha = (t) => crypto.createHash('sha256').update(t, 'utf8').digest('hex');
   sourceFiles().forEach(f => {
-    const txt = '// THAIPUT v' + version + ' · ' + f + ' · sinh từ src/, không sửa tay\n' + fs.readFileSync(path.join(ROOT, 'src', f), 'utf8');
+    const txt = '// THAIPUT ' + vtag + ' · ' + f + ' · sinh từ src/, không sửa tay\n' + fs.readFileSync(path.join(ROOT, 'src', f), 'utf8');
     fs.writeFileSync(path.join(OUT, f), txt); man.push(f + '  ' + sha(txt));
   });
   fs.writeFileSync(path.join(OUT, 'Index.html'), index); man.push('Index.html  ' + sha(index));

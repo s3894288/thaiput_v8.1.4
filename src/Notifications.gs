@@ -52,6 +52,8 @@ var DEFAULT_NOTIFY_RULES_ = {
   RESULT_NOT_COMPLETED: ['WARNING', 'DIGEST', 'Buổi thành Không hoàn thành vì tutor không chọn kết quả (không tính lương)'],
   // Chunk 5N: buổi kẹt Chờ đổi tutor (PENDING_REASSIGN) quá REASSIGN_STUCK_HOURS giờ: chưa có tutor dạy, admin phải đổi tutor hoặc huỷ.
   REASSIGN_STUCK: ['CRITICAL', 'EMAIL', 'Buổi kẹt ở Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: chọn Đổi tutor hoặc Huỷ bởi admin ở cột admin_action'],
+  // Chunk 5R: một lần sau menu 1 khi phiên bản code đổi (Release.gs): tổng hợp thay đổi và những gì lượt chạy đã làm.
+  RELEASE_NOTES: ['INFO', 'EMAIL', 'Sau menu 1 khi phiên bản code đổi: tóm tắt thay đổi của bản mới và những gì lượt chạy đã làm, một lần mỗi lần đổi phiên bản (chi tiết ở tab RELEASE_LOG)'],
   TECH_MIGRATED: ['WARNING', 'EMAIL', 'Bản 8.1.0 chuyển buổi kỹ thuật cũ "Tính lương" sang Lỗi khách quan: admin xem lại từng buổi và chọn đúng lỗi']
 };
 

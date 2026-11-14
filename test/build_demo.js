@@ -17,7 +17,9 @@ const mock = fs.readFileSync(path.join(ROOT, 'demo', 'demo_mock.js'), 'utf8');
 const { load } = require('./load');
 // Chữ web cả hai thứ tiếng như máy chủ gửi (key → [vi, en]), kể cả câu báo lỗi r.MÃ.
 const contentDefaults = (() => { const api = load().api, d = api.contentDefaults_(), out = {}; Object.keys(d).forEach(k => { out[k] = [d[k].vi, d[k].en]; }); return out; })();
-const version = (fs.readFileSync(path.join(ROOT, 'src', 'Config.gs'), 'utf8').match(/VERSION:\s*'([^']+)'/) || [])[1] || '';
+const cfgSrc = fs.readFileSync(path.join(ROOT, 'src', 'Config.gs'), 'utf8');
+const version = (cfgSrc.match(/VERSION:\s*'([^']+)'/) || [])[1] || '';
+const versionDate = (cfgSrc.match(/VERSION_DATE:\s*'([^']+)'/) || [])[1] || '';
 
 const demoBar = `
 <style>
@@ -37,7 +39,7 @@ const demoBar = `
     <button type="button" data-role="tutor" aria-pressed="false">Tutor</button>
     <button type="button" data-role="admin" aria-pressed="false">Admin</button>
   </div>
-  <div class="meta"><span><span class="tag">Demo v${version}</span> · <span data-vi="dữ liệu giả, không gửi email" data-en="fake data, no emails">dữ liệu giả, không gửi email</span></span><button type="button" id="demo-reset" data-vi="Làm mới" data-en="Reset">Làm mới</button></div>
+  <div class="meta"><span><span class="tag">Demo v${version}${versionDate ? ' (' + versionDate + ')' : ''}</span> · <span data-vi="dữ liệu giả, không gửi email" data-en="fake data, no emails">dữ liệu giả, không gửi email</span></span><button type="button" id="demo-reset" data-vi="Làm mới" data-en="Reset">Làm mới</button></div>
 </div>`;
 
 const demoScript = `

@@ -14,7 +14,8 @@
  */
 
 var APP = {
-  VERSION: '8.1.8',
+  VERSION: '8.1.9',
+  VERSION_DATE: '14/11/2026',   // ngày phát hành (dd/mm/yyyy), hiện ở dòng đầu menu 1, dist/Code.gs, thông báo cập nhật
   NAME: 'thaiput',
   TIMEZONE: 'Asia/Ho_Chi_Minh'
 };

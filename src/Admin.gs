@@ -77,6 +77,7 @@ function onOpen() {
       .addItem('Bảo trì: tắt (chạy bình thường)', 'menuMaintOff')
       .addSeparator()
       .addItem('Phát hành: sao lưu ngay (thư mục Releases, không tự xoá)', 'menuReleaseBackup')
+      .addItem('Phát hành: xem thay đổi của bản này', 'menuReleaseNotes')
       .addItem('Các bước chuyển dữ liệu theo phiên bản (chỉ đọc)', 'menuMigrationStatus')
       .addItem('Bù buổi 8.1.0: xem trước gói sẽ đổi ngày (chỉ đọc)', 'menuCompDryRun'))
     .addSubMenu(ui.createMenu('Chuyển hệ thống')
@@ -155,7 +156,7 @@ function onEditInstallable(e) { requireOperator_(e);
  * nhật ký (ACTIVITY_LOG, MAIL_LOG, METRICS) để không tự sinh dòng vô tận; tab AUTH chỉ ghi ô nào bị sửa, không ghi giá trị (mã phiên).
  * Tab không thuộc hệ thống (REPORT_MONTH, tab admin tự tạo) bỏ qua.
  */
-var SHEET_EDIT_SKIP_ = ['ACTIVITY_LOG', 'MAIL_LOG', 'METRICS'];
+var SHEET_EDIT_SKIP_ = ['ACTIVITY_LOG', 'MAIL_LOG', 'METRICS', 'RELEASE_LOG'];
 var SHEET_EDIT_HIDE_VALUES_ = ['AUTH'];
 function colLetter_(n) { var out = ''; for (; n > 0; n = Math.floor((n - 1) / 26)) out = String.fromCharCode(65 + (n - 1) % 26) + out; return out; }
 function a1Of_(row, col, nr, nc) { var a = colLetter_(col) + row; return nr > 1 || nc > 1 ? a + ':' + colLetter_(col + nc - 1) + (row + nr - 1) : a; }

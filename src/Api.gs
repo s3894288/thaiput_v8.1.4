@@ -28,7 +28,7 @@ function doGet(e) {
  */
 function bootJson_(params) {
   var page = String(params.page || 'home'), tok = String(params.t || '');
-  var boot = { page: /^[a-z]{1,20}$/.test(page) ? page : 'home', linkToken: /^[a-f0-9]{32,128}$/i.test(tok) ? tok : '', version: APP.VERSION };
+  var boot = { page: /^[a-z]{1,20}$/.test(page) ? page : 'home', linkToken: /^[a-f0-9]{32,128}$/i.test(tok) ? tok : '', version: APP.VERSION, versionDate: APP.VERSION_DATE };
   // Đăng nhập Google (chunk 5D): dự án phụ chuyển sang ?page=gauth&ge=email&gts=thời điểm&gs=chữ ký. Chỉ nhận đúng dạng.
   if (boot.page === 'gauth') {
     var ge = String(params.ge || '').toLowerCase(), gts = String(params.gts || ''), gs = String(params.gs || '');

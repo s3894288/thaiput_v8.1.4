@@ -141,6 +141,12 @@ var DEFAULT_EMAIL_TEMPLATES_ = {
     '[Daily summary {{date}}] {{count}} notifications', 'Daily summary',
     '{{count}} notifications today. Full list above and in the NOTIFICATIONS tab.',
     'date, count, summary_html, table_html, sheet_link'],
+  // Chunk 5R: gửi một lần sau menu 1 khi phiên bản code đổi (Release.gs, releaseDeliver_). {{summary_html}} do code dựng, hai thứ tiếng (summary_html_en cho nửa tiếng Anh).
+  ADMIN_RELEASE_NOTES: ['ADMIN', 'thaiput đã cập nhật lên bản {{to}}', 'Tóm tắt cập nhật lên bản {{to}}',
+    'Hệ thống vừa cập nhật từ bản **{{from}}** lên bản **{{to}}** ({{date}}). Dưới đây là thay đổi của từng bản và những gì lượt chạy menu 1 vừa làm (đo thật).\n\n{{summary_html}}\n\n{{button:sheet_link|Mở tab RELEASE_LOG}}\n\nEmail này chỉ gửi một lần mỗi lần đổi phiên bản.',
+    'thaiput updated to version {{to}}', 'Update summary for version {{to}}',
+    'The system just updated from version **{{from}}** to version **{{to}}** ({{date}}). Below are the changes of each version and what the menu 1 run just did (measured).\n\n{{summary_html}}\n\n{{button:sheet_link|Open the RELEASE_LOG tab}}\n\nThis email is sent once per version change.',
+    'from, to, date, summary_html, sheet_link'],
   // Chunk 5I: menu "Kiểm tra gửi email": thư nhỏ có mã để tìm trong hộp thư và trong Email Log Search của admin.google.com.
   MAIL_TEST: ['ALL', 'Kiểm tra gửi email thaiput {{code}}', 'Email kiểm tra',
     'Đây là email kiểm tra admin gửi từ menu thaiput lúc **{{time}}**.\n\nMã kiểm tra: **{{code}}**. Thấy email này nghĩa là đường gửi từ {{sender}} tới hộp thư này đang hoạt động. Không cần trả lời.',
@@ -275,6 +281,6 @@ function sampleTplVars_(key) {
     device: 'Chrome · Windows', via: 'link email', via_en: 'email link',
     tag: 'Cần xử lý', tag_en: 'Action needed', message: 'Ví dụ thông báo', message_en: 'Sample notification', code: 'MT0000', sender: 'admin@example.com', event: 'STUDENT_CANCELLED', time: fmtDateTime_(getNow_()),
     lesson_date: 'Thứ 2 20/10', lesson_slot: '19:00', days: 3, old_end: '20/10/2026',
-    summary_html: '<ul><li>RESULT_COMPLETED: <b>5</b></li></ul>', table_html: '', subject: 'Ví dụ lỗi', detail_html: '<pre>Ví dụ chi tiết lỗi</pre>'
+    summary_html: '<ul><li>RESULT_COMPLETED: <b>5</b></li></ul>', from: '8.1.4', to: '8.1.9', table_html: '', subject: 'Ví dụ lỗi', detail_html: '<pre>Ví dụ chi tiết lỗi</pre>'
   };
 }
