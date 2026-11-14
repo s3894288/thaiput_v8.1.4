@@ -72,6 +72,8 @@ function createGasEnv(opts) {
           if (state.failSetValuesOnce && state.failSetValuesOnce === name && nr > 1) { state.failSetValuesOnce = null; throw new Error('Service Spreadsheets timed out (giả lập)'); }
           state.writeCalls = (state.writeCalls || 0) + 1;
           if (vals.length !== nr || vals.some(l => l.length !== nc)) throw new Error('Kích thước dữ liệu không khớp vùng ghi (' + nr + 'x' + nc + ')');
+          // Google thật: một ô tối đa 50.000 ký tự (luật 14: mock không "tốt bụng" hơn Google); vượt thì lệnh ghi bị từ chối, không ghi gì.
+          vals.forEach(l => l.forEach(v => { if (typeof v === 'string' && v.length > 50000) throw new Error('Exception: Your input contains more than the maximum of 50000 characters in a single cell.'); }));
           for (let i = 0; i < nr; i++) { ensureRow(row + i); const line = sh.values[row - 1 + i]; for (let j = 0; j < nc; j++) { const key = (row + i) + ':' + (col + j); const v = vals[i][j]; lit(line, col - 1 + j, false); if (sh.formats[key] === '@') { line[col - 1 + j] = v instanceof Date ? v : (v === '' || v === null || v === undefined ? '' : String(v)); lit(line, col - 1 + j, typeof line[col - 1 + j] === 'string' && line[col - 1 + j].charAt(0) === '='); }
             else if (typeof v === 'string' && v.charAt(0) === "'") { line[col - 1 + j] = v.substring(1); lit(line, col - 1 + j, true); }
             else { if (typeof v === 'string' && /^[=+\-@]/.test(v) && !/^[+-]?\d/.test(v)) state.formulaWrites.push({ sheet: name, cell: key, value: v }); line[col - 1 + j] = autoParse(v); } } }

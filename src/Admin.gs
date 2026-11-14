@@ -66,6 +66,7 @@ function onOpen() {
       .addItem('Báo cáo tháng trước', 'menuReportLastMonth'))
     .addSubMenu(ui.createMenu('Email')
       .addItem('Cập nhật nội dung web và email (sau khi sửa CONTENT, EMAIL_TEMPLATES)', 'menuRefreshContent')
+      .addItem('Làm mới ảnh QR chuyển khoản (sau khi thay file ảnh)', 'menuRefreshBankQr')
       .addItem('Gửi thử một mẫu email cho tôi', 'menuPreviewEmail')
       .addItem('Kiểm tra gửi email (thư có mã, hướng dẫn tìm thư bị mất)', 'menuMailTest')
       .addSeparator()
@@ -130,7 +131,7 @@ function onEditInstallable(e) { requireOperator_(e);
   var editedAt = getNow_();
   var sh = e.range.getSheet(), name = sh.getName();
   // Chunk 5F: admin sửa tay thì bộ đệm dùng chung hết hiệu lực ngay (CONFIG 60 giây, danh sách slot 60 giây).
-  if (name === 'CONFIG') { dropConfigCache_(); bumpSlotsVersion_(); }
+  if (name === 'CONFIG') { dropConfigCache_(); bumpSlotsVersion_(); try { bankQrEditCheck_(sh, e.range); } catch (qx) { Logger.log('Làm mới ảnh QR sau khi sửa CONFIG lỗi: ' + qx.message); } }
   if (name === 'BOOKINGS' || name === 'AVAILABILITY' || name === 'USERS') bumpSlotsVersion_();
   // Chunk 5I: nhật ký ghi mọi sửa tay trong Sheets (tab, ô, giá trị cũ và mới). Lỗi ghi nhật ký không chặn việc xử lý bên dưới.
   try { logSheetEdit_(e, sh, name); } catch (x) { Logger.log('Không ghi được nhật ký sửa tay: ' + x.message); }
@@ -149,6 +150,18 @@ function onEditInstallable(e) { requireOperator_(e);
   var res = handleAdminEdit_(name, String(header), id, value, adminActor_(e), { at: editedAt });
   if (res && res.message) { try { SpreadsheetApp.getActive().toast(res.message, 'thaiput', 8); } catch (x) { } }
   return res;
+}
+
+/** Sửa tay tab CONFIG chạm tới dòng BANK_QR_IMAGE, BANK_NAME, BANK_ACCOUNT hoặc BANK_HOLDER (hoặc vùng lớn không đọc hết được) thì làm mới ảnh QR cho khách (soát 5R). Trả true nếu đã làm mới. */
+function bankQrEditCheck_(sh, range) {
+  var row = range.getRow(), nr = range.getNumRows(), hit = nr > 200;
+  if (!hit) {
+    var kc = 1, last = sh.getLastColumn(), head = last ? sh.getRange(1, 1, 1, last).getValues()[0] : [];
+    for (var i = 0; i < head.length; i++) if (String(head[i]).trim() === 'key') { kc = i + 1; break; }
+    if (row + nr - 1 >= 2) sh.getRange(Math.max(row, 2), kc, row + nr - Math.max(row, 2), 1).getValues().forEach(function (l) { if (BANK_QR_WATCH_KEYS_.indexOf(String(l[0]).trim()) !== -1) hit = true; });
+  }
+  if (hit) bankQrBump_();
+  return hit;
 }
 
 /*
@@ -464,6 +477,18 @@ function menuRefreshContent(e) { requireOperator_(e);
   var r = refreshContent_();
   logMenu_(e, 'CONTENT_REFRESHED', 'CONTENT', '', JSON.stringify({ warnings: r.warnings.length }));
   alert_('Đã cập nhật. Tải lại trang web để thấy chữ mới; email gửi từ bây giờ dùng mẫu mới.' + (r.warnings.length ? '\n\nCần xem lại:\n' + r.warnings.slice(0, 20).join('\n') : '\nKhông thấy lỗi.'));
+}
+/**
+ * Soát 5R: làm mới ảnh QR chuyển khoản cho mọi khách ngay (tăng BANK_QR_REV). Dùng sau khi thay file ảnh dưới cùng link, hoặc đổi tài khoản ngân hàng.
+ * Không ghi Sheets ngoài nhật ký; đọc thử ảnh một lần để báo ngay ảnh có dùng được không.
+ */
+function menuRefreshBankQr(e) { requireOperator_(e);
+  bankQrBump_();
+  var v = String(cfg_('BANK_QR_IMAGE') || '').trim(), r = v ? bankQrRead_(v) : null;
+  logMenu_(e, 'BANK_QR_REFRESH', 'CONFIG', 'BANK_QR_IMAGE', JSON.stringify({ result: !v ? 'EMPTY' : (r.ok ? 'OK' : r.code) }));
+  alert_(!v ? 'Đã làm mới. BANK_QR_IMAGE đang trống nên trang không hiện mã QR.'
+    : r.ok ? 'Đã làm mới ảnh QR cho khách: từ bây giờ trang hiện ảnh hiện tại của link (' + r.type + ', ' + r.kb + ' KB).'
+    : 'Đã làm mới, nhưng ảnh QR đang LỖI (' + r.code + '): ' + r.fix + ' Trang đang ẩn ô QR cho tới khi sửa xong và làm mới lại.');
 }
 /** Xoá bộ nhớ đệm và kiểm tra: key lạ hoặc mất {bien} trong CONTENT, biến không có trong danh sách của mẫu email, chiến dịch marketing lỗi. */
 function refreshContent_() {

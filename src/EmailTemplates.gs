@@ -190,9 +190,11 @@ function emailTemplate_(key) {
     if (v !== '' && d && TEMPLATE_UPGRADES_[key] && TEMPLATE_UPGRADES_[key][c] === v) v = '';
     t[c] = v.trim() === '-' ? '' : (v !== '' ? v : (d ? d[i] : ''));   // ô trống = mẫu gốc; dấu - = cố ý để trống
   });
-  if (row.active !== undefined && row.active !== '' && (row.active === false || String(row.active).toUpperCase() === 'FALSE')) t.active = false;
+  if (!emailActiveOn_(row.active)) t.active = false;
   return t;
 }
+/** Hàm thuần: giá trị ô active của EMAIL_TEMPLATES có nghĩa là MẪU ĐANG GỬI không. Chỉ FALSE (ô tick bỏ hoặc chữ FALSE) là tắt; trống hay giá trị khác là bật. Dùng chung với bước gộp dòng trùng (Setup.gs). */
+function emailActiveOn_(v) { return !(v !== undefined && v !== '' && (v === false || String(v).toUpperCase() === 'FALSE')); }
 
 /** Thay {{bien}} trong một dòng chữ thường (tiêu đề): không thoát HTML, biến _html bị bỏ. */
 function renderPlain_(text, vars, lang) {

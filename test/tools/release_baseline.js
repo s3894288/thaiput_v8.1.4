@@ -11,6 +11,9 @@
  *      (config: ADDED, CHANGED, REMOVED; content, templates, notify cũng vậy; data: key là TAB hoặc TAB.cột).
  *   3. node test/tools/release_baseline.js --write      (từ chối nếu ghi chú chưa phủ hết thay đổi, hoặc nếu chưa tăng phiên bản)
  *   4. node test/tools/release_baseline.js              (in ra thay đổi so với baseline và phần ghi chú còn thiếu, không ghi gì)
+ * Bản CHƯA phát hành (chưa dán lên hệ thống nào) mà soát thêm mặc định mới: thêm mục vào phần tử RELEASE_NOTES_ của chính bản đó rồi
+ *   node test/tools/release_baseline.js --write --same-version     (cho phép ghi khi APP.VERSION không đổi; vẫn từ chối nếu ghi chú chưa phủ hết)
+ * Không dùng --same-version cho bản đã phát hành: admin đã nâng cấp bằng bản đó sẽ không được báo thay đổi mới (phải tăng phiên bản).
  * fingerprint(api, version) dùng cả cho fixture 8.1.4 (test/fixtures/release_baseline_8_1_4.json) để test I149 đối chiếu ghi chú 8.1.5 đến 8.1.9.
  */
 'use strict';
@@ -94,7 +97,7 @@ function main() {
   miss.forEach(i => console.log('  THIẾU ghi chú: ' + i.group + ' ' + i.key + ' ' + i.kind));
   if (!write) return;
   if (!noteOfCur.length || miss.length) { console.error('Không ghi baseline: ghi chú phát hành chưa phủ hết.'); process.exit(1); }
-  if (items.length && base.version === cur.version) { console.error('Không ghi baseline: mặc định đổi nhưng APP.VERSION vẫn là ' + cur.version + '. Tăng phiên bản trước.'); process.exit(1); }
+  if (items.length && base.version === cur.version && process.argv.indexOf('--same-version') === -1) { console.error('Không ghi baseline: mặc định đổi nhưng APP.VERSION vẫn là ' + cur.version + '. Tăng phiên bản trước (hoặc --same-version nếu bản này chưa phát hành).'); process.exit(1); }
   fs.writeFileSync(BASELINE, JSON.stringify(cur, null, 1) + '\n');
   console.log('Đã ghi baseline cho bản ' + cur.version);
 }

@@ -500,6 +500,8 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
   })();
   var TAB_KEY = 'thaiput_tab_session', SHARED_KEY = 'thaiput_session';
   function parse(raw) { try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  /** Việc mỗi view đăng ký để quên dữ liệu của người đang đăng nhập khi phiên kết thúc (thoát, hết hạn): thiết bị dùng chung không để người sau thấy dữ liệu người trước (soát 5R). */
+  T.sessionEnd = [];
   T.session = {
     get: function () {
       var s = parse(T.store.tab.get(TAB_KEY));
@@ -517,6 +519,7 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
       if (!last || last.token === o.token) T.store.shared.set(SHARED_KEY, v);
     },
     clear: function () {
+      T.sessionEnd.forEach(function (f) { try { f(); } catch (e) { } });
       var mine = parse(T.store.tab.get(TAB_KEY)), last = parse(T.store.shared.get(SHARED_KEY));
       T.store.tab.set(TAB_KEY, null);
       if (!mine || (last && last.token === mine.token)) T.store.shared.set(SHARED_KEY, null);
@@ -1525,13 +1528,18 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
     user: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
     check: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>'
   };
-  var st = { tab: 'schedule', home: null, av: null, week: 1, dirty: {}, pick: {}, pre: null };
+  var st = { tab: 'schedule', home: null, av: null, week: 1, dirty: {}, pick: {}, pre: null, tok: '' };
+  /** Quên dữ liệu của người trước (soát 5R): bản giờ rảnh tải trước, giờ đang sửa, kết quả đang chọn, trang chủ. Gọi khi phiên kết thúc và khi vào cổng bằng phiên khác. */
+  function resetView() { st.home = null; st.av = null; st.dirty = {}; st.pick = {}; st.pre = null; }
+  T.sessionEnd.push(function () { resetView(); st.tok = ''; });
   /** Giờ rảnh tải trước (nền) tối đa bao lâu thì còn dùng được, mili giây. */
   var PRE_MAX_MS = 60000;
 
   T.views.tutor = {
     render: function (root, opts) {
       st.tab = (opts && opts.tab) || st.tab || 'schedule';
+      var tok = T.token();
+      if (st.tok !== tok) { resetView(); st.tok = tok; }   // phiên khác (người khác dùng chung máy): không mang dữ liệu người trước sang
       root.innerHTML = T.topbar() + T.skeleton(3);
       T.authed('apiTutorHome').then(function (r) {
         if (!r.ok) { root.innerHTML = T.topbar() + '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
@@ -1626,14 +1634,14 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
    */
   function prefetchAvail() {
     if (st.tab === 'avail') return;
-    var mine = { t: Date.now(), p: null };
+    var mine = { t: Date.now(), tok: T.token(), p: null };   // gắn với phiên đã tải nó (soát 5R): takePre chỉ trả lại cho đúng phiên đó
     mine.p = T.api('apiTutorAvailability', T.token(), '', 14).then(function (r) { return r && r.ok ? r : null; }, function () { return null; }).catch(function () { return null; });
     st.pre = mine;
   }
-  /** Lấy kết quả tải trước nếu còn mới (dưới 60 giây), dùng một lần; không thì null. */
+  /** Lấy kết quả tải trước nếu còn mới (dưới 60 giây) VÀ của đúng phiên đang đăng nhập, dùng một lần; không thì null. */
   function takePre() {
     var pre = st.pre; st.pre = null;
-    return pre && Date.now() - pre.t < PRE_MAX_MS ? pre.p : null;
+    return pre && pre.tok && pre.tok === T.token() && Date.now() - pre.t < PRE_MAX_MS ? pre.p : null;
   }
 
   function drawAvail(body, root) {

@@ -11,8 +11,10 @@
  *
  * Chạy lại (cần lịch sử git có commit 7bb6780; test thường KHÔNG cần, vì đọc thẳng file JSON đã commit):
  *     TZ=Asia/Ho_Chi_Minh node test/tools/make_fixture_8_1_4.js
- * Giờ giả lập cuối: thứ Ba 10/11/2026 10:00 (SIM_NOW nằm trong Script Properties của fixture). Mọi dữ liệu, trừ mã băm token đăng nhập (ngẫu nhiên mỗi lần),
- * giống nhau giữa các lần chạy; chạy lại sẽ đổi file JSON ở các ô token_hash của tab AUTH và dấu băm, không đổi gì khác.
+ * Giờ giả lập cuối: thứ Ba 10/11/2026 10:00 (SIM_NOW nằm trong Script Properties của fixture). Chạy lại sẽ đổi file JSON ở: (1) mã băm token đăng nhập
+ * (ngẫu nhiên mỗi lần: ô token_hash của tab AUTH và dấu băm); (2) các mốc ĐỒNG HỒ THẬT trong Script Properties (nhịp tim HB_<job>, BACKUP_OK_AT, MET_LAST),
+ * vì mock lấy Date.now() thật lúc chạy. Mốc (2) không phải dữ liệu cố định: bộ thử nâng cấp (integration.js, fx814) dời chúng về "bây giờ" mỗi lần nạp
+ * (fixture_io.rebaseRealClock), nếu không trang health sẽ báo STALE khi fixture cũ hơn 30 phút. Ngoài hai nhóm này, mọi dữ liệu giống nhau giữa các lần chạy.
  */
 'use strict';
 process.env.TZ = 'Asia/Ho_Chi_Minh';

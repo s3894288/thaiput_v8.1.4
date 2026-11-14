@@ -93,4 +93,25 @@ function restore(env, data) {
   st.mails = []; st.calendarCalls = []; st.cache = {};
 }
 
-module.exports = { dump, restore, stringify, parse };
+/**
+ * Dời mọi giá trị ĐỒNG HỒ THẬT trong Script Properties về "bây giờ" (giữ nguyên khoảng cách giữa chúng). Fixture lưu các mốc này lúc dựng (nhịp tim job
+ * HB_<job>, BACKUP_OK_AT, MET_LAST...), còn mã đọc chúng bằng realNowMs_ (luật 1: ngoại lệ đồng hồ thật), nên để nguyên thì fixture càng cũ càng "STALE"
+ * và test đỏ không vì lỗi mã. Nhận dạng theo dạng giá trị, không theo danh sách tên: số nguyên 13 chữ số (mili giây Unix, 2017 đến 2033) hoặc "<mili giây>:<chuỗi>"
+ * (dấu chạy MKT_RUN_). Mốc gốc (anchor) là mốc lớn nhất trong nhóm HB_* và BACKUP_OK_AT (lúc dựng fixture), không phải mốc "đến hạn" ở tương lai.
+ * MET_LAST (mốc giờ tròn) chỉ dời theo số GIỜ NGUYÊN để vẫn tròn giờ. Giờ mô phỏng (SIM_NOW, ngày trong Sheets) KHÔNG đổi. Trả về { anchor, delta } hoặc null nếu không có gì để dời.
+ */
+const RC_MS_ = /^(1[5-9]\d{11})(?::.*)?$/;
+function rebaseRealClock(data, nowMs) {
+  const props = data.props || {}, keys = Object.keys(props).filter(k => typeof props[k] === 'string' && RC_MS_.test(props[k]));
+  if (!keys.length) return null;
+  const beat = keys.filter(k => /^HB_/.test(k) || k === 'BACKUP_OK_AT').map(k => Number(props[k].match(RC_MS_)[1]));
+  const anchor = beat.length ? Math.max.apply(null, beat) : Math.max.apply(null, keys.map(k => Number(props[k].match(RC_MS_)[1])));
+  const delta = nowMs - anchor, HOUR = 3600000, hourDelta = (Math.floor(nowMs / HOUR) - Math.floor(anchor / HOUR)) * HOUR;
+  keys.forEach(k => {
+    const m = props[k].match(RC_MS_), d = k === 'MET_LAST' ? hourDelta : delta;
+    props[k] = String(Number(m[1]) + d) + props[k].substring(m[1].length);
+  });
+  return { anchor, delta };
+}
+
+module.exports = { dump, restore, stringify, parse, rebaseRealClock };

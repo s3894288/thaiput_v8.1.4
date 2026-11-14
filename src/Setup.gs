@@ -80,12 +80,21 @@ function setupCore_(ss) {
   Object.keys(dropdownSpec_()).forEach(function (n) { var sh = ss.getSheetByName(n); applyDropdowns_(sh, n, 2, sh.getMaxRows() - 1); });
 
   // 2b. Gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT TRƯỚC khi gieo chữ gốc (soát T1): một key một dòng, không mất chữ admin sửa.
+  // Chữ admin bị bỏ luôn được ghi đủ vào ACTIVITY_LOG (TEMPLATE_DEDUPE_TEXT) trước khi ghi đè. Sao lưu trước cập nhật hỏng: không gộp key nào sẽ bỏ chữ admin.
+  var dupRep = [], dupFail = null;
+  try { dupRep = dedupeDuplicateKeys_({ protectText: RELEASE_SNAPSHOT_FAILED_ }); }
+  catch (de) { dupFail = de; dupRep = de.partial || []; }
   try {
-    var dupRep = dedupeDuplicateKeys_(), dupLines = dupReportLines_(dupRep);
+    var dupLines = dupReportLines_(dupRep);
     dupLines.forEach(function (l) { lines.push(l); });
-    dupRep.forEach(function (p, i) { upgradeAdd_('DUP_MERGED', p.tab + '.' + p.key, dupLines[i], 'Merged ' + p.rows.length + ' duplicate rows of key ' + p.key + ' in ' + p.tab + ' into one (rows ' + p.rows.join(', ') + '); admin edits kept.'); });
-  }
-  catch (de) { lines.push('CẢNH BÁO: chưa gộp được dòng trùng key ở EMAIL_TEMPLATES, CONTENT (' + de.message + '). Menu 2 vẫn báo key trùng; chạy lại menu 1 sau khi xem tab.'); }
+    dupRep.forEach(function (p, i) {
+      if (p.skipped) { upgradeAdd_('DUP_SKIPPED', p.tab + '.' + p.key, dupLines[i], 'NOT merged: key ' + p.key + ' in ' + p.tab + ' (rows ' + p.rows.join(', ') + ') because the pre-upgrade backup failed and the merge would discard admin text; rows left as they are.'); return; }
+      upgradeAdd_('DUP_MERGED', p.tab + '.' + p.key, dupLines[i], 'Merged ' + p.rows.length + ' duplicate rows of key ' + p.key + ' in ' + p.tab + ' into one (rows ' + p.rows.join(', ') + '); admin edits kept.');
+    });
+    // Mâu thuẫn ở ô active: dòng riêng, nổi bật (không chôn trong dòng gộp dài), và có trong tóm tắt cập nhật.
+    dupActiveWarnings_(dupRep).forEach(function (w) { lines.push(w.vi); upgradeAdd_('DUP_ACTIVE', w.tab + '.' + w.key, w.vi, w.en); });
+  } catch (de3) { lines.push('LƯU Ý: chưa lập được dòng báo gộp key trùng (' + de3.message + ').'); }
+  if (dupFail) lines.push('CẢNH BÁO: chưa gộp được dòng trùng key ở EMAIL_TEMPLATES, CONTENT (' + dupFail.message + '). Menu 2 vẫn báo key trùng; chạy lại menu 1 sau khi xem tab.');
 
   // 3. CONFIG: thêm khoá còn thiếu với giá trị mặc định
   clearDbCache_();
@@ -429,7 +438,7 @@ function dupTrunc_(v) { var s = String(v === undefined || v === null ? '' : v); 
  * hai bản admin sửa khác nhau: giữ bản đang có hiệu lực, ghi bản bị bỏ vào báo cáo. Trả { patch (cho dòng đầu), cells, removed }.
  */
 function dupMergeRows_(rows, spec) {
-  var patch = {}, cells = [], first = rows[0];
+  var patch = {}, cells = [], first = rows[0], active = null, pick = {}, paired = {};
   var has = function (v) { return !(v === undefined || v === null || String(v) === ''); };
   spec.cols.forEach(function (c) {
     var vals = rows.map(function (r) { return r[c]; });
@@ -440,35 +449,53 @@ function dupMergeRows_(rows, spec) {
     if (cur < 0 || !admin(cur)) {
       for (var j = vals.length - 1; j >= 0; j--) if (admin(j)) { chosen = j; adopted = true; break; }
     }
+    pick[c] = chosen;
     var value = chosen < 0 ? '' : vals[chosen], seen = {}, discarded = [];
     for (var i = vals.length - 1; i >= 0; i--) {
       if (i === chosen || !admin(i) || String(vals[i]) === String(value) || seen[String(vals[i])]) continue;
-      seen[String(vals[i])] = true; discarded.push({ row: rows[i]._row, text: dupTrunc_(vals[i]) });
+      // text: bản cắt gọn cho dòng chữ của menu 1; full: chữ đầy đủ, ghi nguyên vẹn vào ACTIVITY_LOG trước khi ghi đè (dupTextLogRows_).
+      seen[String(vals[i])] = true; discarded.push({ row: rows[i]._row, text: dupTrunc_(vals[i]), full: String(vals[i]) });
     }
     if (chosen >= 0 && String(first[c] === undefined || first[c] === null ? '' : first[c]) !== String(value)) patch[c] = value;
     if (adopted || discarded.length) cells.push({ col: c, adopted_from: adopted ? rows[chosen]._row : null, kept_row: chosen >= 0 ? rows[chosen]._row : null, discarded: discarded });
   });
+  // Ô trạng thái bật tắt (EMAIL_TEMPLATES.active): KHÔNG phải chữ để chọn bản "admin sửa". Dòng CUỐI luôn thắng, đúng cái emailTemplate_ đang dùng
+  // lúc gửi thư (bản 8.1.4 cũng đọc dòng cuối), theo cả hai chiều: gộp không bao giờ đổi việc một email đang gửi hay đang tắt.
+  if (spec.stateCol) {
+    var sc = spec.stateCol, lastRow = rows[rows.length - 1], lastOn = spec.isOn(lastRow[sc]);
+    if (String(first[sc] === undefined || first[sc] === null ? '' : first[sc]) !== String(lastRow[sc] === undefined || lastRow[sc] === null ? '' : lastRow[sc])) patch[sc] = lastRow[sc] === undefined || lastRow[sc] === null ? '' : lastRow[sc];
+    var opposite = rows.filter(function (r) { return spec.isOn(r[sc]) !== lastOn; }).map(function (r) { return r._row; });
+    if (opposite.length) active = { col: sc, kept_on: lastOn, kept_row: lastRow._row, opposite_rows: opposite };
+  }
+  // Ô chữ gốc ghi kèm (CONTENT.default_vi, default_en) lấy từ CÙNG dòng với ô chữ đã chọn (vi, en): "ô bằng chữ gốc đã ghi" phải còn đúng sau khi gộp.
+  // Lấy từ dòng đầu trong khi vi lấy từ dòng khác thì lần gieo chữ sau coi ô chưa sửa là "admin đã sửa" (CONTENT_KEPT) và không bao giờ nâng chữ gốc mới.
+  Object.keys(spec.paired || {}).forEach(function (d) {
+    var src = pick[spec.paired[d]];
+    if (src === undefined || src < 0 || !has(rows[src][d])) return;
+    paired[d] = true;
+    if (String(first[d] === undefined || first[d] === null ? '' : first[d]) !== String(rows[src][d])) patch[d] = rows[src][d];
+  });
   (spec.fixed || []).forEach(function (c) {
-    if (has(first[c])) return;
+    if (paired[c] || has(first[c])) return;
     for (var j = rows.length - 1; j > 0; j--) if (has(rows[j][c])) { patch[c] = rows[j][c]; return; }
   });
-  return { patch: patch, cells: cells, removed: rows.length - 1 };
+  return { patch: patch, cells: cells, removed: rows.length - 1, active: active };
 }
 
 /** Quy tắc gộp của từng tab. */
 function dupSpec_(tab) {
   if (tab === 'EMAIL_TEMPLATES') return {
-    cols: ['active', 'subject_vi', 'title_vi', 'body_vi', 'subject_en', 'title_en', 'body_en', 'note'], fixed: ['audience', 'variables'], start: 'row',
+    cols: ['subject_vi', 'title_vi', 'body_vi', 'subject_en', 'title_en', 'body_en', 'note'], fixed: ['audience', 'variables'], start: 'row',
+    stateCol: 'active', isOn: emailActiveOn_,
     isDefault: function (c, v, row) {
       var key = String(row.key).trim();
-      if (c === 'active') return String(v).trim().toUpperCase() !== 'FALSE';
       var s = String(v).trim(), d = DEFAULT_EMAIL_TEMPLATES_[key], i = TEMPLATE_COLS_.indexOf(c), old = TEMPLATE_UPGRADES_[key] && TEMPLATE_UPGRADES_[key][c];
       return (d && i !== -1 && s === String(d[i]).trim()) || (old !== undefined && s === String(old).trim());
     }
   };
   var defs = contentDefaults_();
   return {
-    cols: ['vi', 'en', 'note'], fixed: ['page', 'position', 'shown_when', 'default_vi', 'default_en'], start: 'nonEmpty',
+    cols: ['vi', 'en', 'note'], fixed: ['page', 'position', 'shown_when', 'default_vi', 'default_en'], paired: { default_vi: 'vi', default_en: 'en' }, start: 'nonEmpty',
     isDefault: function (c, v, row) {
       if (c === 'note') return false;
       var s = String(v).trim(), d = defs[String(row.key).trim()];
@@ -489,7 +516,7 @@ function dupPlanTab_(tab, rows) {
   return order.filter(function (k) { return groups[k].length > 1; }).map(function (k) {
     var g = groups[k], m = dupMergeRows_(g, spec);
     if (String(g[0].key) !== k) m.patch.key = k;   // key ghi SAU cùng các ô khác (DbTable.update kiểm lại khoá dòng theo cột key)
-    return { tab: tab, key: k, first: g[0], rows: g.map(function (r) { return r._row; }), removed: m.removed, patch: m.patch, cells: m.cells };
+    return { tab: tab, key: k, first: g[0], rows: g.map(function (r) { return r._row; }), removed: m.removed, patch: m.patch, cells: m.cells, active: m.active };
   });
 }
 
@@ -500,36 +527,107 @@ function dupKeysOf_(rows) {
   return order.filter(function (k) { return g[k].length > 1; }).map(function (k) { return { key: k, rows: g[k] }; });
 }
 
+/** Cỡ tối đa (ký tự, tính theo dạng JSON đã thoát) của chữ trong MỘT ô nhật ký khi lưu chữ admin bị bỏ. Giới hạn của Sheets là 50.000 ký tự mỗi ô; chừa dư cho phần bọc. */
+var DUP_TEXT_CHUNK_ = 30000;
+/** Cỡ tối đa (ký tự) của ô chi tiết dòng tóm tắt TEMPLATE_DEDUPE; danh sách dài hơn thì cắt bớt kèm số còn lại. */
+var DUP_SUMMARY_MAX_ = 30000;
+
+/**
+ * Hàm thuần: chia chữ thành các đoạn sao cho mỗi đoạn, sau khi thoát JSON (xuống dòng, dấu nháy kép, ký tự điều khiển dài hơn 1 ký tự), không quá maxJson ký tự.
+ * Không cắt giữa một cặp thay thế (ký tự ngoài BMP). Nối các đoạn lại cho đúng chữ gốc. Chữ rỗng trả [''].
+ */
+function dupSplitText_(text, maxJson) {
+  var s = String(text === undefined || text === null ? '' : text), parts = [], cur = '', curLen = 0, i = 0;
+  while (i < s.length) {
+    var cp = s.charCodeAt(i), len = (cp >= 0xD800 && cp <= 0xDBFF && i + 1 < s.length) ? 2 : 1, ch = s.substr(i, len), el = JSON.stringify(ch).length - 2;
+    if (curLen + el > maxJson && cur) { parts.push(cur); cur = ''; curLen = 0; }
+    cur += ch; curLen += el; i += len;
+  }
+  parts.push(cur);
+  return parts;
+}
+
+/**
+ * Hàm thuần: các dòng nhật ký TEMPLATE_DEDUPE_TEXT cho MỌI bản chữ admin bị bỏ của một kế hoạch gộp (không cắt chữ). Mỗi bản bị bỏ một hoặc nhiều dòng;
+ * chữ dài chia nhiều dòng (part 1..parts) để ô không bao giờ vượt giới hạn Sheets. Khôi phục: chọn các dòng cùng entity, entity_id, col, row, nối text theo part.
+ */
+function dupTextLogRows_(p) {
+  var out = [];
+  p.cells.forEach(function (c) {
+    c.discarded.forEach(function (d) {
+      var parts = dupSplitText_(d.full, DUP_TEXT_CHUNK_);
+      parts.forEach(function (txt, i) {
+        out.push({ tab: p.tab, key: p.key, detail: JSON.stringify({ col: c.col, row: d.row, kept_row: c.kept_row, part: i + 1, parts: parts.length, chars: String(d.full).length, text: txt }) });
+      });
+    });
+  });
+  return out;
+}
+
+/** Hàm thuần: chi tiết dòng tóm tắt TEMPLATE_DEDUPE: không chứa chữ bị bỏ (đã ở dòng TEMPLATE_DEDUPE_TEXT riêng), và không bao giờ quá DUP_SUMMARY_MAX_ ký tự. */
+function dupSummaryDetail_(plan) {
+  var items = plan.map(function (p) {
+    return { key: String(p.key).substring(0, 120), rows: p.rows.slice(0, 40), rows_total: p.rows.length, active: p.active || undefined,
+      cells: p.cells.map(function (c) { return { col: c.col, adopted_from: c.adopted_from, kept_row: c.kept_row, discarded: c.discarded.map(function (d) { return { row: d.row, chars: String(d.full).length }; }) }; }) };
+  });
+  var out = [], used = 2;
+  for (var i = 0; i < items.length; i++) {
+    var j = JSON.stringify(items[i]);
+    if (used + j.length + 60 > DUP_SUMMARY_MAX_ && out.length) { out.push({ truncated: items.length - i }); break; }
+    out.push(items[i]); used += j.length + 1;
+  }
+  var s = JSON.stringify(out);
+  return s.length > DUP_SUMMARY_MAX_ ? JSON.stringify([{ truncated: items.length }]) : s;
+}
+
+/** Hàm thuần: kế hoạch này có bỏ chữ admin đã sửa không (bản bị bỏ khác bản giữ). Chỉ ô chữ, không tính ô active (dòng cuối luôn thắng, báo riêng). */
+function dupDiscardsText_(p) { return p.cells.some(function (c) { return c.discarded.length > 0; }); }
+
 /**
  * Menu 1: gộp mỗi key trùng thành MỘT dòng, ở vị trí dòng đầu tiên. Chạy trong khoá. Không có key trùng: không ghi gì, không đụng tab.
- * Thứ tự: ghi nhật ký (TEMPLATE_DEDUPE, mỗi tab một dòng, chi tiết JSON), ghi ô vào dòng đầu (DbTable.update), rồi purgeRows_ bỏ dòng sau
- * (quyết định theo nội dung đọc mới: dòng đầu của key được giữ, luật 10). Trả [{ tab, key, rows, removed, cells }].
+ * Thứ tự: ghi nhật ký (TEMPLATE_DEDUPE mỗi tab một dòng tóm tắt, và MỖI bản chữ admin bị bỏ một hoặc nhiều dòng TEMPLATE_DEDUPE_TEXT, chữ đầy đủ),
+ * GHI XUỐNG SHEETS NGAY (flushDb_) rồi mới ghi ô vào dòng đầu (DbTable.update), rồi purgeRows_ bỏ dòng sau (quyết định theo nội dung đọc mới, luật 10).
+ * Ghi nhật ký lỗi thì ném lỗi, tab đó không bị gộp (e.partial = báo cáo các tab đã gộp xong). opts.protectText (sao lưu trước cập nhật hỏng): key nào gộp
+ * sẽ bỏ chữ admin thì để nguyên dòng trùng (entry skipped: true), key chỉ có dòng giống nhau hay chữ admin so với chữ gốc vẫn gộp.
+ * Trả [{ tab, key, rows, removed, cells, active, skipped }].
  */
-function dedupeDuplicateKeys_() {
+function dedupeDuplicateKeys_(opts) {
+  opts = opts || {};
   return withLock_(function () {
     var all = [];
-    ['EMAIL_TEMPLATES', 'CONTENT'].forEach(function (tab) {
-      var t = table_(tab), plan = dupPlanTab_(tab, t.all());
-      if (!plan.length) return;
-      logActivity_(adminActor_(), 'TEMPLATE_DEDUPE', tab, String(plan.length), JSON.stringify(plan.map(function (p) { return { key: p.key, rows: p.rows, cells: p.cells }; })));
-      plan.forEach(function (p) {
-        if (!Object.keys(p.patch).length) return;
-        // Ô key ghi sau cùng: DbTable.update kiểm lại khoá dòng bằng chính cột key.
-        var patch = {}, k;
-        for (k in p.patch) if (k !== 'key') patch[k] = p.patch[k];
-        if ('key' in p.patch) patch.key = p.patch.key;
-        t.update(p.first, patch);
+    try {
+      ['EMAIL_TEMPLATES', 'CONTENT'].forEach(function (tab) {
+        var t = table_(tab), full = dupPlanTab_(tab, t.all());
+        if (!full.length) return;
+        var plan = [], keep = {};
+        full.forEach(function (p) {
+          if (opts.protectText && dupDiscardsText_(p)) { keep[p.key] = true; all.push({ tab: p.tab, key: p.key, rows: p.rows, removed: 0, cells: p.cells, active: p.active, skipped: true }); }
+          else plan.push(p);
+        });
+        if (!plan.length) return;
+        logActivity_(adminActor_(), 'TEMPLATE_DEDUPE', tab, String(plan.length), dupSummaryDetail_(plan));
+        plan.forEach(function (p) { dupTextLogRows_(p).forEach(function (r) { logActivity_(adminActor_(), 'TEMPLATE_DEDUPE_TEXT', r.tab, r.key, r.detail); }); });
+        // Nhật ký (kể cả chữ admin sắp bị bỏ) phải nằm trong Sheets TRƯỚC khi ghi đè dòng đầu: ghi ngay, không chờ purgeRows_. Ghi lỗi thì dừng, chưa đụng tab.
+        flushDb_(); SpreadsheetApp.flush();
+        plan.forEach(function (p) {
+          if (!Object.keys(p.patch).length) return;
+          // Ô key ghi sau cùng: DbTable.update kiểm lại khoá dòng bằng chính cột key.
+          var patch = {}, k;
+          for (k in p.patch) if (k !== 'key') patch[k] = p.patch[k];
+          if ('key' in p.patch) patch.key = p.patch.key;
+          t.update(p.first, patch);
+        });
+        var seen = {}, want = plan.reduce(function (n, p) { return n + p.removed; }, 0);
+        var got = purgeRows_(tab, function (o) {
+          var k = String(o.key === undefined || o.key === null ? '' : o.key).trim();
+          if (!k || keep[k]) return true;
+          if (seen[k]) return false;
+          seen[k] = true; return true;
+        });
+        if (got !== want) throw new Error('Gộp dòng trùng ' + tab + ': dự định bỏ ' + want + ' dòng, thực tế bỏ ' + got + ' (kiểm tab rồi chạy lại menu 1)');
+        plan.forEach(function (p) { all.push({ tab: p.tab, key: p.key, rows: p.rows, removed: p.removed, cells: p.cells, active: p.active }); });
       });
-      var seen = {}, want = plan.reduce(function (n, p) { return n + p.removed; }, 0);
-      var got = purgeRows_(tab, function (o) {
-        var k = String(o.key === undefined || o.key === null ? '' : o.key).trim();
-        if (!k) return true;
-        if (seen[k]) return false;
-        seen[k] = true; return true;
-      });
-      if (got !== want) throw new Error('Gộp dòng trùng ' + tab + ': dự định bỏ ' + want + ' dòng, thực tế bỏ ' + got + ' (kiểm tab rồi chạy lại menu 1)');
-      plan.forEach(function (p) { all.push({ tab: p.tab, key: p.key, rows: p.rows, removed: p.removed, cells: p.cells }); });
-    });
+    } catch (e) { e.partial = all; throw e; }
     return all;
   });
 }
@@ -545,15 +643,32 @@ function dupKeyWarnings_() {
   return out;
 }
 
-/** Hàm thuần: báo cáo gộp → các dòng chữ tiếng Việt cho kết quả menu 1. */
+/** Hàm thuần: báo cáo gộp → các dòng chữ tiếng Việt cho kết quả menu 1 (mỗi phần tử báo cáo đúng một dòng). Dòng chỉ cắt gọn chữ bị bỏ; chữ đầy đủ nằm ở ACTIVITY_LOG. */
 function dupReportLines_(report) {
   return (report || []).map(function (p) {
+    if (p.skipped) return 'CẢNH BÁO: KHÔNG gộp key trùng ' + p.tab + ': ' + p.key + ' (hàng ' + p.rows.join(', ') + ') vì chưa sao lưu được trước cập nhật mà việc gộp sẽ bỏ chữ admin đã sửa. Để nguyên các dòng; chạy menu "Phát hành: sao lưu ngay" rồi chạy lại menu 1 (menu 2 vẫn báo key trùng).';
     var s = 'Gộp dòng trùng ' + p.tab + ': key ' + p.key + ' có ' + p.rows.length + ' dòng (hàng ' + p.rows.join(', ') + '), giữ 1 dòng ở hàng ' + p.rows[0] + ', bỏ ' + p.removed + ' dòng';
     p.cells.forEach(function (c) {
       if (c.adopted_from) s += '; ô ' + c.col + ' lấy chữ admin đã sửa ở hàng ' + c.adopted_from;
-      c.discarded.forEach(function (d) { s += '; ô ' + c.col + ' có 2 bản admin sửa khác nhau, giữ bản ở hàng ' + c.kept_row + ' (dòng đang dùng), BỎ bản ở hàng ' + d.row + ': "' + d.text + '"'; });
+      c.discarded.forEach(function (d) { s += '; ô ' + c.col + ' có 2 bản admin sửa khác nhau, giữ bản ở hàng ' + c.kept_row + ' (dòng đang dùng), BỎ bản ở hàng ' + d.row + ': "' + d.text + '"' + (String(d.full).length > 300 ? ' (' + String(d.full).length + ' ký tự, dòng này chỉ hiện 300 ký tự đầu)' : ''); });
+      if (c.discarded.length) s += ' [chữ đầy đủ đã lưu ở tab ACTIVITY_LOG: hành động TEMPLATE_DEDUPE_TEXT, entity ' + p.tab + ', entity_id ' + p.key + ']';
     });
     return s;
+  });
+}
+
+/**
+ * Hàm thuần: báo cáo gộp → MỘT dòng cảnh báo nổi bật cho mỗi key mà các dòng trùng nói khác nhau về ô active (EMAIL_TEMPLATES). Dòng cuối luôn thắng:
+ * trạng thái giữ lại đúng là cái hệ thống đang dùng lúc gửi thư trước khi gộp. Trả [{ tab, key, vi, en, state: 'ON' | 'OFF', rows }].
+ */
+function dupActiveWarnings_(report) {
+  return (report || []).filter(function (p) { return p.active && !p.skipped; }).map(function (p) {
+    var a = p.active, on = a.kept_on, rows = a.opposite_rows.join(', ');
+    return { tab: p.tab, key: p.key, state: on ? 'ON' : 'OFF', rows: a.opposite_rows,
+      vi: 'CHÚ Ý QUAN TRỌNG: mẫu email ' + p.key + ' có nhiều dòng nói KHÁC NHAU về ô active. Đã giữ trạng thái của dòng cuối (hàng ' + a.kept_row + '): ' + (on ? 'ĐANG GỬI' : 'ĐANG TẮT') +
+        ', đúng như hệ thống đang làm trước khi gộp; dòng ở hàng ' + rows + ' ghi ngược lại (' + (on ? 'tắt' : 'bật') + '). Nếu muốn đổi, sửa ô active của dòng ' + p.key + ' trong tab EMAIL_TEMPLATES.',
+      en: 'IMPORTANT: email template ' + p.key + ' had several rows that disagreed about the active cell. Kept the state of the last row (row ' + a.kept_row + '): ' + (on ? 'SENDING' : 'OFF') +
+        ', exactly what the system was doing before the merge; the row(s) at ' + rows + ' said the opposite (' + (on ? 'off' : 'on') + '). To change it, edit the active cell of ' + p.key + ' in the EMAIL_TEMPLATES tab.' };
   });
 }
 
@@ -663,10 +778,13 @@ function testSystem(e) { requireOperator_(e);
   ['ADMIN_ZALO_URL', 'SCHOOL_SITE_URL', 'POLICY_URL', 'GOOGLE_LOGIN_URL'].forEach(function (k) { var v = String(cfg_(k) || ''); if (v && !/^https:\/\/[^\s"'<>]+$/i.test(v)) warn(k + ' không bắt đầu bằng https:// nên trang web sẽ ẩn link này: ' + v); });
   if (!cfg_('BANK_ACCOUNT')) warn('Chưa điền thông tin ngân hàng (BANK_NAME, BANK_ACCOUNT, BANK_HOLDER)');
   // T2: ảnh QR chuyển khoản (trống chỉ là thông tin; hỏng thì lỗi, vì trang đang âm thầm bỏ ô QR).
+  // Soát 5R: mỗi lần kiểm là một lần LÀM MỚI cho khách (tăng BANK_QR_REV: bỏ bộ nhớ đệm máy chủ, kể cả mục lỗi, và ảnh trong trình duyệt), dù kết quả thế nào,
+  // vì thay file ảnh nguyên link không đổi mã file nên không có gì khác báo cho trang biết ảnh đã đổi.
   try {
-    var qrv = String(cfg_('BANK_QR_IMAGE') || '').trim();
+    var qrv = String(cfg_('BANK_QR_IMAGE') || '').trim(), qrNote = '';
+    try { bankQrBump_(); qrNote = ' Đã làm mới ảnh cho khách xem trang (bộ nhớ đệm ảnh cũ bị bỏ).'; } catch (be) { qrNote = ' CHƯA làm mới được bộ nhớ đệm ảnh (' + be.message + ').'; }
     if (!qrv) ok('BANK_QR_IMAGE để trống: trang đăng ký không hiện mã QR (không bắt buộc)');
-    else { var qr = bankQrRead_(qrv); if (qr.ok) ok('BANK_QR_IMAGE hợp lệ: ' + qr.type + ', ' + qr.kb + ' KB'); else err('BANK_QR_IMAGE hỏng (' + qr.code + '): ' + qr.fix + ' Trang đăng ký đang ẩn ô QR.'); }
+    else { var qr = bankQrRead_(qrv); if (qr.ok) ok('BANK_QR_IMAGE hợp lệ: ' + qr.type + ', ' + qr.kb + ' KB.' + qrNote + ' Sau này thay file ảnh dưới CÙNG link: chạy lại menu 2 này hoặc menu Email > Làm mới ảnh QR chuyển khoản để khách thấy ảnh mới ngay (không thì chờ tới 6 giờ).'); else err('BANK_QR_IMAGE hỏng (' + qr.code + '): ' + qr.fix + ' Trang đăng ký đang ẩn ô QR.' + qrNote); }
   } catch (qe) { err('Kiểm BANK_QR_IMAGE lỗi: ' + qe.message); }
   // 5L: kiểm mọi dòng PACKAGES (mã trùng, kiểu, số ngày, số buổi, giá).
   try { var pi = packageIssues_(table_('PACKAGES').all()); pi.errors.forEach(err); pi.warnings.forEach(warn); if (!pi.errors.length) ok('PACKAGES: ' + table_('PACKAGES').all().length + ' dòng hợp lệ'); } catch (pe2) { err('Kiểm PACKAGES lỗi: ' + pe2.message); }

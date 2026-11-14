@@ -258,10 +258,30 @@ function bankQrId_(value) {
   if (/^[A-Za-z0-9_-]{10,}$/.test(v)) return v;
   return '';
 }
-/** Dấu ngắn của cấu hình (rỗng khi chưa điền hoặc sai dạng): đổi giá trị CONFIG thì dấu đổi, khoá bộ nhớ đệm đổi theo. */
+/*
+ * Số phiên bản ảnh (Script Property BANK_QR_REV, soát 5R): thay file ảnh QR NGUYÊN link (cùng mã file Drive, tài khoản ngân hàng mới) thì mã file không đổi nên
+ * dấu và bộ nhớ đệm cũ vẫn trúng, khách có thể thấy QR của tài khoản cũ tới 6 giờ. Số này nằm trong dấu (bankQrMarker_), nên cũng nằm trong khoá bộ nhớ đệm máy chủ
+ * (bq_<dấu>, kể cả mục "lỗi" 300 giây) và khoá ảnh trong trình duyệt của mọi khách: tăng số này là bỏ hết bản cũ cùng lúc. Tăng bởi: menu 2, sửa tay CONFIG
+ * (BANK_QR_IMAGE, BANK_NAME, BANK_ACCOUNT, BANK_HOLDER), menu "Làm mới ảnh QR chuyển khoản". Đọc rẻ: một Script Property, nhớ trong lần chạy (forgetEnvMemo_ xoá). Không gọi Drive.
+ */
+var BANK_QR_REV_MEMO_ = null;
+function bankQrRev_() {
+  if (BANK_QR_REV_MEMO_ === null) { var v = ''; try { v = props_().getProperty('BANK_QR_REV') || ''; } catch (e) { } BANK_QR_REV_MEMO_ = String(v); }
+  return BANK_QR_REV_MEMO_;
+}
+/** Tăng số phiên bản ảnh QR (bỏ hết bộ nhớ đệm máy chủ và trình duyệt). Trả số mới. Ném lỗi nếu không ghi được Script Property. */
+function bankQrBump_() {
+  var v = String(realNowMs_()) + Math.random().toString(36).slice(2, 6);
+  props_().setProperty('BANK_QR_REV', v);
+  BANK_QR_REV_MEMO_ = v;
+  return v;
+}
+/** Các khoá CONFIG mà sửa tay thì phải làm mới ảnh QR: ảnh, và thông tin tài khoản (đổi tài khoản mà còn QR cũ là chuyển nhầm tiền). */
+var BANK_QR_WATCH_KEYS_ = ['BANK_QR_IMAGE', 'BANK_NAME', 'BANK_ACCOUNT', 'BANK_HOLDER'];
+/** Dấu ngắn của cấu hình (rỗng khi chưa điền hoặc sai dạng): đổi giá trị CONFIG hoặc số phiên bản ảnh thì dấu đổi, khoá bộ nhớ đệm đổi theo. */
 function bankQrMarker_() {
   var id = bankQrId_(cfg_('BANK_QR_IMAGE'));
-  return id ? sha256Hex_('bankqr|' + id).substring(0, 10) : '';
+  return id ? sha256Hex_('bankqr|' + id + '|' + bankQrRev_()).substring(0, 10) : '';
 }
 /** Đọc file Drive, kiểm loại và cỡ. Trả { ok, src, type, kb } hoặc { ok:false, code, fix } (fix: câu hướng dẫn tiếng Việt cho admin). */
 function bankQrRead_(raw) {

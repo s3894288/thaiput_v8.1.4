@@ -572,6 +572,8 @@ var DEFAULT_CONTENT_ = {
   'ad.act.ARCHIVE_FILE_CREATED': ['Tạo file lưu trữ năm', 'Archive file created', 'Chữ đậm ở dòng nhật ký', 'Hành động ARCHIVE_FILE_CREATED'],
   'ad.act.ARCHIVE_FOLDER_CREATED': ['Tạo thư mục lưu trữ', 'Archive folder created', 'Chữ đậm ở dòng nhật ký', 'Hành động ARCHIVE_FOLDER_CREATED'],
   'ad.act.TEMPLATE_DEDUPE': ['Gộp dòng trùng key (EMAIL_TEMPLATES, CONTENT)', 'Merged duplicate key rows (EMAIL_TEMPLATES, CONTENT)', 'Chữ đậm ở dòng nhật ký; chi tiết JSON: key, hàng, ô lấy hoặc bỏ', 'Hành động TEMPLATE_DEDUPE (menu 1 gộp dòng trùng key)'],
+  'ad.act.BANK_QR_REFRESH': ['Làm mới ảnh QR chuyển khoản', 'Refreshed the bank transfer QR image', 'Chữ đậm ở dòng nhật ký; chi tiết JSON: result (OK, EMPTY hoặc mã lỗi của ảnh)', 'Hành động BANK_QR_REFRESH (menu Email: làm mới ảnh QR chuyển khoản)'],
+  'ad.act.TEMPLATE_DEDUPE_TEXT': ['Lưu chữ admin bị bỏ khi gộp dòng trùng key', 'Saved admin text dropped by a duplicate key merge', 'Dòng nhật ký; chi tiết JSON: ô (col), hàng bị bỏ (row), part/parts (chữ dài chia nhiều dòng, nối theo part), text là CHỮ ĐẦY ĐỦ', 'Hành động TEMPLATE_DEDUPE_TEXT (menu 1 gộp dòng trùng key mà hai bản admin sửa khác nhau)'],
   'ad.act.PURGE_RECOVERED': ['Dọn lần bỏ dòng dở', 'Row removal recovered', 'Chữ đậm ở dòng nhật ký', 'Hành động PURGE_RECOVERED'],
   'ad.act.DATA_RESET_STARTED': ['Bắt đầu xoá dữ liệu test', 'Test data reset started', 'Chữ đậm ở dòng nhật ký', 'Hành động DATA_RESET_STARTED'],
   'ad.act.DATA_RESET': ['Xoá dữ liệu test', 'Test data reset', 'Chữ đậm ở dòng nhật ký', 'Hành động DATA_RESET'],

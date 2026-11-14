@@ -307,7 +307,7 @@ function props_() { return PropertiesService.getScriptProperties(); }
  * clearDbCache_ và các hàm ghi ENV, DB_ID gọi forgetEnvMemo_.
  */
 var ENV_MEMO_ = null, DBID_MEMO_ = {};
-function forgetEnvMemo_() { ENV_MEMO_ = null; DBID_MEMO_ = {}; }
+function forgetEnvMemo_() { ENV_MEMO_ = null; DBID_MEMO_ = {}; BANK_QR_REV_MEMO_ = null; }
 function getEnv_() { if (ENV_MEMO_ === null) ENV_MEMO_ = props_().getProperty('ENV') || 'STAGING'; return ENV_MEMO_; }
 function isProduction_() { return getEnv_() === 'PRODUCTION'; }
 function getDbId_() {

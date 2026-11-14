@@ -34,6 +34,8 @@
   })();
   var TAB_KEY = 'thaiput_tab_session', SHARED_KEY = 'thaiput_session';
   function parse(raw) { try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  /** Việc mỗi view đăng ký để quên dữ liệu của người đang đăng nhập khi phiên kết thúc (thoát, hết hạn): thiết bị dùng chung không để người sau thấy dữ liệu người trước (soát 5R). */
+  T.sessionEnd = [];
   T.session = {
     get: function () {
       var s = parse(T.store.tab.get(TAB_KEY));
@@ -51,6 +53,7 @@
       if (!last || last.token === o.token) T.store.shared.set(SHARED_KEY, v);
     },
     clear: function () {
+      T.sessionEnd.forEach(function (f) { try { f(); } catch (e) { } });
       var mine = parse(T.store.tab.get(TAB_KEY)), last = parse(T.store.shared.get(SHARED_KEY));
       T.store.tab.set(TAB_KEY, null);
       if (!mine || (last && last.token === mine.token)) T.store.shared.set(SHARED_KEY, null);

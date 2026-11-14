@@ -154,6 +154,8 @@ var RELEASE_NOTES_ = [
       { key: 'h.bank_note', kind: 'CHANGED', vi: 'Chữ gốc mới: "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." (en: "Transfer reference: Please enter only your phone number."). Ô admin đã sửa được giữ nguyên; chữ gốc mới nằm ở cột default_vi, default_en.', en: 'New default text: "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." (en: "Transfer reference: Please enter only your phone number."). Cells admin edited are kept; the new default is in default_vi, default_en.' },
       { key: 'h.bank_qr_alt', kind: 'ADDED', vi: 'Chữ thay thế (alt) của ảnh mã QR trong khung chuyển khoản.', en: 'Alternative text (alt) of the QR image in the transfer panel.' },
       { key: 'ad.act.TEMPLATE_DEDUPE', kind: 'ADDED', vi: 'Tên hành động nhật ký "Gộp dòng trùng key".', en: 'Log action name "Merged duplicate key rows".' },
+      { key: 'ad.act.TEMPLATE_DEDUPE_TEXT', kind: 'ADDED', vi: 'Tên hành động nhật ký "Lưu chữ admin bị bỏ khi gộp dòng trùng key" (chữ đầy đủ, chữ dài chia nhiều dòng).', en: 'Log action name "Saved admin text dropped by a duplicate key merge" (the full text, long text split over several rows).' },
+      { key: 'ad.act.BANK_QR_REFRESH', kind: 'ADDED', vi: 'Tên hành động nhật ký "Làm mới ảnh QR chuyển khoản" (menu Email).', en: 'Log action name "Refreshed the bank transfer QR image" (Email menu).' },
       { key: 'ad.ev.RELEASE_NOTES', kind: 'ADDED', vi: 'Tên sự kiện "Tóm tắt cập nhật phiên bản" trên trang quản trị.', en: 'Event name "Update summary" on the admin page.' }
     ],
     templates: [
@@ -164,10 +166,11 @@ var RELEASE_NOTES_ = [
     ],
     data: [
       { key: 'RELEASE_LOG', kind: 'ADDED', vi: 'Tab mới RELEASE_LOG (chỉ ghi thêm): mỗi lần đổi phiên bản, menu 1 ghi mỗi mục tóm tắt một dòng (at, from_version, to_version, kind, item, detail). Không lưu trữ, không bị xoá khi xoá dữ liệu test, không chuyển sang hệ thống mới.', en: 'New append-only tab RELEASE_LOG: at each version change menu 1 writes one row per summary item (at, from_version, to_version, kind, item, detail). Not archived, kept by the test data reset, not copied to a new system.' },
-      { vi: 'Menu 1 tự gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT thành một dòng (giữ chữ admin đã sửa, ghi nhật ký TEMPLATE_DEDUPE); menu 2 báo key trùng. Menu 1 ghi chú "Mới ở <bản>:" vào cột note của khoá CONFIG vừa thêm (không ghi đè ghi chú hay giá trị đã có).', en: 'Menu 1 merges duplicate key rows in EMAIL_TEMPLATES and CONTENT into one row (keeping admin edits, logging TEMPLATE_DEDUPE); menu 2 reports duplicate keys. Menu 1 writes "Mới ở <version>:" into the note column of a newly added CONFIG key (never overwriting an existing note or value).' }
+      { vi: 'Menu 1 tự gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT thành một dòng (giữ chữ admin đã sửa, ghi nhật ký TEMPLATE_DEDUPE); menu 2 báo key trùng. Hai bản chữ admin sửa khác nhau: dòng cuối thắng (dòng đang dùng khi gửi), bản bị bỏ được lưu ĐỦ trong ACTIVITY_LOG (TEMPLATE_DEDUPE_TEXT, chia nhiều dòng nếu dài) TRƯỚC khi ghi đè; dòng menu 1 chỉ hiện 300 ký tự đầu. Ô active của mẫu email luôn theo dòng cuối (đúng như đang gửi), nếu các dòng nói khác nhau thì có dòng cảnh báo riêng. Sao lưu trước cập nhật hỏng thì không gộp key nào sẽ bỏ chữ admin. Menu 1 ghi chú "Mới ở <bản>:" vào cột note của khoá CONFIG vừa thêm (không ghi đè ghi chú hay giá trị đã có).', en: 'Menu 1 merges duplicate key rows in EMAIL_TEMPLATES and CONTENT into one row (keeping admin edits, logging TEMPLATE_DEDUPE); menu 2 reports duplicate keys. When two rows hold different admin edits the last row wins (the one used when sending) and the discarded text is saved IN FULL in ACTIVITY_LOG (TEMPLATE_DEDUPE_TEXT, split over several rows if long) BEFORE it is overwritten; the menu 1 line shows only the first 300 characters. The active cell of an email template always follows the last row (exactly what was being sent); if the rows disagree there is a separate warning line. If the pre-upgrade backup failed, no key is merged when that would discard admin text. Menu 1 writes "Mới ở <version>:" into the note column of a newly added CONFIG key (never overwriting an existing note or value).' },
+      { vi: 'Ảnh QR chuyển khoản có số phiên bản (Script Property BANK_QR_REV) nằm trong dấu và khoá bộ nhớ đệm: menu 2, sửa tay CONFIG (BANK_QR_IMAGE, BANK_NAME, BANK_ACCOUNT, BANK_HOLDER) và menu Email "Làm mới ảnh QR chuyển khoản" đều làm khách thấy ảnh mới ngay, không phải chờ 6 giờ khi thay file ảnh dưới cùng link.', en: 'The bank transfer QR image has a revision number (Script Property BANK_QR_REV) inside its marker and cache keys: menu 2, manual edits of CONFIG (BANK_QR_IMAGE, BANK_NAME, BANK_ACCOUNT, BANK_HOLDER) and the Email menu "Làm mới ảnh QR chuyển khoản" all make visitors see the new image at once, with no 6 hour wait when the image file is replaced under the same link.' }
     ],
     admin: [
-      { vi: 'Muốn hiện mã QR: tải ảnh VUÔNG 600 x 600 px PNG dưới 300 KB lên Drive của tài khoản chủ hệ thống, dán link hoặc mã file vào CONFIG BANK_QR_IMAGE, rồi chạy menu 2 kiểm ảnh. Để trống thì không hiện QR.', en: 'To show the QR: upload a SQUARE 600 x 600 px PNG under 300 KB to the system owner account Drive, paste the link or file ID into CONFIG BANK_QR_IMAGE, then run menu 2 to check the image. Leave it empty to hide the QR.' },
+      { vi: 'Muốn hiện mã QR: tải ảnh VUÔNG 600 x 600 px PNG dưới 300 KB lên Drive của tài khoản chủ hệ thống, dán link hoặc mã file vào CONFIG BANK_QR_IMAGE, rồi chạy menu 2 kiểm ảnh. Để trống thì không hiện QR. Sau này thay file ảnh dưới CÙNG link (ví dụ đổi tài khoản ngân hàng) thì chạy lại menu 2 hoặc menu Email > Làm mới ảnh QR chuyển khoản để khách thấy ảnh mới ngay.', en: 'To show the QR: upload a SQUARE 600 x 600 px PNG under 300 KB to the system owner account Drive, paste the link or file ID into CONFIG BANK_QR_IMAGE, then run menu 2 to check the image. Leave it empty to hide the QR. If you later replace the image file under the SAME link (for example a new bank account), run menu 2 again or the Email menu item Làm mới ảnh QR chuyển khoản so visitors see the new image at once.' },
       { vi: 'Nếu đã sửa h.bank_note trong tab CONTENT thì chữ của bạn được giữ; muốn dùng chữ gốc mới thì xoá ô vi, en đó (hoặc dán chữ ở cột default_vi, default_en).', en: 'If you edited h.bank_note in the CONTENT tab your text is kept; to use the new default clear its vi and en cells (or paste the text from default_vi, default_en).' },
       { vi: 'Đọc tab RELEASE_LOG và email "Tóm tắt cập nhật" để xem mọi thay đổi từ bản bạn đang chạy; menu "Phát hành: xem thay đổi của bản này" hiện ghi chú của bản đang cài.', en: 'Read the RELEASE_LOG tab and the "update summary" email to see every change since the version you were running; the menu "Phát hành: xem thay đổi của bản này" shows the notes of the installed version.' }
     ]
@@ -277,6 +280,9 @@ function releaseBuildSummary_(prev, cur, curDate, measured, notes) {
   if (kept.length) lines.push('GIỮ chữ bạn đã sửa dù chữ gốc đã đổi (' + kept.length + ' ô): ' + releaseShort_(kept) + '. Chữ gốc mới ở cột default_vi, default_en của tab CONTENT.');
   var unk = releaseItems_(m, 'CONFIG_UNKNOWN');
   if (unk.length) lines.push('Khoá CONFIG lạ (không xoá, chỉ báo): ' + releaseShort_(unk) + '.');
+  var dact = releaseItems_(m, 'DUP_ACTIVE'), dskip = releaseItems_(m, 'DUP_SKIPPED');
+  if (dact.length) lines.push('CHÚ Ý: ' + dact.length + ' mẫu email có các dòng trùng key nói KHÁC NHAU về ô active, đã giữ trạng thái của dòng cuối (đúng như đang gửi): ' + releaseShort_(dact) + '. Đọc dòng "CHÚ Ý QUAN TRỌNG" của từng mẫu và kiểm lại ô active.');
+  if (dskip.length) lines.push('CẢNH BÁO: ' + dskip.length + ' key trùng CHƯA gộp vì sao lưu trước cập nhật hỏng: ' + releaseShort_(dskip) + '.');
   if (admin.length) { lines.push('VIỆC ADMIN CẦN LÀM:'); admin.slice(0, 6).forEach(function (a, i) { lines.push('  ' + (i + 1) + '. ' + a.vi); }); if (admin.length > 6) lines.push('  (còn ' + (admin.length - 6) + ' việc nữa, xem tab RELEASE_LOG)'); }
   return { notes: list, items: all, noteItems: nItems, measured: m, menuLines: lines, admin: admin };
 }
@@ -286,7 +292,9 @@ var RELEASE_MEASURED_LABEL_ = {
   TAB_ADDED: ['Tab thêm', 'Tabs added'], COLUMN_ADDED: ['Cột thêm', 'Columns added'], CONTENT_ADDED: ['Dòng chữ web thêm', 'Web text rows added'],
   CONTENT_REFRESHED: ['Ô chữ web chưa sửa, đã nâng lên chữ gốc mới', 'Unedited web text cells upgraded to the new default'], CONTENT_KEPT: ['Ô chữ web bạn đã sửa, GIỮ dù chữ gốc đổi', 'Web text cells you edited, KEPT although the default changed'],
   TEMPLATE_ADDED: ['Mẫu email thêm', 'Email templates added'], TEMPLATE_UPGRADED: ['Mẫu email nâng lên chữ gốc mới', 'Email templates upgraded to the new default'], NOTIFY_RULE_ADDED: ['Luật thông báo thêm', 'Notification rules added'],
-  DUP_MERGED: ['Key trùng đã gộp', 'Duplicate keys merged'], MIGRATION: ['Bước chuyển dữ liệu chạy', 'Data migrations run'], DATA_FILLED: ['Dữ liệu điền thêm', 'Data filled in']
+  DUP_MERGED: ['Key trùng đã gộp', 'Duplicate keys merged'],
+  DUP_ACTIVE: ['Mẫu email có ô active mâu thuẫn giữa các dòng trùng (đã giữ trạng thái của dòng cuối, đúng như đang gửi)', 'Email templates whose duplicate rows disagreed about active (kept the last row state, exactly what was being sent)'],
+  DUP_SKIPPED: ['Key trùng KHÔNG gộp (sao lưu trước cập nhật hỏng)', 'Duplicate keys NOT merged (pre-upgrade backup failed)'], MIGRATION: ['Bước chuyển dữ liệu chạy', 'Data migrations run'], DATA_FILLED: ['Dữ liệu điền thêm', 'Data filled in']
 };
 
 /** Hàm thuần: HTML cho email, một ngôn ngữ ('vi' hoặc 'en'). Chữ được thoát; code dựng danh sách. */
@@ -304,6 +312,10 @@ function releaseSummaryHtml_(sum, lang) {
   });
   var m = sum.measured;
   out += '<h3 style="margin:22px 0 6px;font-size:16px">' + esc_(en ? 'What this run actually did (measured)' : 'Lượt chạy này thực sự đã làm (đo thật)') + '</h3>';
+  // Việc cần admin đọc kỹ: nổi bật, mỗi việc một khối, không chôn trong danh sách.
+  m.filter(function (x) { return x.kind === 'DUP_ACTIVE' || x.kind === 'DUP_SKIPPED'; }).forEach(function (x) {
+    out += '<p style="margin:8px 0;padding:8px 12px;border-left:4px solid #b00020;background:#fff4f4"><b>' + esc_(en ? 'Needs your attention' : 'Cần bạn xem') + ':</b> ' + esc_(en ? x.en : x.vi) + '</p>';
+  });
   if (!m.length) out += '<p style="margin:0">' + esc_(en ? 'Nothing to add: keys, columns, tabs and texts were already in place.' : 'Không phải thêm gì: khoá, cột, tab, chữ đã có sẵn.') + '</p>';
   else {
     var kinds = []; m.forEach(function (x) { if (kinds.indexOf(x.kind) === -1) kinds.push(x.kind); });
@@ -323,12 +335,25 @@ function releaseLogWrite_(prev, cur, items) {
   return withLock_(function () { return appendRowsRaw_('RELEASE_LOG', rows); });
 }
 
+/** Hàm thuần: độ dài UTF-8 (byte) của chữ. Script Properties giới hạn 9 KB mỗi giá trị theo BYTE, chữ Việt có dấu mỗi ký tự 2 đến 3 byte. */
+function utf8Len_(str) {
+  var s = String(str), n = 0;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    if (c < 0x80) n += 1; else if (c < 0x800) n += 2; else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) { n += 4; i++; } else n += 3;
+  }
+  return n;
+}
+/** Cỡ tối đa (byte UTF-8) của RELEASE_PENDING: giới hạn thật 9.216 byte, chừa dư cho tên khoá và sai lệch cách đếm. */
+var RELEASE_PENDING_MAX_BYTES_ = 8000;
+
 /** Lượt này không ghi nhận được phiên bản (sao lưu lỗi): giữ số đo ở Script Property để lượt sau cộng vào (lượt sau không còn gì để đo). */
 function releasePendingSave_() {
   if (!UPGRADE_RUN_ || UPGRADE_RUN_.fresh) return;
   var items = UPGRADE_RUN_.items.slice(), pack = function () { return JSON.stringify({ target: APP.VERSION, items: items }); };
-  while (items.length && pack().length > 8000) items.pop();
-  try { props_().setProperty('RELEASE_PENDING', pack()); } catch (e) { }
+  // Cắt theo BYTE UTF-8 (không theo ký tự), bỏ nguyên từng mục ở cuối, không bao giờ cắt giữa mục (JSON luôn hợp lệ).
+  while (items.length && utf8Len_(pack()) > RELEASE_PENDING_MAX_BYTES_) items.pop();
+  try { props_().setProperty('RELEASE_PENDING', pack()); } catch (e) { try { Logger.log('Không lưu được RELEASE_PENDING: ' + e.message); } catch (x) { } }
 }
 
 /**

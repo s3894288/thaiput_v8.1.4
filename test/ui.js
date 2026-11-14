@@ -1679,6 +1679,31 @@ t('U53', 'T3b: tutor tải trước giờ rảnh ở nền. Còn mới (dưới 
   assert.strictEqual(p.$$('details.day').length, 7);
 });
 
+t('U54', 'Soát 5R (FIX 7): bản giờ rảnh tutor tải trước gắn với phiên đã tải: tutor A thoát, tutor B vào CÙNG tab trong 60 giây thì B không bao giờ được hiện giờ rảnh của A (cả khi đổi phiên không qua nút thoát); thoát xoá bản tải trước và dữ liệu đang sửa', async () => {
+  const avCalls = (p) => p.calls.filter(x => x.name === 'apiTutorAvailability' && !x.failed);
+  const mkTwo = async () => { const c = mk(); const a = (await uiLogin(c, 'T001')).session, b = (await uiLogin(c, 'T002')).session; assert.notStrictEqual(a.token, b.token); return { c, a, b }; };
+  // 1. Thoát bằng nút rồi B vào ngay (vào thẳng tab Giờ rảnh): B tự gọi máy chủ bằng phiên của B
+  let { c, a, b } = await mkTwo();
+  let p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60);
+  assert.strictEqual(avCalls(p).length, 1, 'A tải trước giờ rảnh'); assert.strictEqual(avCalls(p)[0].args[0], a.token);
+  p.click('#logout'); await p.flush(40);
+  p.win.T.session.set(b); p.win.T.go('tutor', { tab: 'avail' }); await p.flush(80); p.clean();
+  assert.ok(avCalls(p).some(x => x.args[0] === b.token), 'B gọi máy chủ bằng phiên của B (không dùng bản tải trước của A)');
+  assert.ok(!avCalls(p).slice(1).some(x => x.args[0] === a.token), 'không gọi lại bằng phiên của A');
+  // 2. Đổi phiên KHÔNG qua nút thoát (phiên bị thay thẳng, không gọi T.session.clear): ràng buộc theo phiên vẫn chặn
+  ({ c, a, b } = await mkTwo());
+  p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60);
+  assert.strictEqual(avCalls(p).length, 1);
+  p.win.T.session.set(b); p.win.T.go('tutor', { tab: 'avail' }); await p.flush(80); p.clean();
+  assert.strictEqual(p.win.T.token(), b.token, 'đã đổi sang phiên B');
+  assert.ok(avCalls(p).slice(1).some(x => x.args[0] === b.token), 'B gọi máy chủ bằng phiên của B: ' + JSON.stringify(avCalls(p).map(x => x.args[0].substring(0, 6))));
+  assert.strictEqual(p.$$('.chip[data-key^="2026-10-19|"]').length, 32, 'lưới của B vẽ đủ');
+  // 3. Đúng phiên vẫn dùng bản tải trước (không gọi lại), như U53
+  ({ c, a } = await mkTwo());
+  p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60); p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(avCalls(p).length, 1, 'cùng phiên: dùng bản tải trước');
+});
+
 module.exports = { run };
 if (require.main === module) {
   run().then(r => { r.forEach(x => console.log((x.ok ? 'ĐẠT  ' : 'TRƯỢT ') + x.id + ' ' + x.title + (x.ok ? '' : '\n      ' + x.err))); process.exit(r.every(x => x.ok) ? 0 : 1); });
