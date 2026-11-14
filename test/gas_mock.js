@@ -25,6 +25,7 @@ function createGasEnv(opts) {
     activeUserEmail: opts.activeUserEmail || 'admin.karn@gmail.com',
     effectiveUserEmail: 'booking@thaiput.vn',
     lockCalls: 0,
+    fetches: [],        // chunk 5R: mọi lượt UrlFetchApp.fetch { url, opts }; state.urlFetch(url, opts) do test đặt trả { code, body, headers }
     formulaWrites: [],  // chuỗi bắt đầu bằng = ghi vào ô không phải dạng chữ: Sheets thật sẽ chạy thành công thức
     counter: 0
   };
@@ -183,6 +184,8 @@ function createGasEnv(opts) {
 
   // ── Utilities ──
   const pad = (n) => (n < 10 ? '0' : '') + n;
+  /** Chuỗi → Buffer UTF-8; mảng byte có dấu → Buffer. */
+  const toBuf = (x) => (Array.isArray(x) ? Buffer.from(x.map(b => (b + 256) % 256)) : Buffer.from(String(x), 'utf8'));
   const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const Utilities = {
     formatDate: (d, tz, fmt) => fmt
@@ -191,14 +194,35 @@ function createGasEnv(opts) {
       .replace('EEE', DOW[d.getDay()]),
     DigestAlgorithm: { SHA_256: 'sha256' },
     Charset: { UTF_8: 'utf8' },
-    computeDigest: (alg, s) => Array.from(crypto.createHash(alg).update(String(s), 'utf8').digest()).map(b => (b > 127 ? b - 256 : b)),
+    // Nhận chuỗi hoặc mảng byte có dấu (Java), như Google.
+    computeDigest: (alg, s) => Array.from(crypto.createHash(alg).update(toBuf(s)).digest()).map(b => (b > 127 ? b - 256 : b)),
     getUuid: () => crypto.randomUUID(),
     // Google trả mảng byte có dấu (Java), như computeDigest.
-    computeHmacSha256Signature: (value, key) => Array.from(crypto.createHmac('sha256', String(key)).update(String(value), 'utf8').digest()).map(b => (b > 127 ? b - 256 : b)),
+    // Google có 2 dạng: (String, String) và (Byte[], Byte[]); trộn kiểu thì Google báo không có hàm (chunk 5R, SigV4 cần dạng byte).
+    computeHmacSha256Signature: (value, key) => {
+      if (Array.isArray(value) !== Array.isArray(key)) throw new Error('Cannot find method computeHmacSha256Signature(' + typeof value + ',' + typeof key + ')');
+      return Array.from(crypto.createHmac('sha256', toBuf(key)).update(toBuf(value)).digest()).map(b => (b > 127 ? b - 256 : b));
+    },
     base64EncodeWebSafe: (x) => Buffer.from(Array.isArray(x) ? x.map(b => (b + 256) % 256) : String(x)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
     base64Decode: (s) => Array.from(Buffer.from(String(s), 'base64')),
-    newBlob: (bytes, type, name) => ({ bytes, type, name, getName: () => name, getContentType: () => type, setName(n) { this.name = n; return this; } }),
+    // newBlob(chuỗi) → byte UTF-8 có dấu; getBytes, getDataAsString như Google.
+    newBlob: (data, type, name) => {
+      const bytes = Array.isArray(data) ? data : Array.from(Buffer.from(String(data), 'utf8')).map(b => (b > 127 ? b - 256 : b));
+      return { bytes, type, name, getName: () => name, getContentType: () => type, getBytes: () => bytes.slice(), getDataAsString: () => toBuf(bytes).toString('utf8'), setName(n) { this.name = n; return this; } };
+    },
     sleep: () => {}
+  };
+
+  // ── UrlFetchApp (chunk 5R: SES). Test đặt state.urlFetch = (url, opts) => ({ code, body, headers }) hoặc ném lỗi (mất mạng). ──
+  const UrlFetchApp = {
+    fetch: (url, opts) => {
+      opts = opts || {};
+      state.fetches.push({ url, opts });
+      if (typeof state.urlFetch !== 'function') throw new Error('UrlFetchApp: test chưa giả lập máy chủ cho ' + url);
+      const r = state.urlFetch(url, opts);
+      if (!opts.muteHttpExceptions && r.code >= 400) throw new Error('Request failed for ' + url + ' returned code ' + r.code + '. Truncated server response: ' + String(r.body || '').slice(0, 100));
+      return { getResponseCode: () => r.code, getContentText: () => String(r.body || ''), getHeaders: () => r.headers || {}, getAllHeaders: () => r.headers || {} };
+    }
   };
 
   // ── Mail ──
@@ -357,7 +381,7 @@ function createGasEnv(opts) {
     MimeType: { TEXT: 'TEXT', JSON: 'JSON' },
     createTextOutput: (text) => { const o = { content: String(text), mime: 'TEXT', getContent: () => o.content, setMimeType: (m) => { o.mime = m; return o; } }; return o; }
   };
-  const globals = { SpreadsheetApp, PropertiesService, LockService, CacheService, Utilities, MailApp, GmailApp, Calendar, DriveApp, ScriptApp, Session, Logger, HtmlService, ContentService };
+  const globals = { SpreadsheetApp, PropertiesService, LockService, CacheService, Utilities, MailApp, GmailApp, Calendar, DriveApp, ScriptApp, Session, Logger, HtmlService, ContentService, UrlFetchApp };
   const env = { globals, state, logs, createSpreadsheet, scope: null };
   return env;
 }

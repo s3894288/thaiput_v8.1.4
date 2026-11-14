@@ -1,0 +1,53 @@
+diff --git a/.clasp.json.example b/.clasp.json.example
+new file mode 100644
+index 0000000..d04d567
+--- /dev/null
++++ b/.clasp.json.example
+@@ -0,0 +1,4 @@
++{
++  "scriptId": "DIEN_SCRIPT_ID_CUA_DU_AN_APPS_SCRIPT",
++  "rootDir": "src"
++}
+diff --git a/.github/workflows/test.yml b/.github/workflows/test.yml
+new file mode 100644
+index 0000000..d9c88dd
+--- /dev/null
++++ b/.github/workflows/test.yml
+@@ -0,0 +1,22 @@
++# Thaiput v8 · chạy toàn bộ test và kiểm bản dán tay dist/ khớp src/ (CLAUDE.md luật 28, quy ước 6).
++name: test
++on:
++  push:
++    branches: [main]
++  pull_request:
++jobs:
++  test:
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-node@v4
++        with:
++          node-version: 20
++          cache: npm
++      - run: npm ci
++      - name: Toàn bộ test (TZ Asia/Ho_Chi_Minh)
++        run: npm test
++      - name: Dựng lại dist/ và kiểm khớp src/
++        run: |
++          npm run build
++          git diff --exit-code -- dist dist_google_login
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..d75143d
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,9 @@
++# Thaiput v8 · không commit
++node_modules/
++.clasp.json
++.clasprc.json
++test/REPORT.md
++dist_production/
++*.log
++.DS_Store
++Thumbs.db

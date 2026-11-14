@@ -32,7 +32,7 @@ function compile(src) {
   let m;
   while ((m = reFn.exec(src))) names.add(m[1]);
   while ((m = reVar.exec(src))) names.add(m[1]);
-  const globalsList = ['SpreadsheetApp', 'PropertiesService', 'LockService', 'CacheService', 'Utilities', 'MailApp', 'GmailApp', 'Calendar', 'DriveApp', 'ScriptApp', 'Session', 'Logger', 'HtmlService', 'ContentService'];
+  const globalsList = ['SpreadsheetApp', 'PropertiesService', 'LockService', 'CacheService', 'Utilities', 'MailApp', 'GmailApp', 'Calendar', 'DriveApp', 'ScriptApp', 'Session', 'Logger', 'HtmlService', 'ContentService', 'UrlFetchApp'];
   const body = src + '\nreturn {' + Array.from(names).map(n => JSON.stringify(n) + ': (typeof ' + n + ' !== "undefined" ? ' + n + ' : undefined)').join(',\n') + '};';
   const factory = new Function(...globalsList, body);
   return { factory, globalsList };

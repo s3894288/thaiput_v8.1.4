@@ -4,6 +4,9 @@
 
 ## Thay đổi so với bản trước
 
+**Bản 8.1.5 (10/11/2026, chunk 5R):** gửi email qua Amazon SES để không còn kẹt hạn mức email của Google. Ba ô mới ở B8 (`MAIL_TRANSPORT` nhận thêm `SES`, `MAIL_FROM_ADDRESS`, `MAIL_DAILY_CAP`), Phần B thành 100 ô. Cài SES từng bước: `plan/P0_BUOC_TUNG_BUOC.md` mục 2 (A2 đến A11).
+
+
 Bản trước: 8.0.10 (18/10/2026, đã xuất) và bản nháp 8.1.1 (01/11, chưa xuất). Những điểm mới:
 
 * **Email gửi cố định qua GmailApp (8.1.4):** không còn file MailFix, không còn bước tìm và thay sau mỗi lần dán code. Ô mới `MAIL_TRANSPORT` (B8). Tab MAIL_LOG thêm cột `transport`. Tình huống thư không tới: Phần L3.
@@ -23,7 +26,7 @@ Cách đọc: chữ **đậm** là tên nút hoặc mục menu. `Chữ đơn cá
 Nội dung:
 
 * Phần A. Luật chung khi sửa CONFIG
-* Phần B. 98 ô CONFIG
+* Phần B. 100 ô CONFIG
 * Phần C. Menu thaiput
 * Phần D. Chữ trên trang web (tab CONTENT), hai thứ tiếng
 * Phần E. Ngôn ngữ của từng người dùng
@@ -46,7 +49,7 @@ Nội dung:
 6. Sửa nhiều ô một lúc: chạy menu 2 sau khi sửa.
 
 
-## Phần B. 98 ô CONFIG
+## Phần B. 100 ô CONFIG
 
 Mặc định là giá trị code dùng khi ô trống hoặc không có dòng. Menu 1 thêm dòng còn thiếu với giá trị mặc định, không ghi đè ô đã sửa.
 
@@ -149,7 +152,9 @@ Không còn tự Hoàn thành. Tutor phải chọn kết quả trên trang tutor
 | `REMINDER_WINDOW_MINUTES` | 15 | Độ rộng cửa sổ nhắc (bằng nhịp chạy của việc nhắc) |
 | `EXPIRY_NOTICE_DAYS` | 3 | Báo học viên trước khi gói hết hạn chừng này ngày |
 | `MAIL_FROM_NAME` | thaiput | Tên người gửi hiện trong hộp thư |
-| `MAIL_TRANSPORT` | GMAILAPP | Đường gửi email. `GMAILAPP` (mặc định từ 8.1.4, giống MailFix cũ). `MAILAPP` chỉ dùng khi GMAILAPP hỏng (thư dễ bị trả về trên tên miền của trường). Gõ sai: dùng GMAILAPP |
+| `MAIL_TRANSPORT` | GMAILAPP | Đường gửi email. `GMAILAPP` (mặc định từ 8.1.4, giống MailFix cũ). `MAILAPP` chỉ dùng khi GMAILAPP hỏng (thư dễ bị trả về trên tên miền của trường). `SES` (từ 8.1.5): gửi qua Amazon SES, không bị hạn mức email của Google; cần 3 Thuộc tính tập lệnh `SES_KEY`, `SES_SECRET`, `SES_REGION` (dán ở Cài đặt dự án, không dán vào CONFIG). SES lỗi thì thư đó tự gửi lại bằng GmailApp và có thông báo MAIL_FAILED tối đa 1 lần mỗi giờ. Gõ sai: dùng GMAILAPP |
+| `MAIL_FROM_ADDRESS` | (trống) | Từ 8.1.5, chỉ dùng với `SES`: địa chỉ gửi, phải thuộc tên miền đã xác minh trong SES, ví dụ `booking@mail.<tên miền>`. Trống: `no-reply@mail.<tên miền của ADMIN_EMAIL>`. Học viên bấm Trả lời vẫn về `ADMIN_EMAIL` |
+| `MAIL_DAILY_CAP` | 1400 | Từ 8.1.5, chỉ dùng với `SES`: số thư tối đa mỗi ngày (hạn mức tự đặt). Tên miền gửi mới: tuần đầu đặt 300, mỗi 2 ngày tăng gấp đôi tới 1400. `0` = không giới hạn. `MAIL_LOW_QUOTA_RESERVE`, `MARKETING_QUOTA_RESERVE` tính trên số này |
 | `ADMIN_EMAIL` | admin@thaiput.vn | Địa chỉ duy nhất nhận email hệ thống; địa chỉ "trả lời tới" của mọi email. Phải trùng tài khoản chạy hệ thống |
 | `MAIL_LOW_QUOTA_RESERVE` | 15 | Hạn mức email còn lại trong ngày nhỏ hơn hoặc bằng số này thì tạm bỏ email ưu tiên thấp (nhắc buổi, sắp hết hạn) |
 | `MARKETING_QUOTA_RESERVE` | 100 | Email marketing dừng khi hạn mức còn lại chỉ còn chừng này (Phần G) |

@@ -1,6 +1,6 @@
 # thaiput v8
 
-Hệ thống đặt lịch luyện nói tiếng Thái 1:1, bản **8.1.4** (02/11/2026). Google Sheets làm database, Google Apps Script làm máy chủ (web app), một trang web cho học viên, tutor và admin (nhúng được vào Google Sites).
+Hệ thống đặt lịch luyện nói tiếng Thái 1:1, bản **8.1.5** (10/11/2026). Google Sheets làm database, Google Apps Script làm máy chủ (web app), một trang web cho học viên, tutor và admin (nhúng được vào Google Sites).
 
 Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy bằng Node (giả lập Google), bản dán tay, tài liệu, kế hoạch, lịch sử. Từ 05/11/2026 repo GitHub thay cho 2 file bundle trong claude.ai project.
 
@@ -18,7 +18,7 @@ Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy b
 | `HUONG_DAN_*.md` | 4 hướng dẫn cho admin: vận hành, phát hành và nâng cấp, thử tải, triển khai Workspace; thêm `HUONG_DAN_GITHUB_CLAUDE_CODE.md` (làm việc với repo này) |
 | `policy/` | Chính sách học viên, tutor (bản nháp) |
 | `docs/` | Đặc tả đã chốt: 50 quyết định, plan code, 40 kịch bản test, checklist, tên miền và Workspace |
-| `plan/` | Kế hoạch 5J đến 5Q, lộ trình, kế hoạch sau go live, luật bù buổi, trả lời 29/10 và 01/11 |
+| `plan/` | Kế hoạch 5J đến 5Q, lộ trình, kế hoạch sau go live, kế hoạch v9 chi tiết và bản 2 tối ưu giá, điều phối Claude, Codex, Gemini (Next.js + Supabase + Cloudflare + SES), luật bù buổi, trả lời 29/10 và 01/11 |
 | `archive/` | Lịch sử đã gộp (giải thích chunk, báo cáo, soát, tư vấn, spec v7, hồ sơ v6, bảng tra `MANIFEST.md`) |
 | `THIET_KE_GIAO_DIEN.md`, `CLEANUP_REPORT.md` | Thiết kế giao diện 19/10; báo cáo dọn dẹp 30/10 |
 
@@ -32,7 +32,7 @@ npm run build:prod     dist_production/: mỗi file src/*.gs một file, kèm MA
 npm run clasp:push     đẩy src/ lên dự án Apps Script ghi trong .clasp.json
 ```
 
-Kết quả bản 8.1.4: hàm thuần 34/34, kịch bản 46/46, tích hợp 134/134, giao diện 48/48, thử tải 2/2.
+Kết quả bản 8.1.5: hàm thuần 34/34 (file `test/unit.js` viết lại 10/11, xem PROGRESS), kịch bản 46/46, tích hợp 137/137, giao diện 48/48, thử tải 2/2. GitHub Actions (`.github/workflows/test.yml`) chạy `npm test` và kiểm `dist/` khớp `src/` mỗi lần đẩy.
 
 ## Hai cách đưa code lên Apps Script
 

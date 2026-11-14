@@ -4114,13 +4114,13 @@ t('I132', '5Q gửi email cố định: mặc định GmailApp (chữ thuần + 
   assert.strictEqual(st.mails.length, n1);
 });
 
-t('I133', '5Q chặn tái phạm: ngoài MailTransport.gs không file nào trong src/ gọi MailApp, GmailApp hay Gmail API trực tiếp (gửi thư hoặc đọc hạn mức); bản dist không còn cần tìm và thay', () => {
+t('I133', '5Q chặn tái phạm: ngoài MailTransport.gs không file nào trong src/ gọi MailApp, GmailApp, Gmail API hay UrlFetchApp (5R) trực tiếp (gửi thư hoặc đọc hạn mức); bản dist không còn cần tìm và thay', () => {
   const dir = path.join(__dirname, '..', 'src'), bad = [];
   fs.readdirSync(dir).filter(f => /\.gs$/.test(f) && f !== 'MailTransport.gs').forEach(f => {
     fs.readFileSync(path.join(dir, f), 'utf8').split('\n').forEach((line, i) => {
       // Bỏ chuỗi trong nháy trước (link https:// không làm mất phần sau), rồi bỏ chú thích; bắt cả tên đứng riêng (gán bí danh, M['sendEmail']).
       const code = line.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"/g, "''").replace(/\/\/.*$/, '').replace(/^\s*\*.*$/, '').replace(/^\s*\/\*.*$/, '');
-      if (/\b(MailApp|GmailApp)\b|\bGmail\.Users\b|getRemainingDailyQuota/.test(code)) bad.push(f + ':' + (i + 1) + ' ' + line.trim().slice(0, 80));
+      if (/\b(MailApp|GmailApp|UrlFetchApp)\b|\bGmail\.Users\b|getRemainingDailyQuota|amazonaws\.com/.test(code)) bad.push(f + ':' + (i + 1) + ' ' + line.trim().slice(0, 80));
     });
   });
   assert.deepStrictEqual(bad, []);
@@ -4176,6 +4176,169 @@ t('I135', 'Soát tài liệu 5Q (hồi quy): chọn Từ chối sau khi đã Duy
   api.clearDbCache_();
   const after = api.table_('BOOKINGS').byId(bk.bookingId);
   assert.ok(after.tutor_id !== 'T001' || after.status !== 'CONFIRMED', JSON.stringify({ t: after.tutor_id, s: after.status, n: after.admin_note }));
+});
+
+// ── Chunk 5R: gửi email qua Amazon SES ──
+/** Bản SigV4 độc lập bằng Node crypto (không dùng mã trong src/), để đối chiếu sigV4_. */
+function sigV4Ref(req) {
+  const crypto = require('crypto');
+  const sha = (x) => crypto.createHash('sha256').update(x, 'utf8').digest('hex');
+  const hm = (k, v) => crypto.createHmac('sha256', k).update(v, 'utf8').digest();
+  const hdr = {}; Object.keys(req.headers).forEach(k => { hdr[k.toLowerCase()] = String(req.headers[k]).trim().replace(/\s+/g, ' '); });
+  const names = Object.keys(hdr).sort();
+  const canonical = [req.method.toUpperCase(), req.path, req.query || '', names.map(h => h + ':' + hdr[h] + '\n').join(''), names.join(';'), sha(req.payload || '')].join('\n');
+  const date = req.amzDate.slice(0, 8), scope = date + '/' + req.region + '/' + req.service + '/aws4_request';
+  let k = hm('AWS4' + req.secret, date); k = hm(k, req.region); k = hm(k, req.service); k = hm(k, 'aws4_request');
+  return crypto.createHmac('sha256', k).update(['AWS4-HMAC-SHA256', req.amzDate, scope, sha(canonical)].join('\n'), 'utf8').digest('hex');
+}
+/** Máy chủ SES giả: ghi lại yêu cầu, trả theo kịch bản. */
+function sesServer(c, plan) {
+  const st = c.env.state, seen = [];
+  st.urlFetch = (url, opts) => {
+    seen.push({ url, opts, body: JSON.parse(opts.payload) });
+    const p = typeof plan === 'function' ? plan(seen.length) : plan;
+    if (p === 'NETWORK') throw new Error('Address unavailable: https://email.ap-southeast-1.amazonaws.com');
+    return p || { code: 200, body: JSON.stringify({ MessageId: 'ses-' + seen.length }) };
+  };
+  return seen;
+}
+function sesOn(c, extra) {
+  Object.assign(c.env.state.props, { SES_KEY: 'AKIDEXAMPLE', SES_SECRET: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY' }, extra || {});
+  cfgSet(c, 'MAIL_TRANSPORT', 'SES');
+}
+
+t('I136', '5R chữ ký AWS Signature V4: sigV4_ khớp vector mẫu của tài liệu AWS (IAM ListUsers) và khớp bản tính độc lập bằng Node cho yêu cầu SES có tiếng Việt; HMAC dùng dạng byte như Google (mock từ chối trộn chuỗi và byte)', () => {
+  const c = mk('2026-10-12 10:00'), api = c.api;
+  const iam = { method: 'GET', path: '/', query: 'Action=ListUsers&Version=2010-05-08', payload: '', amzDate: '20150830T123600Z', region: 'us-east-1', service: 'iam',
+    key: 'AKIDEXAMPLE', secret: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8', Host: 'iam.amazonaws.com', 'X-Amz-Date': '20150830T123600Z' } };
+  const r = api.sigV4_(iam);
+  assert.strictEqual(r.signature, '5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7', 'vector mẫu AWS');
+  assert.strictEqual(r.signedHeaders, 'content-type;host;x-amz-date');
+  assert.ok(/^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/20150830\/us-east-1\/iam\/aws4_request, SignedHeaders=content-type;host;x-amz-date, Signature=5d67/.test(r.authorization));
+  const ses = { method: 'POST', path: '/v2/email/outbound-emails', query: '', amzDate: '20261012T030000Z', region: 'ap-southeast-1', service: 'ses',
+    key: 'AKIDEXAMPLE', secret: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
+    headers: { host: 'email.ap-southeast-1.amazonaws.com', 'x-amz-date': '20261012T030000Z' },
+    payload: JSON.stringify({ Content: { Simple: { Subject: { Data: 'Xác nhận đặt lịch · ยืนยัน' } } } }) };
+  assert.strictEqual(api.sigV4_(ses).signature, sigV4Ref(ses));
+  // Header ghi lộn thứ tự, chữ hoa, khoảng trắng thừa: AWS sắp theo tên chữ thường và gộp khoảng trắng
+  const mixed = Object.assign({}, ses, { headers: { 'X-Amz-Date': '20261012T030000Z', 'X-Amz-Target': '  a   b ', Host: 'email.ap-southeast-1.amazonaws.com' } });
+  assert.strictEqual(api.sigV4_(mixed).signature, sigV4Ref(mixed));
+  assert.strictEqual(api.sigV4_(mixed).signedHeaders, 'host;x-amz-date;x-amz-target');
+  assert.strictEqual(api.amzDate_(new Date(Date.UTC(2026, 9, 5, 7, 8, 9))), '20261005T070809Z');
+  assert.throws(() => c.env.globals.Utilities.computeHmacSha256Signature('x', [1, 2]), /Cannot find method/);
+});
+
+t('I137', '5R gửi qua SES: đúng địa chỉ API của vùng, chữ ký hợp lệ, thân thư có tên người gửi, trả lời về admin, HTML kèm chữ thuần, CC; MAIL_LOG ghi SES; SES lỗi (thiếu khoá, mã 400, 500, mất mạng) thì thư tự gửi lại bằng GmailApp, ghi MAIL_FALLBACK một lần mỗi giờ, không ném lỗi; GmailApp cũng hỏng thì MAIL_FAILED', () => {
+  const c = mk('2026-10-12 10:00'), api = c.api, st = c.env.state;
+  sesOn(c); cfgSet(c, 'MAIL_FROM_ADDRESS', 'booking@mail.thaiput.vn');
+  const seen = sesServer(c);
+  assert.strictEqual(api.mailTransport_(), 'SES');
+  const g0 = st.mails.length;
+  assert.ok(api.sendMail_('a@x.test', 'Chào bạn', '<p>Xin <b>chào</b></p>', 'S1', 'high'));
+  assert.strictEqual(st.mails.length, g0, 'không đi qua Google');
+  assert.strictEqual(seen.length, 1);
+  const q = seen[0], h = q.opts.headers;
+  assert.strictEqual(q.url, 'https://email.ap-southeast-1.amazonaws.com/v2/email/outbound-emails');
+  assert.ok(q.opts.method === 'post' && q.opts.muteHttpExceptions === true && q.opts.contentType === 'application/json');
+  const sig = /Signature=([0-9a-f]{64})$/.exec(h.Authorization)[1];
+  assert.strictEqual(sig, sigV4Ref({ method: 'POST', path: '/v2/email/outbound-emails', headers: { host: 'email.ap-southeast-1.amazonaws.com', 'x-amz-date': h['X-Amz-Date'] },
+    payload: q.opts.payload, amzDate: h['X-Amz-Date'], region: 'ap-southeast-1', service: 'ses', secret: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY' }), 'chữ ký khớp bản độc lập');
+  assert.ok(/Credential=AKIDEXAMPLE\/\d{8}\/ap-southeast-1\/ses\/aws4_request/.test(h.Authorization));
+  const b = q.body;
+  assert.strictEqual(b.FromEmailAddress, '"' + api.cfg_('MAIL_FROM_NAME') + '" <booking@mail.thaiput.vn>');
+  assert.deepStrictEqual(b.Destination.ToAddresses, ['a@x.test']);
+  assert.deepStrictEqual(b.ReplyToAddresses, [api.cfgList_('ADMIN_EMAIL')[0]]);
+  assert.strictEqual(b.Content.Simple.Subject.Data, 'Chào bạn');
+  assert.strictEqual(b.Content.Simple.Body.Text.Data, 'Xin chào');
+  assert.ok(/<b>chào<\/b>/.test(b.Content.Simple.Body.Html.Data));
+  api.clearDbCache_();
+  assert.strictEqual(api.table_('MAIL_LOG').all().filter(r => r.kind === 'S1')[0].transport, 'SES');
+  // CC, BCC, tên có dấu nháy
+  api.mailDeliver_({ to: 'a@x.test, b@x.test', subject: 'S', htmlBody: '<p>x</p>', name: 'Tên "lạ"', cc: 'c@x.test', bcc: 'd@x.test' });
+  const b2 = seen[1].body;
+  assert.deepStrictEqual([b2.Destination.ToAddresses, b2.Destination.CcAddresses, b2.Destination.BccAddresses], [['a@x.test', 'b@x.test'], ['c@x.test'], ['d@x.test']]);
+  assert.strictEqual(b2.FromEmailAddress, '"Tên lạ" <booking@mail.thaiput.vn>');
+  // MAIL_FROM_ADDRESS trống: suy từ ADMIN_EMAIL
+  cfgSet(c, 'MAIL_FROM_ADDRESS', '');
+  assert.strictEqual(api.mailFromAddress_(), 'no-reply@mail.' + api.cfgList_('ADMIN_EMAIL')[0].split('@')[1]);
+  // AWS trả 400, 500, mất mạng: tự gửi lại bằng GmailApp, không ném lỗi, báo một lần
+  const fails = [{ code: 400, body: '{"message":"Email address is not verified."}' }, { code: 500, body: 'oops' }, 'NETWORK'];
+  fails.forEach((f, i) => {
+    sesServer(c, f);
+    const n0 = st.mails.length;
+    assert.ok(api.sendMail_('f' + i + '@x.test', 'S', '<p>z</p>', 'S2', 'high'), 'không báo hỏng: ' + JSON.stringify(f));
+    assert.strictEqual(st.mails.length, n0 + 1);
+    assert.strictEqual(st.mails[st.mails.length - 1].transport, 'GMAILAPP');
+  });
+  api.clearDbCache_();
+  const fb = api.table_('ACTIVITY_LOG').all().filter(r => r.action === 'MAIL_FALLBACK');
+  assert.strictEqual(fb.length, 1, 'báo một lần mỗi giờ');
+  const d = JSON.parse(fb[0].detail);
+  assert.ok(d.from === 'SES' && d.used === 'GMAILAPP' && /400/.test(d.error), fb[0].detail);
+  const nt = api.table_('NOTIFICATIONS').all().filter(n => /^SES lỗi/.test(n.message));
+  assert.ok(nt.length === 1 && /^SES failed/.test(nt[0].message_en));
+  assert.ok(api.table_('MAIL_LOG').all().filter(r => r.kind === 'S2').every(r => r.transport === 'GMAILAPP'));
+  // Thiếu khoá: không gọi AWS, gửi bằng GmailApp
+  const c2 = mk('2026-10-12 10:00'); cfgSet(c2, 'MAIL_TRANSPORT', 'SES');
+  const s2 = sesServer(c2);
+  assert.ok(c2.api.sendMail_('k@x.test', 'S', '<p>z</p>', 'S3', 'high'));
+  assert.strictEqual(s2.length, 0);
+  assert.strictEqual(c2.env.state.mails[c2.env.state.mails.length - 1].transport, 'GMAILAPP');
+  assert.ok(c2.api.testSystem().errors.some(x => /SES_KEY/.test(x)), 'menu 2 báo LỖI thiếu khoá');
+  // SES và GmailApp cùng hỏng: MAIL_FAILED, sendMail_ trả false (không ném)
+  const c3 = mk('2026-10-12 10:00'); sesOn(c3); sesServer(c3, 'NETWORK');
+  const orig = c3.env.globals.GmailApp.sendEmail;
+  c3.env.globals.GmailApp.sendEmail = () => { throw new Error('Service invoked too many times for one day: email.'); };
+  try {
+    assert.strictEqual(c3.api.sendMail_('z@x.test', 'S', '<p>z</p>', 'S4', 'high'), false);
+  } finally { c3.env.globals.GmailApp.sendEmail = orig; }
+  c3.api.clearDbCache_();
+  const mf = c3.api.table_('ACTIVITY_LOG').all().filter(r => r.action === 'MAIL_FAILED');
+  assert.ok(mf.length >= 1 && /SES: .*too many times/.test(mf[0].detail), JSON.stringify(mf));
+  // Menu Kiểm tra gửi email báo đường SES
+  const c4 = mk('2026-10-12 10:00'); sesOn(c4); sesServer(c4);
+  const mt = c4.api.mailTest_('k@x.test', 'admin@thaiput.vn');
+  assert.ok(mt.ok && mt.transport === 'SES', JSON.stringify(mt));
+});
+
+t('I138', '5R hạn mức SES: MAIL_DAILY_CAP trừ số thư SES hôm nay; mất bộ đệm thì đếm lại MAIL_LOG; ngày mới đếm lại từ 0; còn tới MAIL_LOW_QUOTA_RESERVE thì thư nhắc (ưu tiên thấp) dừng, thư quan trọng vẫn gửi; MAIL_DAILY_CAP = 0 là không giới hạn; menu 2 hiện hạn mức SES; quyền external_request có trong appsscript.json', () => {
+  const c = mk('2026-10-12 10:00'), api = c.api, st = c.env.state;
+  sesOn(c); cfgSet(c, 'MAIL_DAILY_CAP', 20); cfgSet(c, 'MAIL_LOW_QUOTA_RESERVE', 15);
+  const seen = sesServer(c);
+  assert.strictEqual(api.mailBudget_(), 20);
+  for (let i = 0; i < 3; i++) api.sendMail_('a' + i + '@x.test', 'S', '<p>x</p>', 'B1', 'high');
+  assert.strictEqual(api.mailBudget_(), 17);
+  // Mất bộ đệm (Google xoá CacheService): đếm lại MAIL_LOG
+  Object.keys(st.cache).filter(k => /^ses_sent_/.test(k)).forEach(k => delete st.cache[k]);
+  api.clearDbCache_();
+  assert.strictEqual(api.mailBudget_(), 17, 'đếm lại từ MAIL_LOG');
+  // Còn 15 (bằng MAIL_LOW_QUOTA_RESERVE): thư nhắc dừng, thư quan trọng vẫn đi
+  api.sendMail_('b@x.test', 'S', '<p>x</p>', 'B1', 'high'); api.sendMail_('c@x.test', 'S', '<p>x</p>', 'B1', 'high');
+  assert.strictEqual(api.mailBudget_(), 15);
+  const n = seen.length;
+  assert.strictEqual(api.sendMail_('d@x.test', 'Nhắc', '<p>x</p>', 'REMINDER_STUDENT', 'low'), false);
+  assert.strictEqual(seen.length, n, 'thư nhắc không gửi');
+  assert.ok(api.sendMail_('e@x.test', 'Xác nhận', '<p>x</p>', 'B1', 'high'));
+  assert.strictEqual(seen.length, n + 1);
+  api.clearDbCache_();
+  assert.ok(api.table_('ACTIVITY_LOG').all().some(r => r.action === 'MAIL_SKIPPED_LOW_QUOTA'));
+  // Ngày mới: đếm từ 0
+  c.at('2026-10-13 08:00'); api.clearDbCache_();
+  assert.strictEqual(api.mailBudget_(), 20);
+  // 0 = không giới hạn (-1 = không chặn thư nhắc)
+  cfgSet(c, 'MAIL_DAILY_CAP', 0);
+  assert.strictEqual(api.mailBudget_(), -1);
+  assert.ok(api.sendMail_('f@x.test', 'Nhắc', '<p>x</p>', 'REMINDER_STUDENT', 'low'));
+  // Menu 2
+  cfgSet(c, 'MAIL_DAILY_CAP', 1400);
+  const ts = api.testSystem();
+  assert.ok(ts.lines.some(l => /qua SES: 1399 \(MAIL_DAILY_CAP 1400, đã gửi 1\)/.test(l)), ts.lines.filter(l => /SES/.test(l)).join(' | '));
+  assert.ok(!ts.errors.some(x => /SES_KEY/.test(x)));
+  // Quyền gọi dịch vụ ngoài (UrlFetchApp) trong appsscript.json
+  const man = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'appsscript.json'), 'utf8'));
+  assert.ok(man.oauthScopes.indexOf('https://www.googleapis.com/auth/script.external_request') !== -1);
+  assert.ok(man.oauthScopes.indexOf('https://www.googleapis.com/auth/gmail.send') !== -1);
 });
 
 module.exports = { results };
