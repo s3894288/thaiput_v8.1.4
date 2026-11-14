@@ -1609,6 +1609,76 @@ t('U51', 'T2: khung chuyển khoản. Không QR: một cột, không ô trống,
   p.clean();
 });
 
+t('U52', 'T3b: font nạp không chặn (media=print + onload, noscript dự phòng, đủ 3 họ font, display=swap, 2 preconnect); khung chờ tĩnh trong #app có sẵn trước script rồi bị T.go thay (trang chủ, đăng nhập, bảo trì); ảnh banner có width, height, decoding mà CSS vẫn width 100% height auto', async () => {
+  const c = mk();
+  const html = c.api.doGet({ parameter: { page: 'home' } }).getContent();
+  const link = html.match(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]*>/g) || [];
+  assert.strictEqual(link.length, 2, 'một link chính và một link trong noscript');
+  assert.ok(/media="print" onload="this\.media='all'"/.test(link[0]), link[0]);
+  assert.ok(/<noscript><link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^"]+"><\/noscript>/.test(html), 'noscript dự phòng');
+  ['Be+Vietnam+Pro:wght@400;500;600;700', 'Noto+Sans+Thai:wght@600', 'Noto+Sans+Thai+Looped:wght@600', 'display=swap'].forEach(f => assert.ok(link[0].indexOf(f) !== -1, 'thiếu ' + f));
+  assert.strictEqual((html.match(/rel="preconnect"/g) || []).length, 2, 'giữ 2 preconnect');
+  // Khung chờ có sẵn trong HTML tĩnh (trước khi script chạy)
+  const bare = new JSDOM(html);   // không chạy script
+  assert.strictEqual(bare.window.document.querySelectorAll('#app > .stack > .skeleton').length, 3, 'khung chờ tĩnh 3 dòng');
+  // Sau T.start: bị thay hẳn
+  for (const pg of ['home', 'login']) {
+    const p = open(c, { page: pg }); await p.flush(40); p.clean();
+    assert.strictEqual(p.$$('#app .skeleton').length, 0, pg + ': khung chờ tĩnh đã bị thay');
+    assert.ok(p.$('#app main') || p.$('#app form'), pg + ': nội dung thật đã vẽ');
+  }
+  // Bảo trì đóng: maintScreen thay cả nội dung
+  const m = open(c, { page: 'home' }); await m.flush(40);
+  m.win.T.maintScreen({ ok: false, reason: 'MAINT_CLOSED', message: 'x', msg: { vi: 'Đang bảo trì', en: 'Maintenance' } });
+  assert.ok(!m.$('#app .skeleton'), 'màn bảo trì không còn khung chờ');
+  // Ảnh banner
+  const h = open(c, { page: 'home' }); await h.flush(40);
+  const img = h.$('.hero-img');
+  assert.strictEqual(img.getAttribute('width'), '1101'); assert.strictEqual(img.getAttribute('height'), '630'); assert.strictEqual(img.getAttribute('decoding'), 'async');
+  assert.ok(/\.hero-img \{[^}]*width: 100%; height: auto/.test(h.$('style').textContent), 'CSS giữ width 100%, height auto');
+});
+
+t('U53', 'T3b: tutor tải trước giờ rảnh ở nền. Còn mới (dưới 60 giây) thì dùng, không gọi lại; quá 60 giây thì gọi như cũ; lỗi nền nuốt im, không đăng xuất; giờ rảnh đang sửa không bị ghi đè khi đổi ngôn ngữ; sau khi lưu bản tải trước bị bỏ', async () => {
+  const nAv = (p) => p.calls.filter(x => x.name === 'apiTutorAvailability' && !x.failed).length;
+  // 1. Còn mới: tải trước 1 lần, bấm tab dùng lại, không gọi thêm
+  let c = mk(); let s1 = (await uiLogin(c, 'T001')).session;
+  let p = open(c, { page: 'tutor' }, { session: s1 }); await p.flush(60);
+  assert.strictEqual(nAv(p), 1, 'tải trước đúng 1 lần khi đang ở tab lịch');
+  p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 1, 'dùng bản tải trước, không gọi lại');
+  assert.strictEqual(p.$$('.chip[data-key^="2026-10-19|"]').length, 32, 'lưới giờ rảnh vẽ đủ');
+  // Dùng một lần: ra rồi vào lại thì gọi mới
+  p.click('.tab[data-tab="schedule"]'); await p.flush(20); p.click('.tab[data-tab="avail"]'); await p.flush(60);
+  assert.strictEqual(nAv(p), 2, 'bản tải trước chỉ dùng một lần');
+  // 2. Giờ rảnh đang sửa chưa lưu: đổi ngôn ngữ không gọi lại, không mất chỗ đã chọn
+  p.click('.chip[data-key="2026-10-19|10:00"]');
+  p.click('[data-langsw]'); await p.flush(30);
+  assert.strictEqual(nAv(p), 2); assert.ok(p.$('.chip[data-key="2026-10-19|10:00"].dirty'), 'giữ giờ đang sửa');
+  // 3. Lưu: vẽ lại bằng lượt gọi mới (bản tải trước đã bỏ)
+  p.click('#ab-go'); await p.flush(60);
+  p.click('.sheet button'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 3, 'sau khi lưu gọi lại máy chủ');
+  assert.ok(c.rows('AVAILABILITY').some(a => a.tutor_id === 'T001' && c.keyOf(a.date) === '2026-10-19' && a.slot === '10:00' && a.status === 'OPEN'));
+  // 4. Quá 60 giây: gọi như cũ
+  c = mk(); s1 = (await uiLogin(c, 'T001')).session;
+  p = open(c, { page: 'tutor' }, { session: s1 }); await p.flush(60);
+  assert.strictEqual(nAv(p), 1);
+  const real = p.win.Date.now; p.win.Date.now = () => real.call(p.win.Date) + 61000;
+  p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 2, 'bản cũ hơn 60 giây không dùng');
+  assert.strictEqual(p.$$('details.day').length, 7);
+  // 5. Lỗi nền (4 lần thử đều hỏng) nuốt im, phiên còn nguyên; bấm tab thì gọi bình thường
+  c = mk(); s1 = (await uiLogin(c, 'T001')).session;
+  p = open(c, { page: 'tutor' }, { session: s1, failNext: { apiTutorAvailability: 4 } }); await p.flush(80); p.clean();
+  assert.strictEqual(nAv(p), 0, 'tải trước hỏng');
+  assert.ok(p.session() && p.session().token, 'không đăng xuất');
+  assert.strictEqual(p.$('body').getAttribute('data-page'), 'tutor', 'vẫn ở cổng tutor');
+  assert.ok(!p.$('.alert.bad'), 'không hiện lỗi');
+  p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 1, 'gọi bình thường sau lỗi nền');
+  assert.strictEqual(p.$$('details.day').length, 7);
+});
+
 module.exports = { run };
 if (require.main === module) {
   run().then(r => { r.forEach(x => console.log((x.ok ? 'ĐẠT  ' : 'TRƯỢT ') + x.id + ' ' + x.title + (x.ok ? '' : '\n      ' + x.err))); process.exit(r.every(x => x.ok) ? 0 : 1); });

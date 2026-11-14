@@ -8,7 +8,9 @@
     user: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>',
     check: '<svg class="ic" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12l5 5L20 6"/></svg>'
   };
-  var st = { tab: 'schedule', home: null, av: null, week: 1, dirty: {}, pick: {} };
+  var st = { tab: 'schedule', home: null, av: null, week: 1, dirty: {}, pick: {}, pre: null };
+  /** Giờ rảnh tải trước (nền) tối đa bao lâu thì còn dùng được, mili giây. */
+  var PRE_MAX_MS = 60000;
 
   T.views.tutor = {
     render: function (root, opts) {
@@ -19,6 +21,7 @@
         st.home = r.data;
         T.adoptLang(r.data.profile && r.data.profile.lang);
         frame(root);
+        prefetchAvail();
       }).catch(function () { });
     },
     /** Đổi ngôn ngữ: vẽ lại bằng dữ liệu đã có, giữ giờ rảnh chưa lưu và kết quả đang chọn. */
@@ -99,9 +102,27 @@
   function addDaysKey(key, n) { var p = key.split('-'), d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function dowOf(key) { return T.dow(key, true); }
 
+  /**
+   * Tải trước giờ rảnh ở nền khi đang ở tab khác, để bấm tab Giờ rảnh là hiện ngay. Chỉ giữ kết quả kèm mốc giờ, không đụng st.av
+   * (giờ rảnh đang sửa chưa lưu không bao giờ bị ghi đè). Lỗi (kể cả phiên hết hạn) nuốt im: lượt gọi thường sẽ xử lý như cũ.
+   * Dùng T.api thẳng (không qua T.authed) để lượt nền không bao giờ đăng xuất hay báo lỗi.
+   */
+  function prefetchAvail() {
+    if (st.tab === 'avail') return;
+    var mine = { t: Date.now(), p: null };
+    mine.p = T.api('apiTutorAvailability', T.token(), '', 14).then(function (r) { return r && r.ok ? r : null; }, function () { return null; }).catch(function () { return null; });
+    st.pre = mine;
+  }
+  /** Lấy kết quả tải trước nếu còn mới (dưới 60 giây), dùng một lần; không thì null. */
+  function takePre() {
+    var pre = st.pre; st.pre = null;
+    return pre && Date.now() - pre.t < PRE_MAX_MS ? pre.p : null;
+  }
+
   function drawAvail(body, root) {
     body.innerHTML = '<h2>' + T.t('t.avail_title') + '</h2>' + T.skeleton(3);
-    T.authed('apiTutorAvailability', '', 14).then(function (r) {
+    var pre = takePre();
+    (pre ? pre.then(function (r) { return r || T.authed('apiTutorAvailability', '', 14); }) : T.authed('apiTutorAvailability', '', 14)).then(function (r) {
       if (!r.ok) { body.innerHTML = '<div class="alert bad">' + T.esc(r.message) + '</div>'; return; }
       st.av = r.data; st.dirty = {};
       renderAvail(body, root);
@@ -201,6 +222,7 @@
     var changes = Object.keys(st.dirty).map(function (k) { var p = k.split('|'); return { date: p[0], slot: p[1], open: st.dirty[k] }; });
     if (!changes.length) return;
     var btn = T.$('#ab-go', root); btn.disabled = true; btn.textContent = T.t('t.saving');
+    st.pre = null;   // giờ rảnh sắp đổi: bản tải trước không còn đúng
     T.authed('apiTutorSetAvailability', changes).then(function (r) {
       btn.disabled = false;
       if (T.state.page !== 'tutor') return;
@@ -214,7 +236,7 @@
       T.sheet('<h2>' + T.t('t.saved') + '</h2><ul style="margin:0;padding-left:18px">' +
         (c.OPEN ? '<li>' + T.t('t.saved_open', { n: c.OPEN }) + '</li>' : '') + (c.CANCELLED ? '<li>' + T.t('t.saved_removed', { n: c.CANCELLED }) + '</li>' : '') +
         (c.CANCEL_PENDING ? '<li>' + T.t('t.saved_pending', { n: c.CANCEL_PENDING }) + '</li>' : '') + (c.bad ? '<li>' + T.t('t.saved_bad', { n: c.bad }) + '</li>' : '') + '</ul>')
-        .then(function () { st.dirty = {}; updateBar(root); drawAvail(T.$('#tab-body', root), root); });
+        .then(function () { st.pre = null; st.dirty = {}; updateBar(root); drawAvail(T.$('#tab-body', root), root); });
     }).catch(function () { });
   }
 

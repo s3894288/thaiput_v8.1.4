@@ -4714,6 +4714,38 @@ t('I146', 'T2: ảnh QR chuyển khoản. Tách mã từ các dạng link; từ 
   assert.ok(/apiBankQr: 1/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'ui', 'App.html'), 'utf8').match(/var READ_APIS = (\{[\s\S]*?\});/)[1]), 'trình duyệt tự thử lại theo READ_APIS');
 });
 
+t('I147', 'T3b: bộ chuẩn hoá cột chọn sẵn một lần (cellNormalizer_) cho kết quả y hệt normalizeCell_ ở mọi cột của mọi tab SCHEMA, với ngày, Date, số, trống, boolean, slot và chữ có dấu nháy; table_() đọc đúng như cũ', () => {
+  const c = mk(), { api } = c;
+  c.onlyOpen('2026-10-14', '20:00', ['T001']); assert.ok(c.book('S003', [['2026-10-14', '20:00']])[0].ok);
+  const vals = [new Date(2026, 9, 5), new Date(2026, 9, 5, 13, 45), new Date(1899, 11, 30, 8, 0), new Date(1899, 11, 30, 23, 30), new Date(NaN),
+    '2026-10-05', '05/10/2026', '2026-02-31', '08:00', ' 19:30 ', '', null, undefined, 0, 7, 1234567890, 84912345678, true, false,
+    "'0912345678", "'=SUM(1)", '+84912345678', '=x', 'Chữ có dấu', '  ', 'S001', 'T002'];
+  let n = 0;
+  Object.keys(api.SCHEMA).forEach(tab => {
+    const sc = api.SCHEMA[tab];
+    sc.cols.forEach(col => {
+      const f = api.cellNormalizer_(sc, col);
+      vals.forEach(v => { assert.deepStrictEqual(f(v), api.normalizeCell_(sc, col, v), tab + '.' + col + ' với ' + String(v)); n++; });
+    });
+  });
+  assert.ok(n > 1000, 'đã so ' + n + ' ô');
+  // Ba loại cột đều có mặt trong SCHEMA thật: ngày, chữ (kể cả slot), thường
+  const kinds = new Set(); Object.keys(api.SCHEMA).forEach(tab => api.SCHEMA[tab].cols.forEach(col => { const sc = api.SCHEMA[tab]; kinds.add((sc.dates || []).indexOf(col) !== -1 ? 'date' : (sc.text || []).indexOf(col) !== -1 ? (col === 'slot' ? 'slot' : 'text') : 'raw'); }));
+  assert.deepStrictEqual(Array.from(kinds).sort(), ['date', 'raw', 'slot', 'text']);
+  // Schema giả: cột vừa trong dates vừa trong text thì ngày thắng (như normalizeCell_); không có dates/text thì giữ nguyên
+  const fake = { cols: ['a', 'slot', 'b'], dates: ['a'], text: ['a', 'slot'] };
+  vals.forEach(v => ['a', 'slot', 'b'].forEach(col => assert.deepStrictEqual(api.cellNormalizer_(fake, col)(v), api.normalizeCell_(fake, col, v))));
+  const bare = { cols: ['x'] };
+  vals.forEach(v => assert.deepStrictEqual(api.cellNormalizer_(bare, 'x')(v), api.normalizeCell_(bare, 'x', v)));
+  // table_() đầu cuối: từng ô của mọi dòng AVAILABILITY và BOOKINGS khớp normalizeCell_ trên giá trị thô trong Sheets
+  ['AVAILABILITY', 'BOOKINGS', 'USERS'].forEach(tab => {
+    api.clearDbCache_();
+    const tb = api.table_(tab), sh = api.dbSpreadsheet_().getSheetByName(tab), raw = sh.getDataRange().getValues(), head = raw[0].map(h => String(h).trim());
+    assert.ok(tb.rows.length > 0, tab + ' có dữ liệu');
+    tb.rows.forEach(o => { api.SCHEMA[tab].cols.forEach(col => { const j = head.indexOf(col); assert.deepStrictEqual(o[col], j === -1 ? '' : api.normalizeCell_(api.SCHEMA[tab], col, raw[o._row - 1][j]), tab + ' dòng ' + o._row + ' cột ' + col); }); });
+  });
+});
+
 module.exports = { results };
 if (require.main === module) {
   results.forEach(r => console.log((r.ok ? '  ĐẠT       ' : '  KHÔNG ĐẠT ') + r.id + '  ' + r.title + (r.ok ? '' : '\n              ' + r.err)));

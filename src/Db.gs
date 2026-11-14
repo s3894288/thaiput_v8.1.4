@@ -78,6 +78,9 @@ function table_(name) {
     }
     colIndex[c] = i;
   });
+  // Bộ chuẩn hoá chọn MỘT lần cho mỗi cột (trước đây normalizeCell_ chạy nhiều indexOf cho từng ô): kết quả giống hệt normalizeCell_.
+  var colNames = schema.cols, nCols = colNames.length, colPos = [], colNorm = [];
+  for (var cj = 0; cj < nCols; cj++) { colPos.push(colNames[cj] in colIndex ? colIndex[colNames[cj]] : -1); colNorm.push(cellNormalizer_(schema, colNames[cj])); }
   var rows = [];
   for (var r = 1; r < values.length; r++) {
     var line = values[r];
@@ -86,7 +89,7 @@ function table_(name) {
     for (var k = 0; k < line.length; k++) { if (line[k] !== '' && line[k] !== null && line[k] !== false) { empty = false; break; } }
     if (empty) continue;
     var obj = { _row: r + 1 };
-    schema.cols.forEach(function (c) { obj[c] = c in colIndex ? normalizeCell_(schema, c, line[colIndex[c]]) : ''; });
+    for (var ci = 0; ci < nCols; ci++) { obj[colNames[ci]] = colPos[ci] === -1 ? '' : colNorm[ci](line[colPos[ci]]); }
     rows.push(obj);
   }
   var t = new DbTable_(name, schema, sh, colIndex, rows, sh.getLastRow());
@@ -117,6 +120,18 @@ function flushLogAppend_() {
     appendRowsRaw_(n, q);
   });
 }
+
+/** Chọn sẵn hàm chuẩn hoá cho một cột (cùng luật với normalizeCell_, nhưng không tra danh sách cho từng ô). */
+function cellNormalizer_(schema, col) {
+  if (schema.dates && schema.dates.indexOf(col) !== -1) return asDate_;
+  if (schema.text && schema.text.indexOf(col) !== -1) {
+    if (col === 'slot') return asSlot_;
+    return textCell_;
+  }
+  return rawCell_;
+}
+function textCell_(v) { return v === null || v === undefined ? '' : String(v); }
+function rawCell_(v) { return v; }
 
 function normalizeCell_(schema, col, v) {
   if (schema.dates && schema.dates.indexOf(col) !== -1) return asDate_(v);

@@ -8,11 +8,14 @@
   <title>thaiput · Đặt lịch luyện nói · Speaking lessons</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans+Thai:wght@600&family=Noto+Sans+Thai+Looped:wght@600&display=swap">
+  <!-- Font nạp không chặn: media="print" rồi đổi thành all khi tải xong (display=swap giữ chữ hiện ngay bằng font hệ thống). Tắt JavaScript thì dùng noscript. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans+Thai:wght@600&family=Noto+Sans+Thai+Looped:wght@600&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Noto+Sans+Thai:wght@600&family=Noto+Sans+Thai+Looped:wght@600&display=swap"></noscript>
   <?!= include_('ui/Styles'); ?>
 </head>
 <body>
-  <div id="app"></div>
+  <!-- Khung chờ tĩnh (cùng lớp với T.skeleton(3)): hiện ngay trước khi script chạy; T.go thay toàn bộ nội dung #app. -->
+  <div id="app"><div class="stack"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div></div>
   <script>
     // Giá trị do doGet (Api.gs, bootJson_) truyền vào: trang cần mở, token link đăng nhập (nếu có), phiên bản.
     var BOOT = <?!= bootJson ?>;

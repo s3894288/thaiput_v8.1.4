@@ -68,7 +68,7 @@
     var bank = T.bankPanel(info);
     root.innerHTML = T.topbar(topBtn(s)) +
       '<main class="stack-lg">' +
-      '<section class="hero"><img class="hero-img" alt="" src="' + HERO_IMG + '"><span class="th-word" lang="th">' + T.t('h.hero_th') + '</span><h1>' + T.t('h.hero_title') + '</h1>' +
+      '<section class="hero"><img class="hero-img" alt="" width="1101" height="630" decoding="async" src="' + HERO_IMG + '"><span class="th-word" lang="th">' + T.t('h.hero_th') + '</span><h1>' + T.t('h.hero_title') + '</h1>' +
       '<p class="muted">' + T.t('h.hero_sub') + '</p></section>' +
       '<div class="facts"><div><b>' + T.t('h.fact1_big') + '</b><span>' + T.t('h.fact1') + '</span></div><div><b>' + T.t('h.fact2_big') + '</b><span>' + T.t('h.fact2') + '</span></div>' + (info.bookingLeadHours >= 0 ? '<div><b>' + (info.bookingLeadHours ? info.bookingLeadHours + 'h' : T.t('h.fact3_lead_zero')) + '</b><span>' + T.t('h.fact3_lead') + '</span></div>' : '<div><b>15:00</b><span>' + T.t('h.fact3_deadline') + '</span></div>') + '</div>' +
       '<form id="reg" class="card stack" novalidate>' +
