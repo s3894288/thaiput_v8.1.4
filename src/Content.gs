@@ -569,6 +569,7 @@ var DEFAULT_CONTENT_ = {
   'ad.act.ARCHIVE_RECOVER': ['Hoàn tất lô lưu trữ dở', 'Archive batch recovered', 'Chữ đậm ở dòng nhật ký', 'Hành động ARCHIVE_RECOVER'],
   'ad.act.ARCHIVE_FILE_CREATED': ['Tạo file lưu trữ năm', 'Archive file created', 'Chữ đậm ở dòng nhật ký', 'Hành động ARCHIVE_FILE_CREATED'],
   'ad.act.ARCHIVE_FOLDER_CREATED': ['Tạo thư mục lưu trữ', 'Archive folder created', 'Chữ đậm ở dòng nhật ký', 'Hành động ARCHIVE_FOLDER_CREATED'],
+  'ad.act.TEMPLATE_DEDUPE': ['Gộp dòng trùng key (EMAIL_TEMPLATES, CONTENT)', 'Merged duplicate key rows (EMAIL_TEMPLATES, CONTENT)', 'Chữ đậm ở dòng nhật ký; chi tiết JSON: key, hàng, ô lấy hoặc bỏ', 'Hành động TEMPLATE_DEDUPE (menu 1 gộp dòng trùng key)'],
   'ad.act.PURGE_RECOVERED': ['Dọn lần bỏ dòng dở', 'Row removal recovered', 'Chữ đậm ở dòng nhật ký', 'Hành động PURGE_RECOVERED'],
   'ad.act.DATA_RESET_STARTED': ['Bắt đầu xoá dữ liệu test', 'Test data reset started', 'Chữ đậm ở dòng nhật ký', 'Hành động DATA_RESET_STARTED'],
   'ad.act.DATA_RESET': ['Xoá dữ liệu test', 'Test data reset', 'Chữ đậm ở dòng nhật ký', 'Hành động DATA_RESET'],

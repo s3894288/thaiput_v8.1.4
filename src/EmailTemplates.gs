@@ -170,6 +170,7 @@ var TEMPLATE_UPGRADES_ = {
 var TEMPLATE_COLS_ = ['audience', 'subject_vi', 'title_vi', 'body_vi', 'subject_en', 'title_en', 'body_en', 'variables'];
 
 /** Mẫu đang dùng: dòng trong EMAIL_TEMPLATES ghi đè từng ô của mẫu gốc (ô trống thì dùng gốc). */
+/* Key trùng ở tab (chờ menu 1 gộp, dedupeDuplicateKeys_): dòng CUỐI thắng ở đây. DbTable.byId trả dòng ĐẦU, giữ nguyên vì mọi tab dùng; menu 2 báo key trùng. */
 function emailTemplate_(key) {
   if (!TEMPLATE_CACHE_) {
     TEMPLATE_CACHE_ = {};

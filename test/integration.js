@@ -4504,6 +4504,133 @@ t('I140', 'Soát 5N (hồi quy): buổi kẹt Chờ đổi tutor xử lý đư�
   assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2, 9), result_at: new Date(2026, 1, 2, 9) }), true, 'admin tự chọn kết quả (cùng lúc): đã xử lý');
 });
 
+// ── Soát T1: dòng trùng key ở EMAIL_TEMPLATES và CONTENT ──
+function dupEnv() {
+  const { api, env } = freshEnv();
+  api.setupFirstRun(); api.clearDbCache_(); api.clearContentCache_();
+  return { api, env };
+}
+/** Thêm một dòng trùng key (bản sao dòng có sẵn, sửa theo patch) ở cuối tab, như admin chép dòng hoặc bản cũ gieo thừa. */
+function addDup(api, tab, key, patch) {
+  api.withLock_(() => { const t = api.table_(tab), r = t.all().find(x => String(x.key).trim() === key), o = {}; api.SCHEMA[tab].cols.forEach(c => { o[c] = r[c]; }); t.insert(Object.assign(o, patch || {})); });
+  api.clearDbCache_(); api.clearContentCache_();
+}
+const rowsOf = (api, tab, key) => api.table_(tab).all().filter(x => String(x.key).trim() === key);
+const snapshot = (env, tab) => JSON.stringify(env.state.spreadsheets.NEW_DB.sheets[tab].values);
+const actLog = (api, action) => api.table_('ACTIVITY_LOG').all().filter(r => r.action === action);
+
+t('I141', 'T1 (a)(d): dòng trùng giống nhau gộp thành một ở vị trí dòng đầu, email vẫn render y như cũ; chạy lại không làm gì; tab không trùng không bị đụng; có nhật ký TEMPLATE_DEDUPE và dòng báo cho menu 1', () => {
+  const { api, env } = dupEnv();
+  const n0 = api.table_('EMAIL_TEMPLATES').all().length, c0 = api.table_('CONTENT').all().length;
+  const pos = rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0]._row;
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK'); addDup(api, 'EMAIL_TEMPLATES', 'REG_RECEIVED'); addDup(api, 'EMAIL_TEMPLATES', 'REG_RECEIVED');
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, n0 + 3);
+  const before = { l: api.emailTemplate_('LOGIN_LINK'), r: api.emailTemplate_('REG_RECEIVED') };
+  const contentBefore = snapshot(env, 'CONTENT');
+  const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+  assert.deepStrictEqual(rep.map(x => x.key + ':' + x.removed), ['LOGIN_LINK:1', 'REG_RECEIVED:2']);
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, n0);
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK').length, 1);
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0]._row, pos, 'dòng giữ ở vị trí dòng đầu');
+  assert.deepStrictEqual(api.emailTemplate_('LOGIN_LINK'), before.l); assert.deepStrictEqual(api.emailTemplate_('REG_RECEIVED'), before.r);
+  assert.strictEqual(snapshot(env, 'CONTENT'), contentBefore, 'tab không trùng không bị đụng');
+  const lines = api.dupReportLines_(rep);
+  assert.ok(lines.length === 2 && /^Gộp dòng trùng EMAIL_TEMPLATES: key LOGIN_LINK/.test(lines[0]), lines.join('|'));
+  const log = actLog(api, 'TEMPLATE_DEDUPE'); assert.strictEqual(log.length, 1); assert.strictEqual(log[0].entity, 'EMAIL_TEMPLATES');
+  assert.strictEqual(JSON.parse(log[0].detail).length, 2);
+  // chạy lại: không đổi gì, không ghi nhật ký
+  const snap = snapshot(env, 'EMAIL_TEMPLATES');
+  assert.deepStrictEqual(api.dedupeDuplicateKeys_(), []); api.clearDbCache_();
+  assert.strictEqual(snapshot(env, 'EMAIL_TEMPLATES'), snap); assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE').length, 1);
+  // menu 1 chạy lại cũng không gieo thêm
+  const r1 = api.setupFirstRun(); api.clearDbCache_();
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, n0); assert.strictEqual(api.table_('CONTENT').all().length, c0);
+  assert.ok(!r1.lines.some(l => /Gộp dòng trùng/.test(l)));
+});
+
+t('I142', 'T1 (b)(c): dòng đầu có chữ admin sửa, dòng cuối là chữ gốc thì chữ admin giữ lại; hai bản admin sửa khác nhau thì dòng cuối thắng và chữ bị bỏ nằm trong báo cáo (cắt 300 ký tự), nhật ký và dòng menu 1; ô active FALSE của admin giữ; chữ gốc cũ (TEMPLATE_UPGRADES_) coi là chữ gốc', () => {
+  const { api, env } = dupEnv();
+  const edit = (tab, key, i, patch) => api.withLock_(() => { const t = api.table_(tab); t.update(rowsOf(api, tab, key)[i], patch); }); 
+  // (b) WELCOME: dòng đầu admin sửa body_vi và tắt active; dòng cuối còn gốc
+  addDup(api, 'EMAIL_TEMPLATES', 'WELCOME');
+  edit('EMAIL_TEMPLATES', 'WELCOME', 0, { body_vi: 'Chữ admin sửa ở dòng đầu', active: false, note: 'ghi chú admin' });
+  // (c) LOGIN_LINK: hai bản khác nhau, bản dòng đầu dài 400 ký tự
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  const long = 'A'.repeat(400);
+  edit('EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { subject_vi: long, body_en: 'English first' });
+  edit('EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { subject_vi: 'Bản dòng cuối', body_en: 'English first' });
+  // chữ gốc cũ ở dòng cuối: không thắng chữ admin ở dòng đầu
+  addDup(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND');
+  edit('EMAIL_TEMPLATES', 'TUTOR_REMIND', 0, { body_vi: 'Tutor tự viết' });
+  edit('EMAIL_TEMPLATES', 'TUTOR_REMIND', 1, { body_vi: api.TEMPLATE_UPGRADES_.TUTOR_REMIND.body_vi });
+  const effBefore = api.emailTemplate_('LOGIN_LINK').subject_vi; assert.strictEqual(effBefore, 'Bản dòng cuối');
+  const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+  const w = rowsOf(api, 'EMAIL_TEMPLATES', 'WELCOME'); assert.strictEqual(w.length, 1);
+  assert.strictEqual(w[0].body_vi, 'Chữ admin sửa ở dòng đầu'); assert.ok(String(w[0].active).toUpperCase() === 'FALSE'); assert.strictEqual(w[0].note, 'ghi chú admin');
+  assert.strictEqual(api.emailTemplate_('WELCOME').active, false);
+  const l = rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0];
+  assert.strictEqual(l.subject_vi, 'Bản dòng cuối', 'dòng cuối (đang dùng khi gửi) thắng'); assert.strictEqual(l.body_en, 'English first');
+  assert.strictEqual(api.emailTemplate_('LOGIN_LINK').subject_vi, 'Bản dòng cuối', 'hành vi gửi thư không đổi');
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND')[0].body_vi, 'Tutor tự viết');
+  const lr = rep.find(x => x.key === 'LOGIN_LINK'), cell = lr.cells.find(c => c.col === 'subject_vi');
+  assert.strictEqual(cell.discarded.length, 1); assert.strictEqual(cell.discarded[0].text, 'A'.repeat(300) + '...'); assert.ok(!lr.cells.some(c => c.col === 'body_en'), 'hai dòng giống nhau: không báo');
+  const lines = api.dupReportLines_(rep).join('\n'); assert.ok(/BỎ bản ở hàng \d+: "A{300}\.\.\."/.test(lines), lines);
+  assert.ok(/ô body_vi lấy chữ admin đã sửa ở hàng/.test(lines));
+  const log = actLog(api, 'TEMPLATE_DEDUPE')[0]; assert.ok(log.detail.indexOf('A'.repeat(300)) !== -1 && log.detail.indexOf('A'.repeat(301)) === -1);
+  // menu 1 đưa các dòng này vào kết quả
+  const { api: a2 } = dupEnv(); addDup(a2, 'EMAIL_TEMPLATES', 'LOGIN_LINK', { subject_vi: 'Khác' });
+  assert.ok(a2.setupFirstRun().lines.some(x => /Gộp dòng trùng EMAIL_TEMPLATES: key LOGIN_LINK/.test(x)));
+});
+
+t('I143', 'T1 (3): CONTENT trùng key gộp cùng luật (vi, en, note; cột code quản lý lấy dòng đầu); chữ admin ở dòng đầu thắng chữ gốc ở dòng cuối; key có dấu cách thừa tính là trùng và được cắt', () => {
+  const { api, env } = dupEnv();
+  const key = 'h.hero_title', n0 = api.table_('CONTENT').all().length;
+  addDup(api, 'CONTENT', key); addDup(api, 'CONTENT', 's.pill_active', { key: 's.pill_active ' });
+  api.withLock_(() => { const t = api.table_('CONTENT'); t.update(rowsOf(api, 'CONTENT', key)[0], { vi: 'Admin vi', note: 'n' }); t.update(rowsOf(api, 'CONTENT', key)[1], { en: 'Admin en cuối' }); });
+  api.withLock_(() => { const t = api.table_('CONTENT'); t.update(rowsOf(api, 'CONTENT', key)[0], { en: 'Admin en đầu' }); });
+  api.clearDbCache_(); api.clearContentCache_();
+  const dupsBefore = api.dupKeysOf_(api.table_('CONTENT').all()).map(d => d.key).sort(); assert.deepStrictEqual(dupsBefore, [key, 's.pill_active']);
+  const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+  assert.strictEqual(api.table_('CONTENT').all().length, n0);
+  const r = rowsOf(api, 'CONTENT', key)[0];
+  assert.strictEqual(r.vi, 'Admin vi'); assert.strictEqual(r.en, 'Admin en cuối', 'hai bản en khác nhau: dòng cuối thắng'); assert.strictEqual(r.note, 'n');
+  assert.ok(rep.find(x => x.key === key).cells.find(c => c.col === 'en').discarded[0].text === 'Admin en đầu');
+  assert.deepStrictEqual(api.contentMap_()[key], ['Admin vi', 'Admin en cuối']);
+  const pill = api.table_('CONTENT').all().filter(x => String(x.key).trim() === 's.pill_active'); assert.strictEqual(pill.length, 1); assert.strictEqual(pill[0].key, 's.pill_active', 'key được cắt dấu cách');
+  assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE').filter(x => x.entity === 'CONTENT').length, 1);
+  assert.deepStrictEqual(api.dedupeDuplicateKeys_(), []);
+});
+
+t('I144', 'T1 (e): menu 2 (testSystem) và nút cập nhật chữ cảnh báo tiếng Việt khi key trùng ở EMAIL_TEMPLATES hoặc CONTENT, nhắc chạy menu 1; hết cảnh báo sau khi gộp', () => {
+  const { api } = dupEnv();
+  const warns = () => api.testSystem().lines.filter(l => /key "/.test(l));
+  assert.deepStrictEqual(warns(), []);
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK'); addDup(api, 'CONTENT', 'h.hero_title');
+  const w = warns();
+  assert.strictEqual(w.length, 2, w.join('\n'));
+  assert.ok(/LƯU Ý  EMAIL_TEMPLATES: key "LOGIN_LINK" xuất hiện 2 lần \(hàng \d+, \d+\).*menu 1/.test(w[0]), w[0]);
+  assert.ok(/CONTENT: key "h.hero_title"/.test(w[1]));
+  assert.ok(api.refreshContent_().warnings.some(x => /EMAIL_TEMPLATES: key "LOGIN_LINK" xuất hiện 2 lần/.test(x)));
+  api.setupFirstRun(); api.clearDbCache_();
+  assert.deepStrictEqual(warns(), []);
+});
+
+t('I145', 'T1 (f) hồi quy nguyên nhân: ô key có dấu cách thừa ("LOGIN_LINK ") không làm menu 1 gieo thêm dòng trùng ở EMAIL_TEMPLATES và CONTENT (byId so nguyên văn, lúc chạy thì cắt khoảng trắng); chữ nâng cấp mẫu vẫn áp lên dòng đó', () => {
+  const { api } = dupEnv();
+  const nE = api.table_('EMAIL_TEMPLATES').all().length, nC = api.table_('CONTENT').all().length;
+  api.withLock_(() => {
+    const e = api.table_('EMAIL_TEMPLATES'), c = api.table_('CONTENT');
+    e.update(e.byId('LOGIN_LINK'), { key: 'LOGIN_LINK ' }); e.update(e.byId('TUTOR_REMIND'), { body_vi: api.TEMPLATE_UPGRADES_.TUTOR_REMIND.body_vi, key: ' TUTOR_REMIND' });
+    c.update(c.byId('h.hero_title'), { key: 'h.hero_title ' });
+  });
+  api.clearDbCache_(); api.setupFirstRun(); api.clearDbCache_(); api.clearContentCache_();
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, nE, 'không gieo thêm mẫu email');
+  assert.strictEqual(api.table_('CONTENT').all().length, nC, 'không gieo thêm chữ web');
+  assert.deepStrictEqual(api.dupKeysOf_(api.table_('EMAIL_TEMPLATES').all()), []);
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().find(r => String(r.key).trim() === 'TUTOR_REMIND').body_vi, api.DEFAULT_EMAIL_TEMPLATES_.TUTOR_REMIND[3], 'chữ gốc cũ được nâng cấp');
+  assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE').length, 0);
+});
+
 module.exports = { results };
 if (require.main === module) {
   results.forEach(r => console.log((r.ok ? '  ĐẠT       ' : '  KHÔNG ĐẠT ') + r.id + '  ' + r.title + (r.ok ? '' : '\n              ' + r.err)));

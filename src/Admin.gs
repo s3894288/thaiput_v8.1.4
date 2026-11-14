@@ -494,6 +494,7 @@ function refreshContent_() {
       marketingCheck_(r, false).errors.forEach(function (x) { warnings.push('MARKETING_EMAILS ' + r.campaign_id + ': ' + x); });
     });
   } catch (e) { }
+  try { dupKeyWarnings_().forEach(function (w) { warnings.push(w); }); } catch (e) { }
   table_('EMAIL_TEMPLATES').all().forEach(function (r) {
     var t = emailTemplate_(r.key);
     if (!t) return;
