@@ -1,14 +1,14 @@
 # Hướng dẫn vận hành thaiput v8 (bản 8.1.9)
 
-*Cập nhật 14/11/2026. Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
+*Cập nhật 15/11/2026 (sau soát chéo 5R). Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
 
 ## Thay đổi so với bản trước
 
 Bản trước: 8.1.4 (02/11/2026, đã xuất). Những điểm mới của 8.1.5 tới 8.1.9:
 
-* **Mỗi key đúng một dòng ở EMAIL_TEMPLATES và CONTENT (8.1.9, chunk 5R).** Trước đây có key bị 2 dòng (anh từng thấy LOGIN_LINK, REG_RECEIVED). Từ 8.1.9 menu 1 tự gộp thành một dòng; dòng đó chính là chữ được gửi hoặc hiện. Ô trống = chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Xem Phần F. Chú ý: nếu dòng đầu có chữ anh sửa mà dòng cuối là chữ mặc định, sau khi gộp chữ anh sửa mới là chữ thật sự được gửi.
-* **Ô CONFIG mới `BANK_QR_IMAGE` (8.1.9):** ảnh mã QR chuyển khoản (link Drive). Thông số ảnh và cách đưa lên: B11. Trang đăng ký và trang gia hạn có khung chuyển khoản mới, dòng lưu ý (key `h.bank_note`) đậm và nổi; chữ mặc định mới "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." (chữ anh đã sửa được giữ). Phần D7.
-* **Tab mới `RELEASE_LOG`, thông báo `RELEASE_NOTES`, email "Tóm tắt cập nhật" (8.1.9):** mỗi lần menu 1 thấy phiên bản đổi, nó hiện tóm tắt thay đổi, ghi vào `RELEASE_LOG`, báo một lần qua thông báo và email tới `ADMIN_EMAIL`. Menu mới **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này** (C5). Tab: K10. Thông báo: J4.
+* **Mỗi key đúng một dòng ở EMAIL_TEMPLATES và CONTENT (8.1.9, chunk 5R).** Trước đây có key bị 2 dòng (anh từng thấy LOGIN_LINK, REG_RECEIVED). Từ 8.1.9 menu 1 tự gộp thành một dòng; dòng đó chính là chữ được gửi hoặc hiện. Ô trống = chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Xem Phần F. Chú ý: nếu dòng đầu có chữ anh sửa mà dòng cuối là chữ mặc định, sau khi gộp chữ anh sửa mới là chữ thật sự được gửi. Chữ anh bị bỏ khi hai dòng cùng có chữ khác nhau được lưu ĐỦ ở ACTIVITY_LOG, hành động `TEMPLATE_DEDUPE_TEXT` (cách lấy lại từng bước: Phần F). Ô `active` của mẫu email theo dòng CUỐI, đúng như hệ thống đang gửi.
+* **Ô CONFIG mới `BANK_QR_IMAGE` (8.1.9):** ảnh mã QR chuyển khoản (link Drive). Thông số ảnh, cách đưa lên và cách làm mới ngay khi thay file: B11 (menu mới **Email → Làm mới ảnh QR chuyển khoản**, C4). Trang đăng ký và trang gia hạn có khung chuyển khoản mới, dòng lưu ý (key `h.bank_note`) đậm và nổi; chữ mặc định mới "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." (chữ anh đã sửa được giữ). Phần D7.
+* **Tab mới `RELEASE_LOG`, thông báo `RELEASE_NOTES`, email "Tóm tắt cập nhật" (8.1.9):** mỗi lần menu 1 thấy phiên bản đổi, nó hiện tóm tắt thay đổi, ghi vào `RELEASE_LOG`, báo một lần qua thông báo và email tới `ADMIN_EMAIL`. Việc giao này được ghi bền: khoá bận hay bị ngắt giữa chừng thì hộp thoại ghi "CÒN DỞ" và menu 1 lần sau (hoặc job mỗi giờ) làm nốt; email không bao giờ gửi hai lần (hiếm khi, nếu bị ngắt đúng lúc, anh nhận một thông báo `MAIL_FAILED` thay cho email). Các dòng lạ trong hộp thoại menu 1 và cách xử lý: L9. Menu mới **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này** (C5). Tab: K10. Thông báo: J4.
 * Phần B nay đủ **100 ô CONFIG** (thêm `REASSIGN_STUCK_HOURS` ở 8.1.7 và `BANK_QR_IMAGE` ở 8.1.9). Khoá CONFIG mới có ghi chú "Mới ở <bản>: ..." ở cột `note`.
 * **Tăng tốc tải trang (8.1.9):** không đổi cách dùng. Muốn biết nhanh hơn bao nhiêu thì đo bằng menu **Đo tốc độ** trước và sau khi dán.
 * **Form đăng ký tô viền đỏ ĐÚNG ô nhập sai (8.1.8).**
@@ -223,10 +223,11 @@ Từng bước:
 2. Mở Drive bằng **tài khoản chủ hệ thống** (tài khoản chạy web app), tải ảnh lên.
 3. Chuột phải vào file → **Chia sẻ** → **Sao chép đường liên kết** (hoặc chỉ lấy mã file trong đường link, đoạn giữa `/file/d/` và `/view`).
 4. Dán vào CONFIG `BANK_QR_IMAGE`.
-5. Chạy **menu 2**: dòng "BANK_QR_IMAGE hợp lệ" (kèm loại và KB). Báo hỏng thì làm theo câu hướng dẫn đi kèm (sai link, không mở được file, file ở thùng rác, quá 300 KB, không phải ảnh).
+5. Chạy **menu 2**: dòng "BANK_QR_IMAGE hợp lệ" (kèm loại và KB). Báo hỏng thì làm theo câu hướng dẫn đi kèm (sai link, không mở được file, file ở thùng rác, quá 300 KB, không phải ảnh). Lỗi được web nhớ 5 phút: sửa xong thì chạy menu 2 lần nữa để làm mới ngay.
 6. Mở trang đăng ký, quét thử bằng ứng dụng ngân hàng.
+7. Sau này thay file ảnh dưới cùng link: chạy lại **menu 2** hoặc menu **Email → Làm mới ảnh QR chuyển khoản** (xem dưới bảng).
 
-Muốn bỏ QR: xoá ô `BANK_QR_IMAGE` (trang không hiện ô QR, không để lại khoảng trống). Đổi LINK thì ảnh mới hiện ngay. Ghi đè nội dung file giữ nguyên link thì web có thể hiện ảnh cũ tới 6 giờ (bộ nhớ đệm): muốn đổi ngay thì đổi link. Ảnh tải sau khi khung chuyển khoản đã hiện, nên không làm trang chậm đi.
+Muốn bỏ QR: xoá ô `BANK_QR_IMAGE` (trang không hiện ô QR, không để lại khoảng trống). Đổi LINK thì ảnh mới hiện ngay. **Thay nội dung file giữ nguyên link** (ví dụ đổi tài khoản ngân hàng): web nhớ ảnh cũ tối đa 6 giờ, nên làm MỘT trong 3 cách để khách thấy ảnh mới ngay: (1) chạy **menu 2** (mỗi lần chạy menu 2 là một lần làm mới ảnh); (2) menu **thaiput → Email → Làm mới ảnh QR chuyển khoản (sau khi thay file ảnh)**; (3) sửa tay một trong 4 ô `BANK_QR_IMAGE`, `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER` ở tab CONFIG (đổi tài khoản ngân hàng thì QR cũng được làm mới). Quên cả 3 cách thì tới 6 giờ mới đổi: quy tắc nhớ là "thay file ảnh xong thì chạy menu 2". Mỗi lần thêm hoặc thay ảnh cũng nên chạy menu 2 để biết ảnh có dùng được không. Ảnh tải sau khi khung chuyển khoản đã hiện, nên không làm trang chậm đi. (Đã kiểm trong bộ mô phỏng; chưa kiểm trên Google thật: sửa tay có kích hoạt đúng trigger không, khi sắp xếp hoặc xoá dòng CONFIG.)
 
 ### B12. Hạ tầng (Setup ghi, không sửa)
 
@@ -293,7 +294,7 @@ Menu nằm trên thanh công cụ của file Sheets (tải lại trang nếu ch�
 | Mục menu | Làm gì | Khi nào |
 |---|---|---|
 | **1. Cài đặt lần đầu / cập nhật cấu trúc** (chủ file) | Tạo tab, cột, ô CONFIG, gói mặc định, thư mục, lịch còn thiếu; chép ô CONFIG đổi tên; chạy các bước chuyển dữ liệu của phiên bản mới (một lần); gieo chữ web, mẫu email, luật thông báo còn thiếu; đặt dropdown, màu, bảo vệ cột; ghi tab META; tạo lại trigger. Phiên bản code đổi: tự sao lưu file dữ liệu vào thư mục Releases trước. Chạy lại bao nhiêu lần cũng an toàn | Mỗi lần dán code mới: NGAY sau khi Lưu, TRƯỚC khi Triển khai |
-| **2. Kiểm tra hệ thống** | Kiểm múi giờ, trigger, CONFIG, mốc tuần, gói học, thư mục, link, bảo trì, cổng thử tải, lưu trữ, đăng nhập Google, đường gửi email, tài khoản gửi, hạn mức email. Mỗi dòng ghi ĐẠT, LỖI (phải sửa) hoặc LƯU Ý (nhắc việc) | Sau mỗi lần cập nhật; khi nghi có lỗi |
+| **2. Kiểm tra hệ thống** | Kiểm múi giờ, trigger, CONFIG, mốc tuần, gói học, thư mục, link, bảo trì, cổng thử tải, lưu trữ, đăng nhập Google, đường gửi email, tài khoản gửi, hạn mức email; từ 8.1.9 còn: ảnh QR `BANK_QR_IMAGE`, key trùng ở EMAIL_TEMPLATES và CONTENT, khoá CONFIG có hai dòng chỉ khác dấu cách hoặc ký tự vô hình. Mỗi lần chạy menu 2 còn làm mới ảnh QR cho khách (B11). Mỗi dòng ghi ĐẠT, LỖI (phải sửa) hoặc LƯU Ý (nhắc việc) | Sau mỗi lần cập nhật; khi nghi có lỗi |
 | **3. Tạo lại trigger tự động** | Xoá trigger cũ của hệ thống và tạo lại đúng **8** | Khi menu 2 báo thiếu trigger; sau khi cập nhật từ bản trước 8.1.1. Chủ file |
 | **Xem link trang web** | Link `/exec` và link trang chủ, đăng nhập, học viên, tutor, kèm 4 link rút gọn (B11). Admin vào bằng link đăng nhập | Gửi link cho người mới |
 
@@ -320,6 +321,7 @@ Menu nằm trên thanh công cụ của file Sheets (tải lại trang nếu ch�
 | Mục | Làm gì | Khi nào |
 |---|---|---|
 | Cập nhật nội dung web và email | Xoá bộ đệm chữ, kiểm lỗi chữ web, mẫu email, chiến dịch marketing đang chờ gửi (Phần D, F, G) | Sau mỗi lần sửa chữ |
+| **Làm mới ảnh QR chuyển khoản** (sau khi thay file ảnh) | Làm khách thấy ảnh QR hiện tại của link ngay, bỏ bản web đang nhớ (tới 6 giờ). Đọc thử ảnh một lần và báo ảnh có dùng được không. Ghi nhật ký `BANK_QR_REFRESH` | Sau khi thay NỘI DUNG file ảnh mà giữ nguyên link |
 | Gửi thử một mẫu email cho tôi | Nhập key mẫu (ví dụ `WELCOME`); thư với dữ liệu minh hoạ tới chính người bấm | Sau khi sửa mẫu |
 | **Kiểm tra gửi email** | Nhập một địa chỉ (trống = tài khoản gửi), gửi thư nhỏ có mã `MT...`. Hộp thoại báo tài khoản gửi, đường gửi (GMAILAPP hoặc MAILAPP), hạn mức trước và sau, 4 bước tìm thư bị mất. Lần đầu sau khi dán `appsscript.json` mới: Google hỏi cấp quyền, bấm cho phép | Ai đó báo không nhận được email (L3); sau mỗi lần dán `appsscript.json` |
 | Email marketing: gửi thử một chiến dịch cho tôi | Gửi bản thử của chiến dịch tới chính người bấm | Phần G |
@@ -481,7 +483,20 @@ Dòng lưu ý dưới thông tin ngân hàng (8.1.9) là khung nổi: chữ kho�
 
 Mỗi dòng là một loại email hệ thống tự gửi (link đăng nhập, chào mừng, xác nhận đặt, huỷ, nhắc buổi, sắp hết hạn, thông báo cho admin, tóm tắt cập nhật...). Mỗi email có nửa tiếng Việt và nửa tiếng Anh.
 
-**Mỗi key đúng một dòng (từ 8.1.9).** Trả lời câu "dòng nào được dùng": sau 8.1.9 mỗi `key` chỉ có đúng MỘT dòng, và dòng đó chính là thư được gửi. Ô để trống = dùng chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Nếu tab từng có 2 dòng cùng key, menu 1 gộp thành một dòng ở vị trí đầu: chữ anh đã sửa thắng chữ mặc định hoặc ô trống; hai dòng cùng có chữ anh khác nhau thì dòng CUỐI thắng (dòng thư thật sự dùng trước đây), chữ bị bỏ được ghi ở hộp thoại menu 1 và ở ACTIVITY_LOG (hành động `TEMPLATE_DEDUPE`). Nguyên nhân sinh dòng trùng (key có khoảng trắng thừa làm menu 1 thêm dòng nữa) đã sửa. Thấy key lại hiện 2 dòng: menu 2 và menu **Cập nhật nội dung web và email** báo, chạy menu 1 để gộp. Tab CONTENT theo cùng luật. Email mới `ADMIN_RELEASE_NOTES` (tóm tắt cập nhật cho admin) nằm ở đây, sửa được như mọi mẫu khác.
+**Mỗi key đúng một dòng (từ 8.1.9).** Trả lời câu "dòng nào được dùng": sau 8.1.9 mỗi `key` chỉ có đúng MỘT dòng, và dòng đó chính là thư được gửi. Ô để trống = dùng chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Nếu tab từng có 2 dòng cùng key, menu 1 gộp thành một dòng ở vị trí đầu: chữ anh đã sửa thắng chữ mặc định hoặc ô trống; hai dòng cùng có chữ anh khác nhau thì dòng CUỐI thắng (dòng thư thật sự dùng trước đây). Ô `active` cũng theo dòng CUỐI (đúng như hệ thống đang gửi); nếu các dòng nói khác nhau về `active`, hộp thoại có dòng **"CHÚ Ý QUAN TRỌNG: mẫu email ... có nhiều dòng nói KHÁC NHAU về ô active"**: đọc, kiểm lại ô `active` của mẫu đó. Chữ anh bị bỏ được lưu ĐỦ (không cắt) ở tab ACTIVITY_LOG, hành động `TEMPLATE_DEDUPE_TEXT`, ghi xuống Sheets trước khi dòng nào bị ghi đè; hộp thoại menu 1 chỉ hiện 300 ký tự đầu và ghi chỗ lấy bản đủ. Nguyên nhân sinh dòng trùng (key có khoảng trắng thừa làm menu 1 thêm dòng nữa) đã sửa. Thấy key lại hiện 2 dòng: menu 2 và menu **Cập nhật nội dung web và email** báo, chạy menu 1 để gộp. Tab CONTENT theo cùng luật. Key có ký tự vô hình (dán từ web) ở hai tab này chỉ được cắt khoảng trắng hai đầu, chưa chuẩn hoá hơn (BL92). Email mới `ADMIN_RELEASE_NOTES` (tóm tắt cập nhật cho admin) nằm ở đây, sửa được như mọi mẫu khác.
+
+**Hai dòng cảnh báo khác về gộp key:** "CẢNH BÁO: KHÔNG gộp key trùng ..." nghĩa là sao lưu trước cập nhật hỏng nên menu 1 để nguyên các dòng trùng (vì gộp sẽ bỏ chữ anh): chạy **Cập nhật phiên bản → Phát hành: sao lưu ngay**, thành công rồi chạy lại menu 1. "CẢNH BÁO: gộp dở ..." nghĩa là lượt gộp bị ngắt giữa chừng (khoá bận, hết giờ): dòng đầu có thể đã bị ghi đè, chữ bị bỏ đã nằm ở ACTIVITY_LOG; chạy lại menu 1 để gộp nốt.
+
+**Lấy lại chữ bị bỏ khi gộp, từng bước (không cần biết code):**
+
+1. Trong hộp thoại menu 1 (hoặc tab `RELEASE_LOG`) tìm dòng "Gộp dòng trùng ...: key X ... BỎ bản ở hàng N ...". Cuối dòng có chữ "[chữ đầy đủ đã lưu ở tab ACTIVITY_LOG: hành động TEMPLATE_DEDUPE_TEXT, run ..., entity ..., entity_id ...]". Ghi lại 3 thứ: mã `run`, tên tab (`entity`), key (`entity_id`), và số hàng N của bản bị bỏ.
+2. Mở tab **ACTIVITY_LOG**. Bật bộ lọc (Dữ liệu → Tạo bộ lọc). Lọc cột `action` = `TEMPLATE_DEDUPE_TEXT`; rồi cột `entity` = tên tab; rồi cột `entity_id` = key.
+3. Mỗi bản chữ bị bỏ nằm ở MỘT hoặc NHIỀU dòng (chữ dài chia mảnh 19.000 ký tự). Cột `detail` là chữ dạng JSON, gồm: `run` (mã lượt), `col` (ô nào, ví dụ `body_en`), `row` (hàng cũ của bản bị bỏ), `kept_row` (hàng của bản được giữ), `part` (mảnh thứ mấy), `parts` (tổng số mảnh), `chars` (độ dài), `text` (chữ).
+4. Chỉ giữ các dòng có cùng `run`, cùng `col` và cùng `row` (đúng bản anh cần). Sắp theo `part` từ 1 tới `parts`.
+5. Chép phần chữ trong `text` của từng mảnh theo thứ tự và nối lại. Trong JSON, xuống dòng hiện là `\n` và dấu nháy kép hiện là `\"`; sửa lại cho đúng khi dán vào ô.
+6. Dán vào ô tương ứng (cột `col`) của dòng `key` trong tab hiện còn đúng MỘT dòng. Sau đó chạy menu **Cập nhật nội dung web và email**, rồi **Gửi thử một mẫu email cho tôi** để xem.
+
+Cách DỄ HƠN khi sao lưu trước cập nhật có sẵn: mở bản sao `THAIPUT_DB_..._TRUOC_8.1.9_...` trong thư mục `THAIPUT_V8_<môi trường>_Releases` (menu 1 tạo ngay trước khi đổi cấu trúc, không bao giờ tự xoá), mở đúng tab, vào hàng N đã ghi ở bước 1 và chép nguyên ô sang file đang chạy. Số hàng N là số hàng TRƯỚC khi gộp, nên chỉ đúng với bản sao này.
 
 | Cột | Nghĩa |
 |---|---|
@@ -712,7 +727,7 @@ Cột "Tên trên web" là chữ hiện dưới mỗi thông báo trên trang qu
 | `SHEET_REMOVED` | Tab hệ thống bị xoá hoặc đổi tên | Khẩn | EMAIL | Ai đó xoá hoặc đổi tên tab BOOKINGS, USERS... | Ngay: đổi lại đúng tên hoặc **Tệp → Nhật ký phiên bản** |
 | `PURGE_CHECK` | Cần kiểm dòng trùng | Khẩn | EMAIL | Lần dọn hoặc lưu trữ bị cắt giữa chừng, sau đó tab bị sửa tay | Kiểm cuối tab có dòng trùng, xoá dòng trùng |
 | `ARCHIVE_FAILED` | Lưu trữ dừng | Khẩn | EMAIL | Lưu trữ đọc lại file lưu trữ thấy thiếu dòng nên dừng (chưa bỏ dòng nào khỏi file chính) | Menu **Lưu trữ: xem tình trạng**; báo coder nếu lặp lại |
-| `MAIL_FAILED` | Email gửi lỗi | Cần xử lý | DIGEST | Một email không gửi được (hết hạn mức ngày, địa chỉ hỏng) | Sửa email người nhận trong USERS; hết hạn mức thì chờ hôm sau |
+| `MAIL_FAILED` | Email gửi lỗi | Cần xử lý | DIGEST | Một email không gửi được (hết hạn mức ngày, địa chỉ hỏng); từ 8.1.9 cũng dùng để báo email "Tóm tắt cập nhật" không giao được hoặc không rõ đã gửi chưa (L9) | Sửa email người nhận trong USERS; hết hạn mức thì chờ hôm sau |
 | `TECH_MIGRATED` | Chuyển buổi kỹ thuật cũ | Cần xử lý | EMAIL | Một lần khi lên 8.1.0: buổi kỹ thuật cũ "Tính lương" thành Lỗi khách quan | Xem từng buổi, chọn lại lỗi đúng ở `admin_action` |
 
 **Calendar và link Meet**
@@ -770,7 +785,7 @@ Cột "Tên trên web" là chữ hiện dưới mỗi thông báo trên trang qu
 | `PACKAGE_HEALED` | Tự sửa ngày gói | Cần xử lý | EMAIL | Đối soát mỗi giờ thấy ngày gói lệch luật (dán đè, sắp xếp) và đã ghi lại đúng | Kiểm dòng; tìm ai đã dán đè |
 | `PACKAGE_ROW_MISSING` | Mất dòng gói | Khẩn | EMAIL | Buổi học trỏ tới gói không còn trong STUDENT_PACKAGES | Khôi phục dòng từ bản sao lưu đêm |
 | `PACKAGE_PASTE_UNSAFE` | Dán đè ô gói không tự lành | Khẩn | EMAIL | Ô mã gói, học viên, ngày mua... bị dán đè, hệ thống không tự sửa được | Chép lại từ bản sao lưu đêm |
-| `RELEASE_NOTES` | Tóm tắt cập nhật phiên bản | Thông tin | EMAIL | (8.1.9) Sau menu 1 khi phiên bản code đổi: một thông báo và một email "Tóm tắt cập nhật" mỗi lần đổi phiên bản; chi tiết ở tab `RELEASE_LOG` | Đọc tóm tắt, đối chiếu việc admin cần làm; không cần xử lý |
+| `RELEASE_NOTES` | Tóm tắt cập nhật phiên bản | Thông tin | EMAIL | (8.1.9) Sau menu 1 khi phiên bản code đổi: một thông báo và một email "Tóm tắt cập nhật" mỗi lần đổi phiên bản; chi tiết ở tab `RELEASE_LOG`. Giao dở thì menu 1 lần sau hoặc job mỗi giờ làm nốt; email không bao giờ gửi hai lần. Nếu email lỗi 5 lần, hoặc lượt gửi bị ngắt đúng lúc, anh nhận thông báo `MAIL_FAILED` (thực thể `RELEASE`) chỉ chỗ đọc tóm tắt thay cho email | Đọc tóm tắt, đối chiếu việc admin cần làm; không cần xử lý. Có thông báo `MAIL_FAILED` về tóm tắt thì đọc tab `RELEASE_LOG` (L9) |
 
 ### J5. Gợi ý chỉnh theo tình huống
 
@@ -950,7 +965,7 @@ Phần I2, J. Tick cột `read` = đã đọc. Màu: đỏ Khẩn chưa đọc, 
 | AUTH | Link và phiên đăng nhập (mã băm) | **Không sửa, không xoá dòng**. Muốn cho ai thoát: trang quản trị, trang một người, **Thoát mọi thiết bị** |
 | METRICS | Số đo tốc độ mỗi giờ | |
 | META | Phiên bản, mốc mã tự sinh, bước chuyển dữ liệu đã chạy, giờ chuẩn bị chuyển | Code ghi ở menu 1 và Chuyển hệ thống Bước 1 |
-| RELEASE_LOG | (8.1.9) Tóm tắt mỗi lần đổi phiên bản, mỗi mục một dòng: `at`, `from_version`, `to_version`, `kind`, `item`, `detail` | Chỉ ghi thêm, không sửa, không xoá. Không lưu trữ, không bị xoá khi xoá dữ liệu test, không chép sang hệ thống mới |
+| RELEASE_LOG | (8.1.9) Tóm tắt mỗi lần đổi phiên bản, mỗi mục một dòng: `at`, `from_version`, `to_version`, `kind`, `item`, `detail` | Chỉ ghi thêm, không sửa, không xoá. Mỗi lần nâng cấp tối đa 400 dòng, quá thì thêm một dòng `TRUNCATED` nói còn bao nhiêu mục. Không lưu trữ, không bị xoá khi xoá dữ liệu test, không chép sang hệ thống mới |
 | REPORT_MONTH | Báo cáo tháng | Menu Báo cáo ghi đè mỗi lần chạy |
 | CONTENT, EMAIL_TEMPLATES, MARKETING_EMAILS | Chữ web, mẫu email, email marketing | Phần D, F, G |
 
@@ -1071,12 +1086,35 @@ Phần I2, J. Tick cột `read` = đã đọc. Màu: đỏ Khẩn chưa đọc, 
 | Trang web báo bảo trì | CONFIG `MAINTENANCE_MODE`; menu **Bảo trì: tắt** |
 | Thông báo `ARCHIVE_FAILED`, `PURGE_CHECK` | Phần J4. Menu **Lưu trữ: xem tình trạng** |
 | Trang chậm | Menu **Đo tốc độ**. BOOKINGS quá 15.000 dòng: kiểm lưu trữ đang bật |
-| Một key hiện 2 dòng ở EMAIL_TEMPLATES hoặc CONTENT | Menu 2 báo; chạy menu 1: gộp thành một dòng, chữ anh sửa được giữ (Phần F) |
+| Một key hiện 2 dòng ở EMAIL_TEMPLATES hoặc CONTENT | Menu 2 báo; chạy menu 1: gộp thành một dòng, chữ anh sửa được giữ; chữ bị bỏ lưu đủ ở ACTIVITY_LOG `TEMPLATE_DEDUPE_TEXT` (Phần F, có cách lấy lại từng bước) |
 | Mã QR không hiện trên trang đăng ký | Kiểm CONFIG `BANK_QR_IMAGE` (trống = không hiện), chạy menu 2 xem dòng `BANK_QR_IMAGE` (sai link, file không mở được, quá 300 KB, không phải ảnh); mở trang lại sau vài phút (lỗi được nhớ ngắn) |
-| Đã thay ảnh QR mà trang còn hiện ảnh cũ | Ghi đè file cùng link thì tới 6 giờ mới đổi; đổi LINK ở `BANK_QR_IMAGE` để hiện ngay |
+| Đã thay ảnh QR mà trang còn hiện ảnh cũ | Chạy menu 2, hoặc menu **Email → Làm mới ảnh QR chuyển khoản**, hoặc sửa tay ô `BANK_QR_IMAGE`, `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER`: ảnh mới hiện ngay. Không làm cách nào thì tới 6 giờ (B11). Đổi LINK ở `BANK_QR_IMAGE` cũng hiện ngay |
 | Muốn xem hôm nâng cấp đã đổi gì | Tab `RELEASE_LOG`, email "Tóm tắt cập nhật", menu **Phát hành: xem thay đổi của bản này** |
+| Hộp thoại menu 1 sau nâng cấp có dòng "CHÚ Ý QUAN TRỌNG", "CẢNH BÁO", "CÒN DỞ" hoặc "TIẾP TỤC giao tóm tắt" | L9 |
 | Cần dòng cũ (tranh chấp) | Menu **Lưu trữ → mở file**, tab cùng tên |
 | Cập nhật phiên bản code | `HUONG_DAN_PHAT_HANH.md` |
+
+### L9. Hộp thoại menu 1 sau khi nâng cấp phiên bản: các dòng cần đọc
+
+Menu 1 chạy lại cùng phiên bản khi mọi việc đã xong thì im lặng (chỉ thêm một dòng `SETUP_RUN` vào ACTIVITY_LOG). Những dòng dưới đây là dấu hiệu còn việc cần đọc hoặc làm.
+
+| Dòng trong hộp thoại | Nghĩa | Làm gì |
+|---|---|---|
+| **CHÚ Ý QUAN TRỌNG: mẫu email ... có nhiều dòng nói KHÁC NHAU về ô active** | Mẫu email từng có dòng trùng nói khác nhau về bật hay tắt. Đã giữ trạng thái của dòng CUỐI (đúng cái hệ thống đang làm trước khi gộp) | Mở EMAIL_TEMPLATES, kiểm ô `active` của mẫu đó đúng ý anh (bật hay tắt); sửa nếu cần |
+| **CẢNH BÁO: KHÔNG gộp key trùng ...** | Sao lưu trước cập nhật hỏng, nên menu 1 để nguyên dòng trùng vì gộp sẽ bỏ chữ anh | Chạy **Phát hành: sao lưu ngay** (thành công), rồi chạy lại menu 1 |
+| **CẢNH BÁO: gộp dở ...** | Lượt gộp key trùng bị ngắt giữa chừng; dòng đầu có thể đã được ghi đè; chữ bị bỏ đã lưu ở ACTIVITY_LOG | Chạy lại menu 1 để gộp nốt; nếu cần chữ cũ, làm theo Phần F ("Lấy lại chữ bị bỏ khi gộp") |
+| **CẢNH BÁO: khoá CONFIG "K" có 2 dòng chỉ khác nhau ở dấu cách hoặc ký tự vô hình** (thêm câu **CHÚ Ý** nếu dòng đang dùng mang mặc định hoặc trống trong khi dòng kia có giá trị khác) | Hai dòng CONFIG coi như một khoá. Hệ thống KHÔNG xoá, KHÔNG đoán, KHÔNG tự đổi giá trị; dùng dòng CUỐI. Nếu có câu CHÚ Ý thì giá trị anh đã nhập nhiều khả năng nằm ở dòng KHÔNG được dùng | Làm theo câu trong dòng: chép giá trị đúng sang dòng đang có hiệu lực (dòng cuối), rồi xoá dòng thừa. Menu 2 cũng báo cho tới khi hết trùng |
+| "Sửa khoá CONFIG có dấu cách thừa ..." | Ô khoá có khoảng trắng thừa (hoặc ký tự vô hình) đã được làm sạch, giá trị giữ nguyên | Không cần làm gì |
+| **CÒN DỞ (...)** | Một hay nhiều đường giao tóm tắt (nhật ký RELEASE, tab RELEASE_LOG, thông báo, email, dòng MAIL_LOG) chưa xong, thường vì hệ thống đang bận. Bản ghi được giữ an toàn | Chạy lại menu 1 (cùng phiên bản) hoặc chờ job mỗi giờ; không cần làm gì thêm |
+| **TIẾP TỤC giao tóm tắt cập nhật bản ...** | Lần chạy này làm nốt phần còn thiếu của lần trước; phần đã xong không làm lại | Đọc các dòng dưới nó; xong thì lần sau menu 1 im lặng |
+| "CHƯA gửi được email tóm tắt cập nhật (lần thử k/5)" | Google từ chối hoặc lỗi gửi thư; thử lại tự động ở lần chạy kế tiếp, tối đa 5 lần | Không cần làm gì; tóm tắt đầy đủ ở tab `RELEASE_LOG`. Hết 5 lần anh nhận thông báo `MAIL_FAILED` |
+| "Email tóm tắt: lượt gửi trước bị ngắt hoặc đang chạy song song, không rõ đã gửi chưa; KHÔNG gửi lại" | Một lượt chạy nhận việc gửi rồi bị ngắt: email có thể đã hoặc chưa đi. Hệ thống không gửi lại để khỏi gửi hai lần và tạo MỘT thông báo `MAIL_FAILED` | Kiểm hộp thư `ADMIN_EMAIL`; không thấy thì đọc tóm tắt ở tab `RELEASE_LOG` (mọi mục của tóm tắt, bằng tiếng Việt) |
+| "CHƯA ghi được nhật ký RELEASE / tab RELEASE_LOG / thông báo (hệ thống đang bận)" | Khoá bận lúc ghi | Chạy lại menu 1 hoặc chờ job mỗi giờ |
+| "LƯU Ý: chưa lập được tóm tắt cập nhật ..." | Lỗi bất ngờ khi dựng tóm tắt; bản ghi được giữ, thử lại tối đa 5 lần rồi báo admin bằng email lỗi | Không ảnh hưởng dữ liệu; nếu cứ lặp lại, chụp hộp thoại gửi coder |
+| "CẢNH BÁO: ... mục đo KHÔNG lưu hết được" | Quá nhiều mục (hơn 400, hoặc hết chỗ trong Script Properties) nên một phần việc đo không có trong tóm tắt | Dữ liệu vẫn đúng. Đối chiếu bằng ACTIVITY_LOG (`SETUP_RUN`) và các tab CONFIG, CONTENT, EMAIL_TEMPLATES |
+| "CHƯA sao lưu được trước cập nhật" | Không tạo được bản sao vào thư mục Releases | **Dừng.** Chạy **Phát hành: sao lưu ngay**, thành công rồi mới chạy lại menu 1 |
+
+Những gì CHƯA kiểm trên Google thật liên quan phần này: khoá thật khi hai người cùng chạy, giới hạn 6 phút của menu 1, và việc ghi nhiều khoá Script Properties cùng lúc có nguyên tử không. Bộ mô phỏng đã thử cắt ngang ở mọi lời gọi dịch vụ (không bao giờ hai email; chi tiết `PROGRESS.md` mục 5R).
 
 ## Phần M. Đăng nhập Google cho admin
 
