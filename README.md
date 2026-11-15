@@ -9,7 +9,7 @@ Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy b
 | Đường dẫn | Nội dung |
 |---|---|
 | `src/` | Mã nguồn thật: 38 file `.gs`, `appsscript.json`, `ui/` (8 file `.html`). **Chỉ sửa ở đây** |
-| `test/` | Bộ giả lập Google (`gas_mock.js`, `load.js`), test hàm, 46 kịch bản, 208 test tích hợp, 67 test giao diện, test công cụ thử tải; `build_dist.js` dựng bản dán tay; `tools/bundle.js` đóng gói cho chat (không cần khi dùng GitHub) |
+| `test/` | Bộ giả lập Google (`gas_mock.js`, `load.js`), test hàm, 46 kịch bản, 211 test tích hợp, 67 test giao diện, test công cụ thử tải; `build_dist.js` dựng bản dán tay; `tools/bundle.js` đóng gói cho chat (không cần khi dùng GitHub) |
 | `dist/` | Bản dán tay sinh từ `src/`: `Code.gs` (gộp 38 file), `Index.html` (gộp giao diện), `appsscript.json`. Không sửa tay |
 | `companion/`, `dist_google_login/` | Dự án phụ đăng nhập Google cho admin (nguồn và bản dán tay) |
 | `loadtest/` | Công cụ thử tải STAGING (`run.js`, `browser.js`) |
@@ -33,9 +33,9 @@ npm run build:prod     dist_production/: mỗi file src/*.gs một file, kèm MA
 npm run clasp:push     đẩy src/ lên dự án Apps Script ghi trong .clasp.json
 ```
 
-Kết quả bản 8.1.9 (tới commit `c59cbce`, sau soát chéo): hàm thuần 34/34, kịch bản 46/46, tích hợp 208/208, giao diện 67/67, thử tải 2/2. `npm test` mất khoảng 2,5 phút.
+Kết quả bản 8.1.9 (tới commit `5292935`, sau soát chéo): hàm thuần 34/34, kịch bản 46/46, tích hợp 211/211, giao diện 67/67, thử tải 2/2. `npm test` mất khoảng 2,5 phút.
 
-**Soát chéo 5R (14 đến 15/11):** bản giao đầu của 8.1.9 chỉ có test và 13 đột biến tự làm. Anh yêu cầu soát gắt: hai agent độc lập (X1, X2; X2 chạy 102 đột biến: 69 bị bắt, 33 sống sót, 9 tương đương), hai vòng sửa, supervisor soát từng vòng và một lượt soát cuối. Soát tìm ra lỗi thật (mất chữ admin khi gộp key trùng, `active` của mẫu email đổi theo dòng sai, ảnh QR cũ tới 6 giờ, tóm tắt nâng cấp mất khi bị ngắt, email có thể gửi hai lần, khoá CONFIG có khoảng trắng thừa) và đã sửa; câu "156/156 xanh" và "13 đột biến bắt cả 13" của bản giao đầu được rút lại. Chi tiết và kết luận soát cuối: `PROGRESS.md` mục "Soát chéo và sửa (14 đến 15/11)". Vẫn chưa chạy trên Google thật.
+**Soát chéo 5R (14 đến 15/11):** bản giao đầu của 8.1.9 chỉ có test và 13 đột biến tự làm. Anh yêu cầu soát gắt: hai agent độc lập (X1, X2; X2 chạy 102 đột biến: 69 bị bắt, 33 sống sót, 9 tương đương), ba vòng sửa, supervisor soát từng vòng (vòng soát 3 tìm ra thêm lỗi hai lượt chạy chen nhau có thể làm hai email tóm tắt, đã sửa) và một lượt soát xác nhận cuối. Soát tìm ra lỗi thật (mất chữ admin khi gộp key trùng, `active` của mẫu email đổi theo dòng sai, ảnh QR cũ tới 6 giờ, tóm tắt nâng cấp mất khi bị ngắt, email có thể gửi hai lần, khoá CONFIG có khoảng trắng thừa) và đã sửa; câu "156/156 xanh" và "13 đột biến bắt cả 13" của bản giao đầu được rút lại. Chi tiết và kết luận soát xác nhận: `PROGRESS.md` mục "Soát chéo và sửa (14 đến 15/11)". Vẫn chưa chạy trên Google thật.
 
 ## Hai cách đưa code lên Apps Script
 
