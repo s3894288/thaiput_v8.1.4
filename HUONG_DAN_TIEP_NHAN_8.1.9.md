@@ -6,7 +6,7 @@
 
 * Dùng được cho CẢ chat claude.ai Project lẫn Claude Code (bản trước chỉ cho chat).
 * Trạng thái đã cập nhật sau soát chéo 5R (14 đến 15/11): các số test mới (tích hợp 211, giao diện 67), các lỗi đã sửa, những gì còn chưa kiểm, và câu nói rút lại "13 đột biến bắt cả 13" và "156/156 xanh".
-* BACKLOG còn 53 câu (BL87 và BL88 đã đóng, thêm BL89 đến BL93); thêm vấn đề PR #2 trùng số bản 8.1.5.
+* BACKLOG còn 54 câu (BL87 và BL88 đã đóng, thêm BL89 đến BL94); thêm vấn đề PR #2 trùng số bản 8.1.5.
 * Thêm phần riêng cho Claude Code và ba câu kiểm tra kèm đáp án.
 
 ## (a) Cách dùng, 5 dòng
@@ -26,7 +26,7 @@
 | `dist/appsscript.json` | KHÔNG đổi từ 8.1.4, chỉ để tra quyền |
 | `CLAUDE.md` | Luật kỹ thuật (luật 59 viết lại sau soát chéo) |
 | `PROGRESS.md` | Mục đầu và mục "Chunk 5R", gồm "Soát chéo và sửa (14 đến 15/11)" |
-| `BACKLOG.md` | 53 câu chờ anh |
+| `BACKLOG.md` | 54 câu chờ anh |
 | `HUONG_DAN_VAN_HANH.md` | Bản 8.1.9, có Phần F (lấy lại chữ bị bỏ khi gộp) và L9 (các dòng cảnh báo của menu 1) |
 | `HUONG_DAN_PHAT_HANH.md` | Bản 8.1.9, mục 3A nâng từ 8.1.4 lên 8.1.9 |
 | `README.md` | Cấu trúc repo, lệnh |
@@ -57,15 +57,15 @@ Bạn là trợ lý kỹ thuật của anh Chris cho dự án **thaiput v8**: h�
 * Một lỗi tutor có từ 8.1.4 cũng được sửa: phản hồi tải giờ rảnh tới muộn xoá giờ vừa chọn chưa lưu.
 
 **3. Soát chéo đã làm và giới hạn trung thực:**
-* Bản giao đầu của 8.1.9 (commit `bbd2aef`) chỉ có test và 13 đột biến tự làm. Anh yêu cầu soát gắt. Đã làm: A1 (kiểm 5O, 5N, 8.1.8 còn nguyên), X1 (soát chéo 5R), X2 (102 đột biến: 69 bị bắt, 33 sống sót, 9 tương đương), hai vòng sửa (`45f6285`, `84a0b96`), supervisor S1 và S2 soát từng vòng (REVISE hai lần, mọi điểm đã áp dụng ở `9b49cdc`, `c59cbce`), vòng soát 3 (REVISE: một lỗi chặn là hai lượt chạy chen nhau có thể làm hai email tóm tắt, hai thông báo và RELEASE_LOG gấp đôi, dữ liệu nghiệp vụ không bị ảnh hưởng; đã sửa ở `5292935`), và một lượt soát xác nhận trên `5292935` (kết luận ở dòng đầu `PROGRESS.md`).
+* Bản giao đầu của 8.1.9 (commit `bbd2aef`) chỉ có test và 13 đột biến tự làm. Anh yêu cầu soát gắt. Đã làm: A1 (kiểm 5O, 5N, 8.1.8 còn nguyên), X1 (soát chéo 5R), X2 (102 đột biến: 69 bị bắt, 33 sống sót, 9 tương đương), hai vòng sửa (`45f6285`, `84a0b96`), supervisor S1 và S2 soát từng vòng (REVISE hai lần, mọi điểm đã áp dụng ở `9b49cdc`, `c59cbce`), vòng soát 3 (REVISE: một lỗi chặn là hai lượt chạy chen nhau có thể làm hai email tóm tắt, hai thông báo và RELEASE_LOG gấp đôi, dữ liệu nghiệp vụ không bị ảnh hưởng; đã sửa ở `5292935`), và một lượt soát xác nhận trên `5292935` do supervisor (Opus) làm: kết luận ĐẠT (PASS), có chạy lại ma trận cắt ngang và xen kẽ của riêng supervisor, 0 email, thông báo hay dòng `RELEASE` thừa ngoài các cửa sổ đã ghi, 30 mẫu email dựng ra chữ không đổi, các tab nghiệp vụ sau menu 1 trên database 8.1.4 mẫu giống hệt (chi tiết ở dòng đầu `PROGRESS.md`). Giới hạn còn lại: một cuộc đua thấp, không chặn, có từ trước (hai lượt menu 1 bấm sát nhau có thể giao tóm tắt hai lần; BL94; cách tránh: bấm menu 1 một lần và chờ hộp thoại), và bài thử mới chạy trong bộ mô phỏng, chưa trên Google thật. Supervisor trả lời có thể chạy trên database 8.1.4 thật, sau khi chạy thử một lượt trên bản sao STAGING của database thật.
 * Hai câu của bản giao đầu đã RÚT LẠI: "13 đột biến bắt cả 13" (quá lạc quan) và "156/156 xanh" (chỉ đúng khoảng 30 phút sau khi dựng dữ liệu mẫu, vì test I151 phụ thuộc đồng hồ thật).
 * Test hiện tại (tới `5292935`): hàm thuần và Db 34/34, 40 kịch bản 46/46, tích hợp 211/211, giao diện web 67/67, thử tải 2/2.
-* Chưa chạy lại trọn bộ 102 đột biến sau khi thêm test. Còn bốn cửa sổ giao tóm tắt cố ý: không email cộng một thông báo trung thực (9 điểm cắt liền nhau trong mỗi ma trận); thừa một dòng MAIL_LOG; thừa một dòng RELEASE nếu có hơn 300 dòng nhật ký xen vào; email đã đi nhưng vẫn có thông báo "có thể đã hoặc chưa gửi" và không có dòng MAIL_LOG (4 điểm liền nhau).
+* Chưa chạy lại trọn bộ 102 đột biến sau khi thêm test. Còn bốn cửa sổ giao tóm tắt cố ý: không email cộng một thông báo trung thực (9 điểm cắt liền nhau trong mỗi ma trận, theo test I197, I198, I210); thừa một dòng MAIL_LOG; thừa một dòng RELEASE nếu có hơn 300 dòng nhật ký xen vào; email đã đi nhưng vẫn có thông báo "có thể đã hoặc chưa gửi" và không có dòng MAIL_LOG (4 điểm liền nhau).
 * **Chưa kiểm trên Google thật** (chỉ kiểm trong bộ mô phỏng Node): Drive đọc ảnh QR bằng tài khoản chạy web app; giới hạn chia mảnh CacheService; font nạp không chặn trong khung HtmlService; `setProperties` có ghi nguyên tử nhiều khoá không; tranh chấp khoá thật và giới hạn 6 phút; ô bắt đầu bằng `=`, `+`, `-`, `@` ở CONTENT và EMAIL_TEMPLATES khi `purgeRows_` ghi lại tab; sắp xếp hoặc xoá dòng CONFIG có kích hoạt sửa tay không; quét QR bằng điện thoại thật; hiển thị email tóm tắt; đo tốc độ trước và sau.
 
 **4. Còn mở:**
 * **5P:** 3 hướng dẫn còn lại, chính sách học viên và tutor, soát tổng bằng 2 agent trước go live, thử tải lại; phần còn lại của 5Q (BL69). Sau đó chunk 6 (go live).
-* **BACKLOG còn 53 câu chờ anh** (mục A 50, mục B 3; đếm số dòng bắt đầu bằng `| BL` ở mục A và B). Anh cũng còn lượt rà toàn bộ BACKLOG đã hẹn. Các câu cần anh quyết SỚM: **BL89** (draft PR #2 "8.1.5 gửi email qua Amazon SES", nhánh `claude/hopeful-galileo-xa1dv9`, xung đột với nhánh này ở 12 file và cũng ghi số bản 8.1.5; đề xuất: nhánh này vào `main` trước, rebase nhánh SES rồi đổi số bản thành 8.2.0 hoặc số trống kế tiếp) và **BL76** (chữ chuyển khoản tự mâu thuẫn: dòng đậm bảo ghi số điện thoại nhưng web và email sau khi gửi còn nói "Mã nội dung chuyển khoản"; không chặn kỹ thuật nhưng làm học viên bối rối). Tiếp theo: BL85, BL86 (đề xuất làm ở 5P); BL90 đến BL93 (giới hạn nhỏ của 5R, không chặn). BL77 đến BL84 là tối ưu tốc độ, không chặn go live.
+* **BACKLOG còn 54 câu chờ anh** (mục A 51, mục B 3; đếm số dòng bắt đầu bằng `| BL` ở mục A và B). Anh cũng còn lượt rà toàn bộ BACKLOG đã hẹn. Các câu cần anh quyết SỚM: **BL89** (draft PR #2 "8.1.5 gửi email qua Amazon SES", nhánh `claude/hopeful-galileo-xa1dv9`, xung đột với nhánh này ở 12 file và cũng ghi số bản 8.1.5; đề xuất: nhánh này vào `main` trước, rebase nhánh SES rồi đổi số bản thành 8.2.0 hoặc số trống kế tiếp) và **BL76** (chữ chuyển khoản tự mâu thuẫn: dòng đậm bảo ghi số điện thoại nhưng web và email sau khi gửi còn nói "Mã nội dung chuyển khoản"; không chặn kỹ thuật nhưng làm học viên bối rối). Tiếp theo: BL85, BL86 (đề xuất làm ở 5P); BL90 đến BL94 (giới hạn nhỏ của 5R, không chặn). BL77 đến BL84 là tối ưu tốc độ, không chặn go live.
 
 **5. Cách bạn làm việc:**
 * Nguồn sự thật là **repo GitHub** (nhánh `claude/wizardly-gates-8xzfbn`) và `CLAUDE.md`. Gặp mâu thuẫn giữa trí nhớ của bạn và các file này thì tin các file.
