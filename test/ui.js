@@ -1880,6 +1880,22 @@ t('U66', 'Soát vòng 3 (D9): ảnh QR đổi GIỮA apiPublicInfo và apiBankQr
   assert.strictEqual(n(), 1, 'không gọi lại máy chủ'); assert.strictEqual(p.$$('.bank-qr img').length, 1); assert.strictEqual(p.$('.bank-qr img').getAttribute('src'), imgNew); assert.strictEqual(p.$('.bank-qr').getAttribute('data-qr'), m2);
 });
 
+t('U67', 'Soát X2 M34: sau khi lưu giờ rảnh, lượt tải lại (drawAvail trên cùng khung) tới CHẬM; tutor mở lại tab Giờ rảnh (lượt tải mới) và chọn giờ chưa lưu; phản hồi cũ tới muộn không được ghi đè giờ đang chọn (kiểm cả khung hiện tại và số thứ tự lượt vẽ)', async () => {
+  const c = mk(); const s1 = (await uiLogin(c, 'T001')).session, hold = {};
+  const p = open(c, { page: 'tutor' }, { session: s1, hold }); await p.flush(60);
+  p.click('.tab[data-tab="avail"]'); await p.flush(60);
+  p.click('.chip[data-key="2026-10-19|10:00"]'); p.click('#ab-go'); await p.flush(60);
+  hold.apiTutorAvailability = 1;   // lượt tải lại sau khi lưu sẽ chậm
+  p.click('.sheet button'); await p.flush(30);
+  assert.strictEqual(p.heldCount('apiTutorAvailability'), 1, 'lượt tải lại sau khi lưu đang bị giữ'); assert.ok(p.$('#tab-body .skeleton'));
+  p.click('.tab[data-tab="schedule"]'); await p.flush(20); p.click('.tab[data-tab="avail"]'); await p.flush(60);   // lượt tải mới
+  const key = '2026-10-19|11:00'; p.click('.chip[data-key="' + key + '"]'); await p.flush(10); assert.ok(p.$('.chip[data-key="' + key + '"]').classList.contains('dirty'));
+  p.release('apiTutorAvailability'); await p.flush(60); p.clean();
+  assert.ok(p.$('.chip[data-key="' + key + '"]').classList.contains('dirty'), 'giờ đang chọn còn nguyên'); assert.ok(!p.$('#actionbar').hidden && /1/.test(p.text('#ab-text')));
+  p.click('#ab-go'); await p.flush(60); const sent = p.calls.filter(x => x.name === 'apiTutorSetAvailability'); assert.deepStrictEqual(sent[sent.length - 1].args[1].map(x => x.slot), ['11:00'], 'lưu đúng giờ vừa chọn');
+});
+
+
 module.exports = { run };
 if (require.main === module) {
   run().then(r => { r.forEach(x => console.log((x.ok ? 'ĐẠT  ' : 'TRƯỢT ') + x.id + ' ' + x.title + (x.ok ? '' : '\n      ' + x.err))); process.exit(r.every(x => x.ok) ? 0 : 1); });

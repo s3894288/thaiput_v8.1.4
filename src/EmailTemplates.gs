@@ -254,9 +254,19 @@ function emailWrapBi_(titleVi, htmlVi, titleEn, htmlEn, enFirst) {
  */
 function sendTpl_(key, to, vars, opts) {
   opts = opts || {};
+  var r = tplRender_(key, to, vars, opts);
+  if (!r) return false;
+  return sendMail_(to, r.subject, r.html, opts.kind || key, opts.priority || 'high');
+}
+/**
+ * Dựng tiêu đề và HTML của một mẫu (không gửi). Trả { subject, html }, hoặc null nếu mẫu bị tắt (ghi MAIL_TEMPLATE_OFF). Ném lỗi nếu không có mẫu.
+ * Tách ra từ sendTpl_ (soát X2) để nơi cần "nhận việc gửi" trước khi gửi (Release.gs) dựng thư xong rồi mới nhận, cửa sổ giữa nhận và gửi chỉ còn lời gọi Google.
+ */
+function tplRender_(key, to, vars, opts) {
+  opts = opts || {};
   var t = emailTemplate_(key);
   if (!t) throw new Error('Không có mẫu email ' + key);
-  if (!t.active) { logActivity_('SYSTEM', 'MAIL_TEMPLATE_OFF', 'MAIL', key, to); return false; }
+  if (!t.active) { logActivity_('SYSTEM', 'MAIL_TEMPLATE_OFF', 'MAIL', key, to); return null; }
   vars = vars || {};
   // Chunk 5H: người nhận đã chọn ngôn ngữ (USERS.lang) thì thứ tiếng đó ở trên; chưa chọn thì theo mặc định của nơi gọi
   // (tutor tiếng Anh trước, còn lại tiếng Việt trước). Email vẫn luôn có cả hai thứ tiếng.
@@ -265,7 +275,7 @@ function sendTpl_(key, to, vars, opts) {
   var subject = sVi && sEn ? (enFirst ? sEn + ' | ' + sVi : sVi + ' | ' + sEn) : (sVi || sEn);
   var html = emailWrapBi_(renderPlain_(t.title_vi, vars, 'vi'), renderBody_(t.body_vi, vars, 'vi'),
     renderPlain_(t.title_en, vars, 'en'), t.body_en ? renderBody_(t.body_en, vars, 'en') : '', enFirst);
-  return sendMail_(to, subject, html, opts.kind || key, opts.priority || 'high');
+  return { subject: subject, html: html };
 }
 
 /** Dữ liệu mẫu để gửi thử (menu "Gửi thử một mẫu email cho tôi"): mọi biến có giá trị minh hoạ. */

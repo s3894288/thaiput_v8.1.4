@@ -75,7 +75,7 @@ function releaseRecord_() {
   try { releasePendingWrite_(rec, { APP_VERSION_LAST: APP.VERSION }); saved = true; }
   catch (e) {
     // Không lưu bền được (hạn mức Script Properties): vẫn ghi nhận phiên bản, giao một lần theo kiểu cũ; không có bản ghi để thử lại.
-    try { props.setProperty('APP_VERSION_LAST', APP.VERSION); } catch (e2) { }
+    try { props.setProperty('APP_VERSION_LAST', APP.VERSION); releasePendingClear_(true); } catch (e2) { }   // bản ghi chưa niêm phong không còn ý nghĩa (soát X2 L4)
     RELEASE_SUMMARY_LINES_ = ['LƯU Ý: không lưu bền được bản ghi giao tóm tắt (' + e.message + '); giao một lần ngay bây giờ, nếu đường nào lỗi sẽ KHÔNG tự thử lại.'];
   }
   try { RELEASE_SUMMARY_LINES_ = RELEASE_SUMMARY_LINES_.concat(releaseLegs_(rec, false, saved).lines); }
@@ -261,8 +261,18 @@ function upgradeStart_(ss) {
     rec = releasePendingRead_();
     if (rec && fresh) { releasePendingClear_(true); rec = null; }
     else if (rec && rec.target !== APP.VERSION) {
-      if (rec.sealed) { try { releaseLegs_(rec, true, true); } catch (e) { Logger.log('Giao nốt tóm tắt bản ' + rec.target + ' lỗi: ' + e.message); } }
+      if (rec.sealed) {
+        // Giao nốt (cố gắng) tóm tắt của bản trước rồi bỏ: đường nào vẫn dở thì KHÔNG biến mất im lặng, báo admin một thông báo trung thực (soát X2 L3).
+        var fin = false, leg = rec.legs || {};
+        try { fin = releaseLegs_(rec, true, true).finished; } catch (e) { Logger.log('Giao nốt tóm tắt bản ' + rec.target + ' lỗi: ' + e.message); }
+        if (!fin) {
+          var left = ['act', 'log', 'notif', 'mail'].filter(function (k) { return leg[k] === 0 || leg[k] === 4; }).map(function (k) { return RELEASE_LEG_NAME_[k]; }).join(', ');
+          releaseNotice_(rec.target, 'Tóm tắt cập nhật bản ' + rec.target + ' chưa giao đủ trước khi nâng lên bản ' + APP.VERSION + ' (còn dở: ' + left + '). Bản ghi tạm đã bỏ; đọc ghi chú phát hành ở menu "Phát hành: xem thay đổi của bản này" và tab RELEASE_LOG.',
+            'The update summary of version ' + rec.target + ' was not fully delivered before upgrading to ' + APP.VERSION + ' (left: ' + left + '). The temporary record was dropped; read the release notes from the menu and the RELEASE_LOG tab.');
+        }
+      }
       releasePendingClear_(true); rec = null;
+    } else if (rec && !rec.sealed && last === APP.VERSION) { releasePendingClear_(true); rec = null;   // bản ghi chưa niêm phong còn sót (lần giao không bền): phiên bản đã ghi nhận xong, bỏ (soát X2 L4)
     } else if (rec && rec.sealed && last !== APP.VERSION) rec.sealed = false;   // không khớp dấu phiên bản (ai đó xoá hoặc đặt lại): coi như chưa niêm phong, giữ số đo
     if (rec && !rec.sealed) items = rec.items.filter(function (x) { return RELEASE_STATE_KINDS_.indexOf(x.kind) === -1; });   // trạng thái (khoá lạ, khoá trùng): lượt này đo lại
   } catch (e) { rec = null; items = []; }
@@ -309,7 +319,7 @@ function releasePendingSave_() { return releasePersist_(true); }
 function upgradeUnknownConfig_(rows) {
   var out = [];
   rows.forEach(function (r) {
-    var k = String(r.key === undefined || r.key === null ? '' : r.key).trim();
+    var k = cfgKeyNorm_(r.key);
     if (!k || k in DEFAULTS_) return;
     var dep = /^Không dùng từ/.test(String(r.note || ''));
     upgradeAdd_('CONFIG_UNKNOWN', k, 'Khoá "' + k + '" có trong CONFIG nhưng code không dùng' + (dep ? ' (cột note đã ghi không dùng nữa)' : ' (khoá bạn tự thêm hoặc khoá đã bỏ)') + '; giá trị giữ nguyên, hệ thống không xoá.',
@@ -351,7 +361,7 @@ function releaseBuildSummary_(prev, cur, curDate, measured, notes, opts) {
   if (dact.length) lines.push('CHÚ Ý: ' + dact.length + ' mẫu email có các dòng trùng key nói KHÁC NHAU về ô active, đã giữ trạng thái của dòng cuối (đúng như đang gửi): ' + releaseShort_(dact) + '. Đọc dòng "CHÚ Ý QUAN TRỌNG" của từng mẫu và kiểm lại ô active.');
   if (dskip.length) lines.push('CẢNH BÁO: ' + dskip.length + ' key trùng CHƯA gộp vì sao lưu trước cập nhật hỏng: ' + releaseShort_(dskip) + '.');
   var twin = releaseItems_(m, 'CONFIG_KEY_TWIN');
-  if (twin.length) lines.push('CẢNH BÁO: ' + twin.length + ' khoá CONFIG có hai dòng chỉ khác nhau ở dấu cách (không xoá, không đoán): ' + releaseShort_(twin) + '. Hệ thống dùng dòng CUỐI; xoá dòng thừa hoặc chép giá trị đúng sang dòng cuối.');
+  if (twin.length) lines.push('CẢNH BÁO: ' + twin.length + ' khoá CONFIG có hai dòng chỉ khác nhau ở dấu cách hoặc ký tự vô hình (không xoá, không đoán): ' + releaseShort_(twin) + '. Hệ thống dùng dòng CUỐI; xoá dòng thừa hoặc chép giá trị đúng sang dòng cuối.' + (m.some(function (x) { return x.kind === 'CONFIG_KEY_TWIN' && / CHÚ Ý: /.test(x.vi); }) ? ' CHÚ Ý: có khoá mà giá trị bạn nhập nhiều khả năng KHÔNG được dùng (dòng đang có hiệu lực mang giá trị mặc định hoặc trống): đọc chi tiết và cách sửa tay ở tab RELEASE_LOG.' : ''));
   if (opts.truncated) { var tr = m.filter(function (x) { return x.kind === 'MEASURED_TRUNCATED'; })[0]; lines.push(tr ? tr.vi : 'CẢNH BÁO: một phần số đo không lưu hết được.'); }
   if (admin.length) { lines.push('VIỆC ADMIN CẦN LÀM:'); admin.slice(0, 6).forEach(function (a, i) { lines.push('  ' + (i + 1) + '. ' + a.vi); }); if (admin.length > 6) lines.push('  (còn ' + (admin.length - 6) + ' việc nữa, xem tab RELEASE_LOG)'); }
   return { notes: list, items: all, noteItems: nItems, measured: m, menuLines: lines, admin: admin };
@@ -427,14 +437,14 @@ function utf8Len_(str) {
 //   trunc: số mục đo KHÔNG lưu hết được (quá RELEASE_ITEMS_MAX_ hoặc quá RELEASE_PENDING_MAX_PARTS_ phần): luôn được báo cho admin, không bao giờ im lặng.
 /** Cỡ tối đa (byte UTF-8) của MỘT giá trị Script Property của bản ghi: giới hạn thật 9.216 byte (tính cả tên khoá), chừa dư cho sai lệch cách đếm. */
 var RELEASE_PENDING_MAX_BYTES_ = 8000;
-var RELEASE_PENDING_MAX_PARTS_ = 40;
+var RELEASE_PENDING_MAX_PARTS_ = 12;   // soát X2 L2: 12 x 8.000 byte = 96 KB, chừa chỗ cho hàng chờ nhật ký LOGQ_ và các khoá khác trong kho 500 KB
 var RELEASE_ITEMS_MAX_ = 400;   // bằng RELEASE_LOG_MAX_ROWS_: quá số này RELEASE_LOG cũng không ghi hết
 var RELEASE_MAIL_MAX_TRIES_ = 5;
 var RELEASE_LEG_MAX_FAILS_ = 5;
 var RELEASE_PARTS_SEEN_ = null;
 
 function releaseEmptyRecord_() {
-  return { v: 2, target: APP.VERSION, from: '', date: APP.VERSION_DATE, at: 0, who: '', sealed: false, mig0: null, carried: 0, legs: { act: 0, log: 0, notif: 0, mail: 0 }, tries: {}, trunc: 0, items: [] };
+  return { v: 2, target: APP.VERSION, from: '', date: APP.VERSION_DATE, at: 0, who: '', sealed: false, mig0: null, carried: 0, legs: { act: 0, log: 0, notif: 0, mail: 0, mlog: 1 }, tries: {}, trunc: 0, items: [], mailLog: null };
 }
 /** Thu một mục cho vừa cap byte (chỉ khi mục đơn lẻ quá lớn): rút ngắn chữ vi, en, item. */
 function releaseFitItem_(x, cap) {
@@ -449,7 +459,7 @@ function releaseFitItem_(x, cap) {
 /** Hàm thuần: bản ghi → { RELEASE_PENDING: chữ, RELEASE_PENDING_1: chữ, ... }, mỗi giá trị dưới RELEASE_PENDING_MAX_BYTES_ byte. */
 function releasePack_(rec) {
   var cap = RELEASE_PENDING_MAX_BYTES_, trunc = Number(rec.trunc) || 0, items = rec.items;
-  var head = function (first, parts, tr) { return JSON.stringify({ v: 2, target: rec.target, from: rec.from, date: rec.date, at: rec.at, who: rec.who, sealed: !!rec.sealed, mig0: rec.mig0, carried: rec.carried, legs: rec.legs, tries: rec.tries, trunc: tr, parts: parts, items: first }); };
+  var head = function (first, parts, tr) { return JSON.stringify({ v: 2, target: rec.target, from: rec.from, date: rec.date, at: rec.at, who: rec.who, sealed: !!rec.sealed, mig0: rec.mig0, carried: rec.carried, legs: rec.legs, tries: rec.tries, mailLog: rec.mailLog || undefined, trunc: tr, parts: parts, items: first }); };
   var capOf = function (g) { return g === 0 ? cap - utf8Len_(head([], RELEASE_PENDING_MAX_PARTS_, trunc + RELEASE_ITEMS_MAX_ * 2)) - 2 : cap - 2; };
   var groups = [[]], used = 0, g = 0, full = false;
   items.forEach(function (x) {
@@ -483,7 +493,7 @@ function releasePendingRead_() {
   var rec = releaseEmptyRecord_(), isItem = function (x) { return x && typeof x === 'object' && typeof x.kind === 'string'; };
   rec.target = String(o.target); rec.from = o.from === undefined || o.from === null ? '' : String(o.from); rec.date = o.date || ''; rec.at = Number(o.at) || 0; rec.who = o.who || '';
   rec.sealed = !!o.sealed; rec.mig0 = Array.isArray(o.mig0) ? o.mig0 : null; rec.carried = Number(o.carried) || 0; rec.trunc = Number(o.trunc) || 0;
-  rec.legs = Object.assign(rec.legs, o.legs || {}); rec.tries = o.tries && typeof o.tries === 'object' ? o.tries : {};
+  rec.legs = Object.assign(rec.legs, o.legs || {}); rec.mailLog = o.mailLog && typeof o.mailLog === 'object' ? o.mailLog : null; rec.tries = o.tries && typeof o.tries === 'object' ? o.tries : {};
   rec.items = (Array.isArray(o.items) ? o.items : []).filter(isItem).map(function (x) { return { kind: x.kind, item: String(x.item || ''), vi: String(x.vi || ''), en: String(x.en === undefined ? x.vi || '' : x.en) }; });
   var parts = Math.max(1, Number(o.parts) || 1);
   for (var i = 1; i < parts; i++) {
@@ -520,7 +530,39 @@ function releaseSummaryOfRec_(rec) {
   return releaseBuildSummary_(rec.from, rec.target, rec.date, m, null, { carried: rec.carried || 0, truncated: lost });
 }
 
-var RELEASE_LEG_NAME_ = { act: 'nhật ký RELEASE (ACTIVITY_LOG)', log: 'tab RELEASE_LOG', notif: 'thông báo RELEASE_NOTES', mail: 'email ADMIN_RELEASE_NOTES' };
+/** MỘT thông báo trung thực cho admin (sự kiện MAIL_FAILED, kênh theo NOTIFY_RULES): tóm tắt cập nhật không giao đủ hoặc không rõ đã gửi email chưa. Không bao giờ ném lỗi. */
+function releaseNotice_(target, vi, en) {
+  try { notify_('MAIL_FAILED', { actor: 'SYSTEM', entity: 'RELEASE', entity_id: target, link: rowLink_('RELEASE_LOG'), message: vi, message_en: en }); } catch (x) { }
+}
+
+/**
+ * Lần thử lại: dòng nhật ký RELEASE của bản này đã nằm trong ACTIVITY_LOG chưa (lượt trước ghi xong rồi bị cắt trước khi đánh dấu)? Chỉ đọc 300 dòng CUỐI (dòng nhật ký chỉ ghi thêm
+ * ở cuối), không đọc cả tab. Tìm theo hành động RELEASE, bản đích, giờ >= mốc ghi nhận của bản ghi (bản nâng cấp trước cùng số bản có giờ cũ hơn nên không nhầm).
+ */
+function releaseActSeen_(rec, atSec) {
+  var sh = dbSpreadsheet_().getSheetByName('ACTIVITY_LOG'), last = sh ? sh.getLastRow() : 0;
+  if (last < 2) return false;
+  var width = sh.getLastColumn(), hdr = sh.getRange(1, 1, 1, width).getValues()[0].map(String), ia = hdr.indexOf('action'), ie = hdr.indexOf('entity_id'), it = hdr.indexOf('time');
+  if (ia < 0 || ie < 0 || it < 0) return false;
+  var n = Math.min(300, last - 1), vals = sh.getRange(last - n + 1, 1, n, width).getValues();
+  for (var i = vals.length - 1; i >= 0; i--) {
+    if (String(vals[i][ia]) === 'RELEASE' && String(vals[i][ie]) === rec.target && Math.floor(new Date(vals[i][it]).getTime() / 1000) >= atSec) return true;
+  }
+  return false;
+}
+
+/*
+ * CỬA SỔ CÒN LẠI CỦA ĐƯỜNG GIAO (cố ý, soát X2 D5; đo bằng ma trận cắt tại MỌI cuộc gọi dịch vụ Google, test I197, I198):
+ *  1. KHÔNG EMAIL + MỘT THÔNG BÁO TRUNG THỰC. Lượt chạy nhận việc gửi (dấu mail = 4, ghi bền trong khoá) rồi bị cắt trước khi Google nhận thư; hoặc hai lượt chạy cùng lúc
+ *     và lượt sau thấy dấu 4. Lượt sau KHÔNG gửi lại (không bao giờ hai email) mà bỏ đường email và báo MỘT thông báo MAIL_FAILED nói thật: email có thể đã hoặc chưa gửi,
+ *     tóm tắt nằm ở tab RELEASE_LOG. Cửa sổ chỉ gồm các cuộc gọi từ lúc nhận tới lúc Google nhận thư (nhả khoá: SpreadsheetApp.flush, releaseLock, hai cặp ghi số đo khoá).
+ *     Đo: 9 điểm cắt liền nhau trong mỗi ma trận (menu 1: 9/1.571 điểm cả lượt, 9/188 điểm phần giao; job mỗi giờ: 9/401). Hai lượt cùng lúc có thể báo thông báo đó dù email của
+ *     lượt kia đã đi (quyết định: không dùng hạn thuê theo giờ).
+ *  2. THỪA MỘT DÒNG MAIL_LOG. Bị cắt giữa lúc ghi dòng MAIL_LOG (đường mlog) và lúc đánh dấu đường đó: lượt sau ghi lại dòng (chỉ dùng để đếm hạn mức email trong ngày).
+ *  3. THỪA MỘT DÒNG NHẬT KÝ RELEASE chỉ khi sau lần ghi dở có hơn 300 dòng nhật ký khác được ghi trước khi lượt sau chạy (lượt sau chỉ đọc 300 dòng cuối để nhận ra dòng đã ghi).
+ * Mọi điểm cắt khác: đúng một thông báo, đúng một dòng RELEASE, đúng một email, RELEASE_LOG đủ và không trùng.
+ */
+var RELEASE_LEG_NAME_ = { act: 'nhật ký RELEASE (ACTIVITY_LOG)', log: 'tab RELEASE_LOG', notif: 'thông báo RELEASE_NOTES', mail: 'email ADMIN_RELEASE_NOTES', mlog: 'dòng MAIL_LOG của email' };
 
 /**
  * Giao các đường còn chưa xong của một bản ghi đã niêm phong. check: đây là lần thử lại (đường nào đã làm xong mà chưa kịp đánh dấu thì nhận ra, không làm lại:
@@ -558,11 +600,20 @@ function releaseLegs_(rec, check, durable) {
   var atMs = rec.at || getNow_().getTime(), sec = function (d) { return Math.floor(new Date(d).getTime() / 1000); };
 
   var find = function () { try { return table_('NOTIFICATIONS').filter(function (n) { return n.event === 'RELEASE_NOTES' && String(n.entity_id) === rec.target && sec(n.time) >= sec(atMs); })[0] || null; } catch (x) { return null; } };
-  var allDone = function () { return L.act !== 0 && L.log !== 0 && L.notif !== 0 && L.mail !== 0; };
+  var allDone = function () { return L.act !== 0 && L.log !== 0 && L.notif !== 0 && L.mail !== 0 && L.mlog !== 0; };
   var finish = function () { if (allDone() && durable !== false) releasePendingClear_(); else save(); };
+  // Trong khoá của job mỗi giờ, dòng ghi (logAppend_, DbTable.insert) chỉ xuống Sheets khi job nhả khoá: phải ghi xuống TRƯỚC khi đánh dấu đường đã xong.
+  var land = function () { if (DB_LOCK_DEPTH_) { flushDb_(); SpreadsheetApp.flush(); } };
+  // Dòng MAIL_LOG của email đã gửi: ghi qua bản ghi bền (đường mlog), KHÔNG bao giờ làm email đã gửi thành "lỗi" khi khoá bận; lần sau ghi nốt. Ghi dòng rồi đánh dấu: bị cắt giữa hai việc thì có thể thừa một dòng MAIL_LOG (chỉ để đếm hạn mức).
+  var mlogWrite = function () {
+    if (L.mlog !== 0) return;
+    if (!rec.mailLog) { L.mlog = 1; return; }
+    try { withLock_(function () { var m = rec.mailLog; logAppend_('MAIL_LOG', { time: new Date(m.time), to: m.to, subject: m.subject, kind: m.kind, transport: m.transport }); land(); }); L.mlog = 1; rec.mailLog = null; }
+    catch (e) { }
+  };
   // 1. Nhật ký RELEASE (ACTIVITY_LOG)
   if (L.act === 0 && !stop) {
-    try { withLock_(function () { logActivity_(rec.who || 'SYSTEM', 'RELEASE', 'SYSTEM', rec.target, JSON.stringify({ from: rec.from || '' })); }); L.act = 1; save(); }
+    try { withLock_(function () { if (check && releaseActSeen_(rec, sec(atMs))) return; logActivity_(rec.who || 'SYSTEM', 'RELEASE', 'SYSTEM', rec.target, JSON.stringify({ from: rec.from || '' })); land(); }); L.act = 1; save(); }
     catch (e) { var r1 = fail('act', e, RELEASE_LEG_MAX_FAILS_); out.push(r1 === 'busy' ? 'CHƯA ghi được nhật ký RELEASE (hệ thống đang bận); sẽ tự làm lại ở menu 1 lần sau hoặc job mỗi giờ.' : 'CHƯA ghi được nhật ký RELEASE (' + e.message + ')' + (r1 === 'gaveup' ? '; đã bỏ cuộc.' : '; sẽ tự thử lại.')); save(); }
   }
   // 2. Tab RELEASE_LOG
@@ -589,7 +640,7 @@ function releaseLegs_(rec, check, durable) {
         var nEn = 'Updated from ' + (rec.from || 'an older version') + ' to ' + rec.target + ' (' + rec.date + '): ' + sum.notes.length + ' versions, ' + sum.measured.length + ' items measured in this run. See the RELEASE_LOG tab.';
         row = notify_('RELEASE_NOTES', { actor: 'SYSTEM', entity: 'RELEASE', entity_id: rec.target, message: nVi, message_en: nEn, link: rowLink_('RELEASE_LOG') }, function () { return false; });
       }
-      if (row) { L.notif = 1; save(); out.push('Đã tạo thông báo RELEASE_NOTES (tab NOTIFICATIONS).'); }
+      if (row) { land(); L.notif = 1; save(); out.push('Đã tạo thông báo RELEASE_NOTES (tab NOTIFICATIONS).'); }
       else { var r3 = fail('notif', new Error('không ghi được dòng NOTIFICATIONS'), RELEASE_LEG_MAX_FAILS_); out.push('CHƯA tạo được thông báo RELEASE_NOTES' + (r3 === 'gaveup' ? '; đã bỏ cuộc sau ' + T.notif + ' lần và báo admin.' : '; sẽ tự thử lại.')); save(); }
     } catch (e) {
       var r3b = fail('notif', e, RELEASE_LEG_MAX_FAILS_);
@@ -600,6 +651,14 @@ function releaseLegs_(rec, check, durable) {
   }
   // 4. Email ADMIN_RELEASE_NOTES (sau khi có thông báo; kênh EMAIL của luật RELEASE_NOTES quyết định có gửi không)
   var mailPending = false;
+  if (L.mlog === 0 && !stop) { mlogWrite(); if (L.mlog === 1) finish(); }
+  if (L.mail === 4) {
+    // Một lượt trước đã nhận gửi email (dấu 4) rồi không báo kết quả (bị cắt, hoặc đang gửi song song): không gửi lại (không bao giờ hai email), báo một lần.
+    L.mail = 3; finish();
+    releaseNotice_(rec.target, 'Email tóm tắt cập nhật bản ' + rec.target + ' có thể ĐÃ hoặc CHƯA gửi (lượt gửi bị ngắt hoặc đang gửi song song). Không gửi lại để tránh trùng. Đọc tóm tắt ở tab RELEASE_LOG.',
+      'The update summary email for version ' + rec.target + ' may or may NOT have been sent (the sending run was cut or is sending in parallel). Not resent to avoid a duplicate. Read the summary in the RELEASE_LOG tab.');
+    out.push('Email tóm tắt: lượt gửi trước bị ngắt hoặc đang chạy song song, không rõ đã gửi chưa; KHÔNG gửi lại (tránh trùng), đã tạo một thông báo. Đọc tóm tắt ở tab RELEASE_LOG.');
+  }
   if (L.mail === 0 && L.notif !== 0) {
     var rule = null, tpl = null; try { rule = notifyRule_('RELEASE_NOTES'); } catch (x) { }
     try { tpl = emailTemplate_('ADMIN_RELEASE_NOTES'); } catch (x2) { }
@@ -608,22 +667,51 @@ function releaseLegs_(rec, check, durable) {
     else {
       mailPending = true;
       var sendIt = function () {
-        var ok = false, err = null;
-        try { ok = sendTpl_('ADMIN_RELEASE_NOTES', adminEmails_().join(','), { from: rec.from || 'bản cũ', from_en: rec.from || 'an older version', to: rec.target, date: rec.date,
-          summary_html: releaseSummaryHtml_(sum, 'vi'), summary_html_en: releaseSummaryHtml_(sum, 'en'), sheet_link: rowLink_('RELEASE_LOG') }, { kind: 'ADMIN_RELEASE_NOTES' }) !== false; }
-        catch (e) { ok = false; err = e; }
+        var rendered = null, err = null, ok = false, col = [];
+        // 1) Dựng thư TRƯỚC khi nhận việc gửi: cửa sổ giữa "nhận" và "Google nhận thư" chỉ còn một lời gọi dịch vụ.
+        var to = adminEmails_().join(',');
+        try { rendered = tplRender_('ADMIN_RELEASE_NOTES', to, { from: rec.from || 'bản cũ', from_en: rec.from || 'an older version', to: rec.target, date: rec.date,
+          summary_html: releaseSummaryHtml_(sum, 'vi'), summary_html_en: releaseSummaryHtml_(sum, 'en'), sheet_link: rowLink_('RELEASE_LOG') }, {}); }
+        catch (e) { err = e; }
+        if (!err && !rendered) { L.mail = 2; save(); return 'Không gửi email: mẫu ADMIN_RELEASE_NOTES đang tắt ở tab EMAIL_TEMPLATES (active).'; }
+        // 2) Nhận việc gửi trong khoá (dấu 4, ghi bền TRƯỚC khi gửi), đọc lại bản ghi mới nhất: hai lượt chạy cùng lúc không cùng gửi; bị cắt sau khi nhận thì lượt sau không gửi lại.
+        if (!err && durable !== false) {
+          var claim = 'busy';
+          try {
+            claim = withLock_(function () {
+              var cur = releasePendingRead_();
+              if (!cur || cur.target !== rec.target || !cur.legs || cur.legs.mail !== 0) return 'taken';
+              cur.legs.mail = 4; releasePendingWrite_(cur);
+              Object.keys(cur.legs).forEach(function (k) { L[k] = cur.legs[k]; }); rec.tries = cur.tries || {}; T = rec.tries;
+              return 'mine';
+            });
+          } catch (ce) { claim = isBusy(ce) ? 'busy' : 'err'; }
+          if (claim === 'taken') return 'Email tóm tắt đã được một lượt chạy khác nhận gửi; lượt này không gửi.';
+          if (claim !== 'mine') return 'CHƯA gửi email tóm tắt (hệ thống đang bận; không tính là lần thử lỗi); menu 1 lần sau hoặc job mỗi giờ sẽ gửi.';
+        }
+        // 3) Gửi. MAIL_LOG của lần gửi được gom (deferWrite_) và ghi SAU khi đánh dấu: khoá bận lúc ghi MAIL_LOG không làm một email đã gửi thành "lỗi" hay "lần thử".
+        if (!err) {
+          DEFER_ACTIVE_++;
+          try { ok = sendMail_(to, rendered.subject, rendered.html, 'ADMIN_RELEASE_NOTES', 'high', { collect: col }) !== false; }
+          catch (e) { ok = false; err = e; }
+          finally { DEFER_ACTIVE_--; }
+        }
         var msg;
         if (ok) {
-          L.mail = 1; finish(); msg = 'Đã gửi email "Tóm tắt cập nhật" tới ADMIN_EMAIL (luật RELEASE_NOTES ở tab NOTIFY_RULES).';
+          L.mail = 1; if (col.length) { rec.mailLog = { time: new Date(col[0].time).getTime(), to: col[0].to, subject: col[0].subject, kind: col[0].kind, transport: col[0].transport }; L.mlog = 0; }
+          save(); mlogWrite(); finish(); msg = 'Đã gửi email "Tóm tắt cập nhật" tới ADMIN_EMAIL (luật RELEASE_NOTES ở tab NOTIFY_RULES).';
           var mark = function () { var t = table_('NOTIFICATIONS'), n = find(); if (n) t.update(n, { emailed_at: getNow_() }); };
-          try { if (deferActive_()) deferWrite_(mark); else withLock_(mark); } catch (x3) { }
+          deferWrite_(mark);
+          if (!AFTER_LOCK_RUNNING_) flushDeferred_();
         } else {
+          if (L.mail === 4) L.mail = 0;   // chắc chắn chưa gửi (Google từ chối hoặc không dựng được thư): trả lại việc gửi
+          if (!AFTER_LOCK_RUNNING_) flushDeferred_();
+          if (err && isBusy(err)) { save(); return 'CHƯA gửi email tóm tắt (hệ thống đang bận; không tính là lần thử lỗi); menu 1 lần sau hoặc job mỗi giờ sẽ gửi.'; }
           T.mail = (T.mail || 0) + 1;
           if (T.mail >= RELEASE_MAIL_MAX_TRIES_) {
             L.mail = 3; finish(); msg = 'CHƯA gửi được email tóm tắt cập nhật sau ' + T.mail + ' lần thử; đã bỏ cuộc và báo admin một lần. Đọc tóm tắt ở tab RELEASE_LOG' + (L.log === 1 ? '' : ' (chưa ghi xong, tóm tắt vẫn được giữ trong hệ thống)') + '.';
-            try { notify_('MAIL_FAILED', { actor: 'SYSTEM', entity: 'RELEASE', entity_id: rec.target, link: rowLink_('RELEASE_LOG'),
-              message: 'Không gửi được email tóm tắt cập nhật bản ' + rec.target + ' sau ' + T.mail + ' lần thử. Đọc tóm tắt ở tab RELEASE_LOG (và thông báo RELEASE_NOTES).',
-              message_en: 'Could not send the update summary email for version ' + rec.target + ' after ' + T.mail + ' attempts. Read the summary in the RELEASE_LOG tab (and the RELEASE_NOTES notification).' }); } catch (x4) { }
+            releaseNotice_(rec.target, 'Không gửi được email tóm tắt cập nhật bản ' + rec.target + ' sau ' + T.mail + ' lần thử. Đọc tóm tắt ở tab RELEASE_LOG (và thông báo RELEASE_NOTES).',
+              'Could not send the update summary email for version ' + rec.target + ' after ' + T.mail + ' attempts. Read the summary in the RELEASE_LOG tab (and the RELEASE_NOTES notification).');
           } else { save(); msg = 'CHƯA gửi được email tóm tắt cập nhật (lần thử ' + T.mail + '/' + RELEASE_MAIL_MAX_TRIES_ + (err ? ': ' + err.message : '') + '). Menu 1 lần sau và job mỗi giờ sẽ thử lại; tóm tắt đầy đủ' + (L.log === 1 ? ' đã nằm ở tab RELEASE_LOG.' : ' sẽ nằm ở tab RELEASE_LOG khi ghi xong (đang giữ trong hệ thống).'); }
         }
         return msg;
@@ -640,7 +728,7 @@ function releaseLegs_(rec, check, durable) {
   if (!(L.log === 1 && L.mail === 1)) head[0] = 'CẬP NHẬT PHIÊN BẢN ' + (rec.from || 'cũ') + ' → ' + rec.target + (rec.date ? ' (' + rec.date + ')' : '') + ': ' + sum.items.length + ' mục tóm tắt; ' +
     (L.log === 1 ? 'đã ghi đầy đủ ở tab RELEASE_LOG' : 'CHƯA ghi xong vào tab RELEASE_LOG (đang giữ an toàn trong hệ thống)') + (L.mail === 1 ? ' và đã gửi email.' : (L.mail === 2 ? '; không gửi email (xem bên dưới).' : '; email CHƯA gửi (xem bên dưới).'));
   var pend = [];
-  ['act', 'log', 'notif', 'mail'].forEach(function (k) { if (L[k] === 0) pend.push(RELEASE_LEG_NAME_[k]); });
+  ['act', 'log', 'notif', 'mail', 'mlog'].forEach(function (k) { if (L[k] === 0) pend.push(RELEASE_LEG_NAME_[k]); });
   if (pend.length && durable !== false) out.push('CÒN DỞ (' + pend.join(', ') + '): bản ghi được giữ lại, menu 1 lần sau (cùng phiên bản) và job mỗi giờ sẽ làm nốt đúng phần còn thiếu, không làm lại phần đã xong.');
   return { lines: head.concat(out), finished: finished };
 }

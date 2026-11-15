@@ -256,6 +256,7 @@ DbTable_.prototype.update = function (rowObj, patch) {
       var range = self.sheet.getRange(rowObj._row, self.colIndex[c] + 1);
       if (self.isText_(c)) range.setNumberFormat('@');
       range.setValue(self.writeValue_(c, v));
+      if (c === self.schema.id) self._ids = null;   // ô khoá vừa đổi: bộ nhớ cột khoá của verifyRow_ đã cũ, lần kiểm sau đọc lại
     }
     rowObj[c] = normalizeCell_(self.schema, c, v);
   });

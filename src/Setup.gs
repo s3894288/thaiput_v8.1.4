@@ -111,7 +111,7 @@ function setupCore_(ss) {
   // Soát X2 (FIX C): khoá có dấu cách thừa ("BANK_NAME ") vẫn là khoá BANK_NAME khi đọc (loadConfigTab_ cắt khoảng trắng). Khoá khớp theo dạng đã cắt, nếu không menu 1 thêm
   // một dòng mặc định trống và dòng đó (nằm sau) thắng, làm giá trị admin biến mất khỏi trang. have: khoá đã cắt → dòng (dòng cuối thắng, đúng như cfg_).
   var keyPlan = cfgKeyPlan_(cfgT.all()), have = keyPlan.have;
-  keyPlan.trim.forEach(function (x) { upgradeAdd_('CONFIG_KEY_TRIMMED', x.to, 'Khoá CONFIG ' + JSON.stringify(x.from) + ' (hàng ' + x.row._row + ') có dấu cách thừa nên đổi thành ' + JSON.stringify(x.to) + '; giá trị giữ nguyên.', 'CONFIG key ' + JSON.stringify(x.from) + ' (row ' + x.row._row + ') had stray whitespace so it was renamed ' + JSON.stringify(x.to) + '; the value is kept.'); });
+  keyPlan.trim.forEach(function (x) { upgradeAdd_('CONFIG_KEY_TRIMMED', x.to, 'Khoá CONFIG ' + JSON.stringify(x.from) + ' (hàng ' + x.row._row + ') có dấu cách thừa hoặc ký tự vô hình nên đổi thành ' + JSON.stringify(x.to) + '; giá trị giữ nguyên.', 'CONFIG key ' + JSON.stringify(x.from) + ' (row ' + x.row._row + ') had stray whitespace or invisible characters so it was renamed ' + JSON.stringify(x.to) + '; the value is kept.'); });
   keyPlan.twins.forEach(function (w) { upgradeAdd_('CONFIG_KEY_TWIN', w.key, cfgTwinText_(w, false), cfgTwinText_(w, true)); });
   var me = ''; try { me = Session.getEffectiveUser().getEmail(); } catch (e) { }
   var added = 0;
