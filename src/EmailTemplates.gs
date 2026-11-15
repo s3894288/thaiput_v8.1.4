@@ -249,14 +249,17 @@ function emailWrapBi_(titleVi, htmlVi, titleEn, htmlEn, enFirst) {
 }
 
 /**
- * Gửi email theo mẫu. opts: { enFirst (tiếng Anh trước khi người nhận chưa chọn ngôn ngữ, cho tutor), kind, priority }.
+ * Gửi email theo mẫu. opts: { enFirst (tiếng Anh trước khi người nhận chưa chọn ngôn ngữ, cho tutor), kind, priority, beforeSend, collect }.
  * Trả false nếu mẫu bị tắt (active FALSE), không có mẫu, hoặc gửi không được.
  */
 function sendTpl_(key, to, vars, opts) {
   opts = opts || {};
   var r = tplRender_(key, to, vars, opts);
   if (!r) return false;
-  return sendMail_(to, r.subject, r.html, opts.kind || key, opts.priority || 'high');
+  // opts.beforeSend({ subject, html }): gọi SAU khi thư đã dựng và TRƯỚC khi gửi; trả false thì không gửi (sendTpl_ trả false). Dùng cho nơi phải "nhận việc gửi" rồi mới gửi (Release.gs).
+  // opts.collect: mảng nhận dòng MAIL_LOG thay vì ghi (nơi gọi tự ghi sau).
+  if (opts.beforeSend && opts.beforeSend({ subject: r.subject, html: r.html }) === false) return false;
+  return sendMail_(to, r.subject, r.html, opts.kind || key, opts.priority || 'high', opts.collect ? { collect: opts.collect } : undefined);
 }
 /**
  * Dựng tiêu đề và HTML của một mẫu (không gửi). Trả { subject, html }, hoặc null nếu mẫu bị tắt (ghi MAIL_TEMPLATE_OFF). Ném lỗi nếu không có mẫu.

@@ -1878,6 +1878,9 @@ t('U66', 'Soát vòng 3 (D9): ảnh QR đổi GIỮA apiPublicInfo và apiBankQr
   const n = () => p.calls.filter(x => x.name === 'apiBankQr').length; assert.strictEqual(n(), 1);
   p.click('[data-langsw]'); await p.flush(40); p.clean();
   assert.strictEqual(n(), 1, 'không gọi lại máy chủ'); assert.strictEqual(p.$$('.bank-qr img').length, 1); assert.strictEqual(p.$('.bank-qr img').getAttribute('src'), imgNew); assert.strictEqual(p.$('.bank-qr').getAttribute('data-qr'), m2);
+  // đúng MỘT lượt gọi apiBankQr cho cả hai lần vẽ (vẽ đầu và vẽ lại), lượt đó trả đúng dấu m2 và ảnh mới; bộ nhớ tab chỉ có một mục ảnh
+  const calls = p.calls.filter(x => x.name === 'apiBankQr'); assert.strictEqual(calls.length, 1, 'đúng một lượt gọi cho hai lần vẽ'); assert.strictEqual(calls[0].result.data.qr, m2); assert.strictEqual(calls[0].result.data.src, imgNew);
+  assert.strictEqual(Object.keys(tab).filter(k => /^thaiput_bankqr_/.test(k)).length, 1, 'chỉ một mục ảnh trong bộ nhớ tab');
 });
 
 t('U67', 'Soát X2 M34: sau khi lưu giờ rảnh, lượt tải lại (drawAvail trên cùng khung) tới CHẬM; tutor mở lại tab Giờ rảnh (lượt tải mới) và chọn giờ chưa lưu; phản hồi cũ tới muộn không được ghi đè giờ đang chọn (kiểm cả khung hiện tại và số thứ tự lượt vẽ)', async () => {

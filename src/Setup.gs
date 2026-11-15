@@ -142,7 +142,7 @@ function setupCore_(ss) {
   });
   releasePersist_();
   // Thực hiện: cắt khoá có dấu cách thừa (DbTable.update, luật 42; key là ô ghi cuối cùng của dòng), rồi đổi tên và thêm mặc định.
-  keyPlan.trim.forEach(function (x) { cfgT.update(x.row, { key: x.to }); lines.push('Sửa khoá CONFIG có dấu cách thừa: ' + JSON.stringify(x.from) + ' thành ' + JSON.stringify(x.to) + ' (hàng ' + x.row._row + ', giá trị giữ nguyên)'); });
+  keyPlan.trim.forEach(function (x) { cfgT.update(x.row, { key: x.to }); lines.push('Sửa khoá CONFIG có dấu cách thừa (hoặc ký tự vô hình): ' + JSON.stringify(x.from) + ' thành ' + JSON.stringify(x.to) + ' (hàng ' + x.row._row + ', giá trị giữ nguyên)'); });
   keyPlan.twins.forEach(function (w) { lines.push('CẢNH BÁO: ' + cfgTwinText_(w, false)); });
   Object.keys(CFG_RENAMED_).forEach(function (k) {
     var r = CFG_RENAMED_[k], old = have[r[0]];
