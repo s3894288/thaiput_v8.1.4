@@ -53,4 +53,15 @@ function load(opts) {
   return { api, env };
 }
 
-module.exports = { load, sourceFiles, combinedSource };
+/**
+ * Một LƯỢT CHẠY MỚI của Apps Script trên CÙNG dữ liệu Google: nạp lại mã (biến toàn cục về trạng thái ban đầu: không còn bộ nhớ của lượt trước, khoá đang giữ,
+ * UPGRADE_RUN_...) nhưng dùng đúng các dịch vụ giả lập của env (Sheets, Script Properties, Drive, mail). Dùng để thử "menu 1 bị cắt rồi chạy lại".
+ */
+function attach(env) {
+  const c = compiled();
+  const api = c.factory(...c.globalsList.map(g => env.globals[g]));
+  env.scope = api;
+  return api;
+}
+
+module.exports = { load, attach, sourceFiles, combinedSource };

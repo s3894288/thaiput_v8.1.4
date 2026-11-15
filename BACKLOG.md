@@ -1,6 +1,42 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 02/11/2026 (lần 8). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 15/11/2026 (lần 14). **Soát chéo 5R (bản 8.1.9) xong: BL87 và BL88 đã đóng, thêm 6 câu mới BL89 đến BL94. BACKLOG còn 54 câu chờ anh (mục A 51, mục B 3).** Đếm bằng cách đếm dòng bắt đầu bằng `| BL` trong mục A và mục B (mục C là việc để sau, không tính). Anh rà toàn bộ file này khi tiện (đã hẹn rà ở lượt cuối của chunk 5). Trả lời theo mã, ví dụ "BL89 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 14/11 lần 13
+
+* **BL87 đã đóng** (đề xuất (c) đã làm và làm thêm): menu mới **Email → Làm mới ảnh QR chuyển khoản**, và ảnh QR còn tự làm mới khi chạy menu 2 hoặc khi sửa tay 4 ô CONFIG (`BANK_QR_IMAGE`, `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER`) nhờ số phiên bản `BANK_QR_REV`. Phần còn lại ghi thành BL90.
+* **BL88 đã đóng** (đề xuất (b) đã làm): soát chéo độc lập 14 đến 15/11 (X1, X2 với 102 đột biến, ba vòng sửa, supervisor S1, S2 và vòng soát 3, cùng một lượt soát xác nhận trên commit cuối). Kết quả và danh sách lỗi: `PROGRESS.md` mục "Soát chéo và sửa (14 đến 15/11)". Việc soát tổng 2 agent của 5P trước go live vẫn còn.
+* Thêm **BL89 đến BL94**: PR #2 SES trùng số bản 8.1.5 và xung đột 12 file (BL89), giới hạn còn lại của ảnh QR (BL90), dòng CONFIG song sinh (BL91), key có ký tự vô hình ở EMAIL_TEMPLATES, CONTENT (BL92), hai cửa sổ hẹp của email tóm tắt nâng cấp (BL93), một cuộc đua còn lại khi bấm menu 1 hai lần sát nhau (BL94; kết luận soát xác nhận cuối: ĐẠT).
+* **BL76 vẫn mở** (nhắc): không chặn kỹ thuật nhưng chữ chuyển khoản tự mâu thuẫn làm học viên bối rối; nên trả lời trước 5P.
+* Mục D thêm các việc cần kiểm trên Google thật rút ra từ soát chéo.
+* BL89 nên quyết sớm nhất (trước khi merge bất kỳ nhánh nào vào `main`).
+
+## Thay đổi so với bản 12/11 lần 12
+
+* 5R xong (bản 8.1.9, 14/11/2026): gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT, khung chuyển khoản mới có ô mã QR (CONFIG `BANK_QR_IMAGE`), tăng tốc tải trang, tóm tắt thay đổi sau mỗi lần nâng cấp (tab RELEASE_LOG).
+* Thêm BL76 đến BL88: 1 mâu thuẫn chữ chuyển khoản (BL76), 8 đề xuất tăng tốc từ lượt kiểm toàn bộ đường tải (BL77 đến BL84), 2 điểm hành vi cũ của menu 1 nay đã ghi trong tóm tắt nâng cấp (BL85, BL86), 1 giới hạn ảnh QR (BL87) và 1 việc chưa làm của 5R (BL88: soát chéo 2 agent).
+* Mục D thêm các việc cần kiểm trên Google thật cho 5R.
+* Các câu BL77 đến BL84 đều là tối ưu, không câu nào chặn go live; BL76 và BL88 nên trả lời trước 5P.
+
+## Thay đổi so với bản 07/11 lần 11
+
+* Soát lại plan 5J đến 5P bằng 2 sub agent trước go live: tìm ra 2 mục có tên trong plan mà chưa làm, nay đã làm ở bản 8.1.8 (bảng màu trong Hướng dẫn vận hành; viền đỏ đúng ô nhập sai).
+* **BL22 đã làm** (viền đỏ đúng ô nhập sai), chuyển xuống "Đã chốt". Mục B còn 3 câu.
+
+## Thay đổi so với bản 05/11 lần 10
+
+* 5N xong (bản 8.1.7): BL13 đã làm theo đề xuất (b), chờ anh duyệt. Soát chéo 5N đề ra 4 câu mới: BL72 đến BL75.
+* **5N, 5O đã xong: đến lượt anh rà toàn bộ BACKLOG** (đã hẹn sau 5N, 5O).
+
+## Thay đổi so với bản 05/11 lần 9
+
+* 5O xong cả khung email (bản 8.1.6): BL09 phần code đã làm (khung mới vẫn kèm bản chữ thuần cho ứng dụng không hỗ trợ); còn bước gửi thử tới Gmail web, Gmail điện thoại, Outlook là việc của admin trên STAGING.
+* Thêm BL71 (chữ trong ảnh banner trang chủ).
+
+## Thay đổi so với bản 02/11 lần 8
+
+* 5O phần giao diện web xong (bản 8.1.5, theo ảnh thương hiệu): BL08 ghi "đã làm phần web, chờ anh duyệt". Phần email của 5O (khung `emailWrap_` mới, gửi thử Gmail web, Gmail điện thoại, Outlook — BL09) chưa làm.
+* Thêm BL70 (tài liệu thiết kế viết lại, chờ anh duyệt).
 
 ## Thay đổi so với bản 01/11 lần 7
 
@@ -68,9 +104,32 @@
 | BL04 | Khoá tutor còn buổi sắp tới: (a) tự đổi tutor, không đổi được thì huỷ và bù; (b) chặn khoá | (a), có xem trước | 5L (đã làm theo đề xuất ở 5L, chờ duyệt ở 5Q) |
 | BL05 | Ngoài "Chuyển dữ liệu từ v6", mục menu nào bỏ hẳn? | Không xoá thêm, chỉ gom vào "Công cụ kỹ thuật" | 5K (đã làm theo đề xuất ở 5K, chờ duyệt ở 5Q) |
 | BL06 | Gói giá 0: (a) vẫn chọn được trong form, kèm nút Zalo; (b) không chọn được, chỉ nút Zalo | (b) | 5K (đã làm theo đề xuất ở 5K, chờ duyệt ở 5Q) |
-| BL08 | Thiết kế đen trắng, có đổ bóng, đảo quyết định 19/10. Gửi lại ảnh tham chiếu nếu cần | Đổi theo yêu cầu 29/10 | 5O |
+| BL08 | Thiết kế đen trắng, có đổ bóng, đảo quyết định 19/10. Gửi lại ảnh tham chiếu nếu cần | Đổi theo yêu cầu 29/10 | 5O (phần web đã làm 05/11 theo ảnh thương hiệu, bản 8.1.5, chờ anh duyệt trên STAGING) |
+| BL70 | `THIET_KE_GIAO_DIEN.md` viết lại theo bản 5O (file gốc tả bản 19/10 không còn đúng; hơi ngoài phạm vi "chỉ Styles.html" của kế hoạch). (a) giữ file đã cập nhật; (b) bỏ file, chỉ giữ chú thích đầu Styles.html | (a) | Tuần này (rà) |
+| BL71 | Ảnh banner trang chủ (anh đưa 05/11) có chữ "THAIPUT LUYỆN NÓI TIẾNG THÁI 1-1 với người Thái Lan" tiếng Việt cố định, đứng ngay trên h1 cùng ý; người xem tiếng Anh (nút EN) vẫn thấy chữ Việt trong ảnh. (a) giữ nguyên (ảnh là nhận diện); (b) cắt ảnh chỉ lấy phần minh hoạ, bỏ khối chữ, h1 lo thông điệp; (c) 2 bản ảnh VI và EN (nặng thêm ~80KB) | (a), đã làm | Tuần này (rà) |
 | BL09 | Email hiện bản phẳng ở Outlook và ứng dụng không hỗ trợ màu chuyển, đổ bóng | Chấp nhận | 5O |
-| BL13 | Màu vàng "Vắng học viên": (a) bỏ; (b) giữ tới khi admin chọn "Đã xử lý" | (b) | 5N |
+| BL13 | Màu vàng "Vắng học viên": (a) bỏ; (b) giữ tới khi admin chọn "Đã xử lý" | (b) | 5N (đã làm theo đề xuất ở 8.1.7, chờ duyệt) |
+| BL72 | Buổi Vắng học viên (vàng) và Không hoàn thành (đỏ) có TRƯỚC 8.1.7 vẫn tô màu sau nâng cấp (như 8.1.6, không phải lỗi mới), admin phải chọn "Đã xử lý" từng dòng. (a) giữ; (b) bước chuyển dữ liệu một lần: đánh dấu đã xem mọi buổi Vắng học viên cũ hơn 7 ngày (không đụng Không hoàn thành, luật 55 cần admin làm rõ); (c) mục menu đánh dấu hàng loạt | (b) | Tuần này (rà) |
+| BL73 | Màu đỏ STUDENT_PACKAGES "chờ admin cộng tay" dựa vào thông báo COMP_ON_EXPIRED CHƯA ĐỌC: bấm "Đã đọc hết" hoặc mở thông báo trên web là hết đỏ dù chưa cộng ngày. (a) giữ, hướng dẫn ghi "cộng xong mới đánh dấu đã đọc"; (b) cột hệ thống mới `comp_pending_days`: đỏ theo dữ liệu, hết khi admin sửa `comp_days_admin` (bỏ được công thức đọc tab NOTIFICATIONS) | (b) ở 5P | Tuần này (rà) |
+| BL74 | Huỷ bởi admin một buổi KẸT Chờ đổi tutor (lỗi phía trường): luôn Huỷ bởi admin (không trừ lượt, được bù), kể cả sau mốc huỷ muộn 15:00 hôm trước (ngoại lệ của luật huỷ muộn ở 5M). (a) giữ; (b) vẫn xét mốc | (a), đã làm | Tuần này (rà) |
+| BL75 | Màu vàng "còn N ngày" chép số EXPIRY_NOTICE_DAYS vào công thức: đổi CONFIG thì chạy lại menu 1 mới đổi màu; công thức dùng ngày thật (TODAY), không theo giờ giả lập SIM_NOW trên STAGING. (a) giữ, ghi hướng dẫn; (b) sửa ô CONFIG đó thì tự tô lại | (a) | Tuần này (rà) |
+| BL76 | Chữ chuyển khoản tự mâu thuẫn: dòng đậm trên form nay ghi "chỉ ghi số điện thoại của bạn", nhưng sau khi gửi, web (key `h.done_code`, `s.renew_done_code`) và email REG_RECEIVED còn nói "Mã nội dung chuyển khoản của bạn: {{transfer_code}}", email REG_ADMIN cho admin cũng hiện mã đó. Học viên có thể chuyển khoản theo mã thay vì số điện thoại. (a) giữ cả hai; (b) đổi các chữ đó thành "mã đăng ký" chỉ để tham khảo, không nói là nội dung chuyển khoản; (c) bỏ `transfer_code` khỏi chữ học viên thấy, chỉ admin còn thấy | (b). Bản admin đang chạy đã tự đổi tên thành "mã đăng ký" ở REG_RECEIVED (theo ảnh chụp tab), nên đổi chữ mặc định cho khớp | Trước 5P. **Nhắc 15/11:** vẫn mở; không chặn kỹ thuật, nhưng học viên đọc hai chỉ dẫn khác nhau (số điện thoại và mã nội dung) có thể chuyển khoản sai nội dung |
+| BL77 | Ảnh bìa trang chủ nặng khoảng 74 KB trên khoảng 125 KB tải lần đầu (59 phần trăm). (a) giữ; (b) nén lại ở rộng 800 px (nhẹ hơn khoảng 30 đến 40 KB, hơi mềm hơn trên điện thoại); (c) đưa ảnh lên Drive như ảnh QR, tải sau | (a) tới khi đo trên Google thật; nếu chậm thì (b) | Không (tối ưu) |
+| BL78 | Trang chủ cần 1 lượt gọi máy chủ (`apiPublicInfo`: gói, ngân hàng) sau khi tải. (a) giữ; (b) nhúng thông tin công khai vào trang đầu để khỏi gọi thêm (nhanh hơn khoảng 0,4 đến 1,5 giây); giá hoặc ngân hàng admin sửa có thể hiện trễ vài phút trừ khi sửa PACKAGES cũng làm mới bộ nhớ đệm | (a) tới khi đo; (b) nếu số đo thấy chậm | Không (tối ưu) |
+| BL79 | Bộ nhớ đệm CONFIG 60 giây và CONTENT 300 giây hết hạn nhanh nên giờ vắng khách hay phải đọc lại Sheets. (a) giữ; (b) kéo dài khoảng 10 và 30 phút, làm mới khi sửa Sheets (tiết kiệm 0,4 đến 0,9 giây mỗi lượt vào giờ vắng); đổi luật 41, sửa bằng script phải chạy menu làm mới | (a) | Không (tối ưu) |
+| BL80 | Bộ nhớ đệm danh sách slot đặt theo phút nên gần như luôn trượt khi ít khách. (a) giữ; (b) làm lại: nhớ danh sách và áp hạn đặt lúc đọc | (a) | Không (tối ưu) |
+| BL81 | `SESSION_CACHE_SECONDS` 120 giây: phiên bị hỏi lại Sheets sau mỗi 2 phút. (a) giữ 120; (b) 900 hoặc 3600 (nhanh hơn, nhưng sửa tay tab AUTH có hiệu lực trễ tới chừng đó; thoát mọi thiết bị qua web vẫn tức thì, luật 35) | (a) | Không (tối ưu) |
+| BL82 | Gửi email link đăng nhập đang nằm TRONG khoá, trái ý luật 5 (việc chậm đăng ký ra sau khoá). (a) giữ; (b) chuyển ra ngoài khoá (nhanh hơn 0,5 đến 1,5 giây, nhả khoá sớm); cần quyết cách đóng dấu chống xin lại và dạng nhật ký | (b) ở 5P | Không (tối ưu) |
+| BL83 | Đo tốc độ (METRICS) ghi cả API đọc: (a) giữ; (b) chỉ lấy mẫu một phần API đọc để nhẹ hơn | (a) | Không (ưu tiên thấp) |
+| BL84 | Mã trang quản trị được gửi cho mọi người dùng (học viên, tutor cũng tải). (a) giữ; (b) chỉ gửi mã quản trị cho admin | (a) | Không (ưu tiên thấp) |
+| BL85 | Menu 1 thay TOÀN BỘ luật tô màu của 5 tab NOTIFICATIONS, REGISTRATIONS, AVAILABILITY, BOOKINGS, STUDENT_PACKAGES: luật admin tự thêm bằng tay ở các tab này mất sau mỗi lần chạy (hành vi cũ từ 5N; nay ghi rõ trong tóm tắt nâng cấp). (a) giữ và nhắc admin ở hướng dẫn; (b) giữ lại luật lạ (không phải của hệ thống) | (a) | 5P |
+| BL86 | `removeLegacyPackage_` chạy ở MỖI lần menu 1: dòng PACKAGES có mã `LEGACY` mà chưa học viên nào dùng sẽ bị xoá, kể cả khi admin cố ý thêm lại gói tên đó. (a) giữ; (b) chỉ chạy một lần (đánh dấu bước chuyển dữ liệu) | (b) | 5P |
+| BL89 | Draft PR #2 (nhánh `claude/hopeful-galileo-xa1dv9`, "8.1.5 gửi email qua Amazon SES", liên quan BL31 và ô `MAIL_DAILY_CAP` của BL69) xung đột với nhánh 8.1.9 này ở 12 file: `.github/workflows/test.yml`, `.gitignore`, `BACKLOG.md`, `HUONG_DAN_PHAT_HANH.md`, `HUONG_DAN_VAN_HANH.md`, `PROGRESS.md`, `README.md`, `dist/Code.gs`, `package.json`, `src/Config.gs`, `test/integration.js`, `test/unit.js` (đã kiểm bằng `git merge-tree`), và cũng ghi `VERSION: '8.1.5'`, trùng số với bản 8.1.5 (giao diện đen trắng) của nhánh này. Nhánh nào vào `main` trước? (a) nhánh này (8.1.9) vào trước, nhánh SES rebase lên rồi đổi số bản thành 8.2.0 hoặc số trống kế tiếp (kèm mục `RELEASE_NOTES_` và baseline); (b) nhánh SES vào trước, đánh lại số bản của nhánh này; (c) để SES tới sau go live | (a). Nhánh này đã soát chéo và có bài thử nâng cấp 8.1.4 lên 8.1.9; SES là tính năng mới chưa chạy thật | Trước khi merge bất kỳ nhánh nào |
+| BL90 | Ảnh QR cũ còn tới 6 giờ trong đúng một trường hợp: anh sửa tài khoản ngân hàng trước (sửa tay `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER` làm mới ngay), RỒI MỚI thay nội dung file ảnh dưới cùng link mà không chạy menu 2 hay menu Làm mới ảnh QR. (a) giữ, hướng dẫn "thay file xong thì chạy menu Làm mới ảnh QR" (đã ghi ở menu 2 và hướng dẫn); (b) cho `apiBankQr` kiểm ngày cập nhật cuối của file Drive tối đa mỗi 5 phút và tự làm mới khi thấy đổi (tốn hạn mức Drive, chưa đo) | (a); làm (b) nếu anh thấy dễ quên | Không |
+| BL91 | Hai dòng CONFIG chỉ khác nhau ở dấu cách hoặc ký tự vô hình, mà giá trị anh nhập nhiều khả năng nằm ở dòng KHÔNG có hiệu lực (dòng đang có hiệu lực, thường là dòng cuối, đang mang mặc định hoặc trống; nếu có dòng khoá sạch và dòng ký tự vô hình nằm sau nó thì dòng khoá sạch mới được dùng). Hiện chỉ BÁO (menu 1, menu 2, RELEASE_LOG, email) kèm cách sửa tay. (a) giữ chỉ báo; (b) thêm sửa tự động hẹp: chỉ khi dòng có hiệu lực là mặc định hoặc trống VÀ dòng kia có giá trị khác mặc định, chép giá trị sang dòng có hiệu lực, ghi nhật ký, vẫn không xoá dòng | (a): tự đổi giá trị đang chạy (có thể là khoá bí mật, số tài khoản) mà không hỏi rủi ro hơn là báo; hiếm gặp | Không |
+| BL92 | Key có ký tự vô hình (U+200B, U+200C, U+200D, U+2060, U+FEFF) ở EMAIL_TEMPLATES và CONTENT chỉ được cắt khoảng trắng hai đầu, chưa chuẩn hoá như khoá CONFIG; hai key trông giống nhau nhưng khác ký tự vô hình bị coi là hai key khác, menu 2 không báo. (a) giữ; (b) dùng cùng hàm chuẩn hoá `cfgKeyNorm_` cho hai tab | (a) tới khi thấy trường hợp thật trên file của anh; (b) nếu menu 1 trên file thật còn để lại cặp trùng | Không |
+| BL93 | Email tóm tắt nâng cấp: có hai trường hợp hẹp mà anh thấy thông báo `MAIL_FAILED` nói "có thể đã hoặc chưa gửi" (tóm tắt luôn nằm ở tab RELEASE_LOG), không bao giờ hai email. (1) Lượt chạy bị ngắt từ lúc nhận việc gửi tới lúc Google nhận thư: anh KHÔNG nhận email (9 điểm liền nhau trong mỗi ma trận cắt ngang, theo test I197, I198, I210). (2) Bị ngắt ngay SAU khi Google nhận thư, trước khi bản ghi đánh dấu đã gửi: anh nhận email NHƯNG vẫn có thông báo đó, và dòng MAIL_LOG của email không bao giờ được ghi (4 điểm liền nhau; chỉ lệch số đếm hạn mức email trong ngày). Hai lượt chạy cùng lúc cũng có thể báo thông báo dù email của lượt kia đã đi. (a) chấp nhận; (b) thêm hạn thuê theo giờ: sau N phút mà dấu "đang gửi" chưa xong thì cho gửi lại (có thể trùng một email, đổi lại hiếm khi thiếu) | (a): tóm tắt luôn còn ở RELEASE_LOG và thông báo; thiếu một email hay lệch một dòng đếm hạn mức tốt hơn gửi trùng | Không |
+| BL94 | Cuộc đua còn lại khi nâng cấp, thấp và không chặn, có từ trước đợt 5R, do soát xác nhận cuối tìm ra: hai lượt menu 1 bấm cách nhau trong khoảng 6 lời gọi dịch vụ (trước lúc phiên bản được ghi nhận) đều có thể giao tóm tắt, nên anh nhận 2 email, 2 thông báo `RELEASE_NOTES` và RELEASE_LOG gấp đôi; dữ liệu nghiệp vụ không bị ảnh hưởng. Supervisor đánh giá gần như không thể xảy ra trên Google thật. (a) giữ nguyên, chỉ dặn: **bấm menu 1 một lần, chờ hộp thoại** (đã ghi ở `PROGRESS.md` mục "Việc của admin" và `HUONG_DAN_PHAT_HANH.md` mục 3A.1); (b) làm chặt: niêm phong bản ghi trong khoá và đọc lại `APP_VERSION_LAST` ngay trong khoá đó (thay đổi nhỏ, cần thêm một vòng soát) | (a): rủi ro rất thấp, tóm tắt trùng không làm hỏng dữ liệu; làm (b) nếu sau này muốn gỡ hẳn | Không |
 
 ## B. Câu hỏi cũ chưa thấy trả lời
 
@@ -78,7 +137,6 @@
 |---|---|---|---|
 | BL20 | Giám sát trang health: (A) Google Cloud; (B) UptimeRobot khoảng 9 đến 10 USD/tháng; (C) Better Stack; (D) chưa giám sát | mục `TU_VAN_GIAM_SAT_16_10.md` trong `archive/TU_VAN_VA_KIEN_TRUC.md` | B cho PRODUCTION |
 | BL21 | "Vắng học viên" báo admin ngay bằng email (đổi NOTIFY_RULES, không cần code) hay giữ email tổng hợp 21 giờ | Trả lời 22/10 | Giữ tổng hợp |
-| BL22 | Form đăng ký: viền đỏ đúng ô nhập sai | Soát giao diện 20/10 | Làm ở 5O |
 | BL23 | Tutor không dùng Gmail vào thẳng Meet: (1) mở Meet cho người chưa đăng nhập; (2) tutor tạo tài khoản Google bằng email đang có; (3) cấp Workspace | Chat tên miền 22/10 | (1) ngay, (2) song song |
 
 ## C. Việc để sau
@@ -100,6 +158,21 @@
 * Thêm, xoá tab thử: nhật ký ghi đúng tên tab.
 * Đo tốc độ.
 * Vùng tô màu khi tab tự thêm hàng (sửa ở 5N).
+* **Mới ở 5R (bản 8.1.9):**
+  * Drive: web đọc đúng file ảnh QR bằng tài khoản chạy hệ thống; menu 2 báo "BANK_QR_IMAGE hợp lệ" với ảnh thật, báo LỖI đúng với link sai, file ở thùng rác, file quá 300 KB;
+  * quét thử mã QR bằng ứng dụng ngân hàng thật trên điện thoại, ở cả hai cỡ (200 px trên điện thoại, 184 px trên máy tính), trang đăng ký lẫn gia hạn; kiểm ô trống thì không hiện khung QR;
+  * bộ nhớ đệm mảnh dưới 100 KB: ảnh gần 300 KB vẫn hiện; đổi link thì ảnh mới hiện ngay;
+  * nâng cấp thật 8.1.4 lên 8.1.9: tóm tắt trong hộp thoại menu 1, tab RELEASE_LOG, email "Tóm tắt cập nhật" tới `ADMIN_EMAIL`; chạy lại menu 1 khi đã giao đủ thì im lặng (chỉ thêm một dòng `SETUP_RUN` ở nhật ký);
+  * trên file Sheets thật: EMAIL_TEMPLATES và CONTENT mỗi key đúng một dòng sau menu 1; chữ gửi đi đúng là chữ admin đã sửa (ví dụ thân REG_RECEIVED tiếng Anh bắt đầu "Thaiput received"); nguồn gốc các cặp dòng trùng đứng cạnh nhau mới giải thích một phần;
+  * tốc độ: đo bằng menu **Đo tốc độ** trước và sau khi dán 8.1.9 (số tăng tốc ở PROGRESS.md mới là ước lượng).
+* **Mới ở soát chéo 5R (15/11), chỉ mới kiểm trong bộ mô phỏng Node:**
+  * link font nạp không chặn (`onload`) chạy đúng trong khung HtmlService của trang thật;
+  * `setProperties` của Script Properties có ghi nguyên tử nhiều khoá không (bản ghi giao tóm tắt `RELEASE_PENDING` cùng dấu phiên bản dựa vào đó);
+  * tranh chấp khoá thật và giới hạn 6 phút của menu 1 (ma trận cắt ngang và xen kẽ hai lượt chạy chỉ chạy trên khoá mô phỏng);
+  * ô bắt đầu bằng `=`, `+`, `-`, `@` ở CONTENT và EMAIL_TEMPLATES còn là chữ sau khi `purgeRows_` ghi lại tab lúc menu 1 gộp key trùng;
+  * sắp xếp hoặc xoá dòng ở tab CONFIG có kích hoạt trigger sửa tay không, và có làm mới ảnh QR không;
+  * email "Tóm tắt cập nhật" hiển thị ra sao ở Gmail web, Gmail điện thoại, Outlook (cả khối "Cần bạn xem" màu đỏ);
+  * chạy code 8.1.4 trên database đã nâng lên 8.1.9 (quay lui code): chưa có test, theo thiết kế bản cũ bỏ qua cột và tab lạ.
 * **Mới:**
   * Gmail API có trừ vào bộ đếm hạn mức của Apps Script không (đo ở 5J);
   * GmailApp (8.1.4) trừ cùng hạn mức: menu Kiểm tra gửi email, số "trước → sau" giảm 1;
@@ -110,6 +183,9 @@
 
 | Ngày | Mã | Kết quả |
 |---|---|---|
+| 15/11 | BL88 | Soát chéo độc lập cho 5R (đề xuất (b)) đã chạy 14 đến 15/11: X1 và X2 (102 đột biến: 69 bị bắt, 33 sống sót, 9 tương đương) tìm ra lỗi thật; hai vòng sửa (`45f6285`, `84a0b96`), các sửa theo supervisor S1, S2 (`9b49cdc`, `c59cbce`) và theo vòng soát 3 (`5292935`, sửa lỗi hai lượt chạy chen nhau làm hai email tóm tắt); soát xác nhận trên commit cuối. Kết quả, danh sách lỗi và số test: `PROGRESS.md` mục "Soát chéo và sửa (14 đến 15/11)". Soát tổng 2 agent của 5P trước go live vẫn còn |
+| 15/11 | BL87 | Làm theo đề xuất (c) và hơn: menu **Email → Làm mới ảnh QR chuyển khoản**; số phiên bản `BANK_QR_REV` (Script Property) nằm trong dấu và khoá bộ nhớ đệm máy chủ và trình duyệt, tăng khi chạy menu 2, khi sửa tay 4 ô CONFIG (`BANK_QR_IMAGE`, `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER`) và khi dùng menu Làm mới, nên khách thấy ảnh mới ngay. Phần còn lại (thay file sau khi đã sửa tài khoản, không chạy menu nào): BL90. Test I165, I194, U66 |
+| 12/11 | BL22 | Form đăng ký tô viền đỏ ĐÚNG ô nhập sai (tên, email, điện thoại, ảnh, ô đồng ý, nhóm gói), con trỏ về ô sai đầu tiên, sửa ô nào thì ô đó hết đỏ ngay. Làm ở bản 8.1.8, test U50 |
 | 01/11 tối | Mới | 5K, 5L soát chéo 1 agent mỗi sub chunk; từ 5P lại 2 agent |
 | 01/11 tối | Mới | Chưa tách STAGING và PRODUCTION tới hết chunk 5; mọi bản chỉ dán STAGING. Chunk 6: chuyển PRODUCTION đơn giản nhất, không mất dữ liệu, 2 bản chức năng tương đương chạy song song, hướng dẫn tắt hết trigger STAGING khi PRODUCTION chạy chính thức. Thay BL11 |
 | 01/11 tối | Mới | Mục chưa duyệt, chưa trả lời, chưa xử lý giữ ở BACKLOG; anh rà ở sub chunk cuối chunk 5 (5Q), coder nhắc |

@@ -28,7 +28,7 @@ function doGet(e) {
  */
 function bootJson_(params) {
   var page = String(params.page || 'home'), tok = String(params.t || '');
-  var boot = { page: /^[a-z]{1,20}$/.test(page) ? page : 'home', linkToken: /^[a-f0-9]{32,128}$/i.test(tok) ? tok : '', version: APP.VERSION };
+  var boot = { page: /^[a-z]{1,20}$/.test(page) ? page : 'home', linkToken: /^[a-f0-9]{32,128}$/i.test(tok) ? tok : '', version: APP.VERSION, versionDate: APP.VERSION_DATE };
   // Đăng nhập Google (chunk 5D): dự án phụ chuyển sang ?page=gauth&ge=email&gts=thời điểm&gs=chữ ký. Chỉ nhận đúng dạng.
   if (boot.page === 'gauth') {
     var ge = String(params.ge || '').toLowerCase(), gts = String(params.gts || ''), gs = String(params.gs || '');
@@ -231,12 +231,108 @@ function apiPublicInfo() {
         school: cfg_('SCHOOL_NAME'),
         packages: (function () { var bad = brokenPackageCodes_(); return Object.keys(defs).map(function (k) { return defs[k]; }).filter(function (p) { return p.active && !bad[p.code]; }); })()   // 5L: gói trùng mã, sai dòng: ẩn
           .map(function (p) { return { code: p.code, name: p.name, nameEn: p.name_en || p.name, type: p.type, days: p.days, sessions: p.sessions, price: p.price_vnd }; }),
-        bank: { name: cfg_('BANK_NAME'), account: cfg_('BANK_ACCOUNT'), holder: cfg_('BANK_HOLDER') },
+        bank: { name: cfg_('BANK_NAME'), account: cfg_('BANK_ACCOUNT'), holder: cfg_('BANK_HOLDER'), qr: bankQrMarker_() },
         contact: contactInfo_(),
         policyUrl: cfg_('POLICY_URL'),
         cutoffHour: cfg_('BOOKING_CUTOFF_HOUR'), bookingLeadHours: bookingLeadHours_()
       }
     };
+  });
+}
+
+// ── Ảnh mã QR chuyển khoản (T2) ──
+// CONFIG BANK_QR_IMAGE: link chia sẻ Drive hoặc mã file. Ảnh KHÔNG nằm trong apiPublicInfo (giữ trang nhanh): trình duyệt
+// lấy riêng bằng apiBankQr sau khi vẽ khung. Bộ nhớ đệm chia mảnh dưới 100 KB (giới hạn mỗi khoá của Google), hạn 6 giờ.
+var BANK_QR_MAX_BYTES_ = 300 * 1024;
+var BANK_QR_TYPES_ = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+var BANK_QR_CHUNK_ = 90000;
+var BANK_QR_TTL_ = 21600;
+var BANK_QR_BAD_TTL_ = 300;   // lỗi nhớ ngắn để khách đông không dồn vào Drive
+
+/** Lấy mã file Drive từ link /file/d/ID/, ?id=ID, hoặc mã trần. Trả '' nếu không đúng dạng. */
+function bankQrId_(value) {
+  var v = String(value == null ? '' : value).trim(), m;
+  if (!v) return '';
+  if ((m = v.match(/^https:\/\/(?:drive|docs)\.google\.com\/(?:[^?#\s]*\/)?file\/d\/([A-Za-z0-9_-]{10,})(?:[\/?#].*)?$/))) return m[1];
+  if ((m = v.match(/^https:\/\/(?:drive|docs)\.google\.com\/[^?#\s]*\?(?:[^#\s]*&)?id=([A-Za-z0-9_-]{10,})(?:[&#].*)?$/))) return m[1];
+  if (/^[A-Za-z0-9_-]{10,}$/.test(v)) return v;
+  return '';
+}
+/*
+ * Số phiên bản ảnh (Script Property BANK_QR_REV, soát 5R): thay file ảnh QR NGUYÊN link (cùng mã file Drive, tài khoản ngân hàng mới) thì mã file không đổi nên
+ * dấu và bộ nhớ đệm cũ vẫn trúng, khách có thể thấy QR của tài khoản cũ tới 6 giờ. Số này nằm trong dấu (bankQrMarker_), nên cũng nằm trong khoá bộ nhớ đệm máy chủ
+ * (bq_<dấu>, kể cả mục "lỗi" 300 giây) và khoá ảnh trong trình duyệt của mọi khách: tăng số này là bỏ hết bản cũ cùng lúc. Tăng bởi: menu 2, sửa tay CONFIG
+ * (BANK_QR_IMAGE, BANK_NAME, BANK_ACCOUNT, BANK_HOLDER), menu "Làm mới ảnh QR chuyển khoản". Đọc rẻ: một Script Property, nhớ trong lần chạy (forgetEnvMemo_ xoá). Không gọi Drive.
+ */
+var BANK_QR_REV_MEMO_ = null;
+function bankQrRev_() {
+  if (BANK_QR_REV_MEMO_ === null) { var v = ''; try { v = props_().getProperty('BANK_QR_REV') || ''; } catch (e) { } BANK_QR_REV_MEMO_ = String(v); }
+  return BANK_QR_REV_MEMO_;
+}
+/** Tăng số phiên bản ảnh QR (bỏ hết bộ nhớ đệm máy chủ và trình duyệt). Trả số mới. Ném lỗi nếu không ghi được Script Property. */
+function bankQrBump_() {
+  var v = Utilities.getUuid().replace(/-/g, '').substring(0, 12);   // không dùng đồng hồ (luật 1): chỉ cần giá trị mới, không trùng lần trước
+  props_().setProperty('BANK_QR_REV', v);
+  BANK_QR_REV_MEMO_ = v;
+  return v;
+}
+/** Các khoá CONFIG mà sửa tay thì phải làm mới ảnh QR: ảnh, và thông tin tài khoản (đổi tài khoản mà còn QR cũ là chuyển nhầm tiền). */
+var BANK_QR_WATCH_KEYS_ = ['BANK_QR_IMAGE', 'BANK_NAME', 'BANK_ACCOUNT', 'BANK_HOLDER'];
+/** Dấu ngắn của cấu hình (rỗng khi chưa điền hoặc sai dạng): đổi giá trị CONFIG hoặc số phiên bản ảnh thì dấu đổi, khoá bộ nhớ đệm đổi theo. */
+function bankQrMarker_() {
+  var id = bankQrId_(cfg_('BANK_QR_IMAGE'));
+  return id ? sha256Hex_('bankqr|' + id + '|' + bankQrRev_()).substring(0, 10) : '';
+}
+/** Đọc file Drive, kiểm loại và cỡ. Trả { ok, src, type, kb } hoặc { ok:false, code, fix } (fix: câu hướng dẫn tiếng Việt cho admin). */
+function bankQrRead_(raw) {
+  var id = bankQrId_(raw);
+  if (!id) return { ok: false, code: 'BAD_LINK', fix: 'Giá trị không phải link Drive hoặc mã file. Dùng link dạng https://drive.google.com/file/d/…/view hoặc chỉ mã file.' };
+  var f;
+  try { f = DriveApp.getFileById(id); } catch (e) { return { ok: false, code: 'NO_ACCESS', fix: 'Không mở được file: sai link hoặc file không thuộc tài khoản chủ hệ thống. Tải ảnh lên Drive của tài khoản chủ hệ thống hoặc chia sẻ cho tài khoản đó quyền xem, rồi dán lại link.' }; }
+  try {
+    if (f.isTrashed()) return { ok: false, code: 'TRASHED', fix: 'File đang ở thùng rác: khôi phục hoặc tải ảnh mới.' };
+    var type = String(f.getMimeType() || '').toLowerCase(), size = Number(f.getSize()) || 0;
+    if (BANK_QR_TYPES_.indexOf(type) === -1) return { ok: false, code: 'BAD_TYPE', fix: 'File không phải ảnh PNG, JPG, WEBP hoặc GIF (đang là ' + (type || 'không rõ') + ').' };
+    if (size > BANK_QR_MAX_BYTES_) return { ok: false, code: 'TOO_LARGE', fix: 'Ảnh nặng ' + Math.ceil(size / 1024) + ' KB, quá 300 KB: xuất lại ảnh 600 x 600 px dạng PNG nén.' };
+    var blob = f.getBlob(), bytes = blob.getBytes();
+    if (!bytes || !bytes.length) return { ok: false, code: 'EMPTY', fix: 'File rỗng: tải ảnh lên lại.' };
+    if (bytes.length > BANK_QR_MAX_BYTES_) return { ok: false, code: 'TOO_LARGE', fix: 'Ảnh nặng ' + Math.ceil(bytes.length / 1024) + ' KB, quá 300 KB: xuất lại ảnh 600 x 600 px dạng PNG nén.' };
+    return { ok: true, src: 'data:' + type + ';base64,' + Utilities.base64Encode(bytes), type: type, kb: Math.ceil(bytes.length / 1024) };
+  } catch (e2) { return { ok: false, code: 'READ_FAIL', fix: 'Đọc file lỗi: ' + e2.message }; }
+}
+/** Ảnh QR cho trang: lấy từ bộ nhớ đệm (nhiều mảnh) hoặc Drive. Trả data URI, '' khi chưa cấu hình hoặc hỏng. Không bao giờ ném lỗi, không ghi Sheets, không lấy khoá. */
+function bankQrSrc_() {
+  var mk = bankQrMarker_();
+  if (!mk) return '';
+  var cache = CacheService.getScriptCache(), mkey = 'bq_' + mk;
+  try {
+    var head = cache.get(mkey);
+    if (head) {
+      var h = JSON.parse(head);
+      if (h.bad) return '';
+      var keys = []; for (var i = 0; i < h.n; i++) keys.push(mkey + '_' + i);
+      var got = cache.getAll(keys), parts = [];
+      for (var j = 0; j < keys.length && got[keys[j]] != null; j++) parts.push(got[keys[j]]);
+      if (parts.length === h.n) return parts.join('');
+    }
+  } catch (e) { }
+  var r;
+  try { r = bankQrRead_(cfg_('BANK_QR_IMAGE')); } catch (e2) { r = { ok: false, code: 'READ_FAIL' }; }
+  try {
+    if (!r.ok) cache.put(mkey, JSON.stringify({ bad: r.code }), BANK_QR_BAD_TTL_);
+    else {
+      var chunks = {}, n = Math.ceil(r.src.length / BANK_QR_CHUNK_);
+      for (var k = 0; k < n; k++) chunks[mkey + '_' + k] = r.src.substring(k * BANK_QR_CHUNK_, (k + 1) * BANK_QR_CHUNK_);
+      cache.putAll(chunks, BANK_QR_TTL_);
+      cache.put(mkey, JSON.stringify({ n: n }), BANK_QR_TTL_);
+    }
+  } catch (e3) { }
+  return r.ok ? r.src : '';
+}
+/** Công khai (trang đăng ký, không đăng nhập): chỉ đọc. Chưa cấu hình hoặc file hỏng thì trả src rỗng, trang tự bỏ ô QR; admin thấy lỗi ở menu 2. */
+function apiBankQr() {
+  return apiWrap_('apiBankQr', function () {
+    return { ok: true, data: { qr: bankQrMarker_(), src: bankQrSrc_() } };
   });
 }
 

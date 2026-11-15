@@ -55,17 +55,21 @@ function adminCancelBooking_(bookingId, actor, reason, at) {
     var b = table_('BOOKINGS').byId(bookingId);
     if (!b) return { ok: false, reason: REASONS.NOT_FOUND };
     if (b.status !== BOOKING_STATUS.CONFIRMED && b.status !== BOOKING_STATUS.PENDING_REASSIGN) return { ok: false, reason: REASONS.INVALID_INPUT };
-    var late = !(when < cancelDeadline_(b.date)), st = late ? BOOKING_STATUS.CANCELLED_LATE : BOOKING_STATUS.CANCELLED_ADMIN;
+    // 5N (soát): buổi kẹt Chờ đổi tutor là lỗi phía trường (chưa có tutor dạy): luôn CANCELLED_ADMIN (được bù), không xét mốc huỷ muộn.
+    var late = b.status !== BOOKING_STATUS.PENDING_REASSIGN && !(when < cancelDeadline_(b.date)), st = late ? BOOKING_STATUS.CANCELLED_LATE : BOOKING_STATUS.CANCELLED_ADMIN;
     cancelBookingInternal_(b, st, actor, reason || 'Admin huỷ', 'ADMIN');
     return { ok: true, status: st, late: late };
   });
 }
 
-/** Admin đổi tutor. tutorId trống: hệ thống tự chọn theo luật; có tutorId: dùng đúng người đó nếu rảnh. Chặn sau giờ bắt đầu (5M). */
+/**
+ * Admin đổi tutor. tutorId trống: hệ thống tự chọn theo luật; có tutorId: dùng đúng người đó nếu rảnh. Chặn sau giờ bắt đầu (5M).
+ * 5N (soát): nhận cả buổi kẹt Chờ đổi tutor (PENDING_REASSIGN), đúng việc thư báo REASSIGN_STUCK bảo admin làm.
+ */
 function adminReassignBooking_(bookingId, actor, tutorId) {
   return withLock_(function () {
     var b = table_('BOOKINGS').byId(bookingId);
-    if (!b || b.status !== BOOKING_STATUS.CONFIRMED) return { ok: false, reason: b ? REASONS.INVALID_INPUT : REASONS.NOT_FOUND };
+    if (!b || (b.status !== BOOKING_STATUS.CONFIRMED && b.status !== BOOKING_STATUS.PENDING_REASSIGN)) return { ok: false, reason: b ? REASONS.INVALID_INPUT : REASONS.NOT_FOUND };
     if (!(getNow_() < slotStart_(b.date, b.slot))) return { ok: false, reason: REASONS.SLOT_STARTED };
     return reassignBookingInLock_(b, [b.tutor_id], actor, 'ADMIN', tutorId || null);
   });
@@ -106,6 +110,23 @@ function adminSetTechFault_(bookingId, actor, fault) {
     table_('BOOKINGS').update(b, { tech_fault: fault, tech_decided_at: getNow_(), payroll_override: fault !== TECH_FAULT.TUTOR });
     recomputeStudentPackages_(b.student_id, actor);
     logActivity_(actor, 'TECH_FAULT', 'BOOKING', bookingId, fault);
+    return { ok: true };
+  });
+}
+
+/**
+ * Chunk 5N: "Đã xử lý (giữ nguyên)" ở cột admin_action của BOOKINGS. Không đổi trạng thái, lương hay gói: chỉ ghi admin_done_at
+ * (dòng hết tô vàng Vắng học viên, hết đỏ Không hoàn thành). Không cho chọn khi màu chỉ hết bằng việc thật:
+ *   CONFIRMED, PENDING_REASSIGN (buổi chưa có kết quả hoặc chưa có tutor), TECH_ISSUE chưa chọn lỗi (chọn 1 trong 3 lựa chọn lỗi).
+ * Trả { ok } hoặc { ok: false, reason, block: 'OPEN' | 'TECH' } để phần nối (Admin.gs) báo đúng việc cần làm.
+ */
+function adminMarkDone_(bookingId, actor) {
+  return withLock_(function () {
+    var t = table_('BOOKINGS'), b = t.byId(bookingId);
+    if (!b) return { ok: false, reason: REASONS.INVALID_INPUT };
+    if (b.status === BOOKING_STATUS.CONFIRMED || b.status === BOOKING_STATUS.PENDING_REASSIGN) return { ok: false, reason: REASONS.INVALID_INPUT, block: 'OPEN', status: b.status };
+    if (b.status === BOOKING_STATUS.TECH_ISSUE && !b.tech_decided_at) return { ok: false, reason: REASONS.INVALID_INPUT, block: 'TECH', status: b.status };
+    logActivity_(actor, 'ADMIN_MARK_DONE', 'BOOKING', bookingId, { status: b.status });
     return { ok: true };
   });
 }

@@ -14,7 +14,8 @@
  */
 
 var APP = {
-  VERSION: '8.1.4',
+  VERSION: '8.1.9',
+  VERSION_DATE: '14/11/2026',   // ngày phát hành (dd/mm/yyyy), hiện ở dòng đầu menu 1, dist/Code.gs, thông báo cập nhật
   NAME: 'thaiput',
   TIMEZONE: 'Asia/Ho_Chi_Minh'
 };
@@ -78,6 +79,8 @@ var DEFAULTS_ = {
   RESULT_NOTICE_AFTER_HOURS: 24,
   RESULT_EXPIRE_AFTER_HOURS: 48,
   RESULT_EXPIRE_AFTER_NOTICE_HOURS: 24,
+  // Chunk 5N: buổi ở trạng thái Chờ đổi tutor (PENDING_REASSIGN) quá số giờ này thì job mỗi giờ báo admin (REASSIGN_STUCK). -1 = tắt.
+  REASSIGN_STUCK_HOURS: 1,
 
   // Đăng nhập (câu 32, đổi 01/11 chunk 5J): theo vai trò. MAX_USES 0 = bấm không giới hạn trong hạn link.
   STUDENT_LINK_MINUTES: 15,
@@ -167,6 +170,9 @@ var DEFAULTS_ = {
   BANK_NAME: '',
   BANK_ACCOUNT: '',
   BANK_HOLDER: '',
+  // Ảnh mã QR chuyển khoản (T2): link chia sẻ Google Drive hoặc mã file Drive của ảnh VUÔNG (PNG, JPG, WEBP, GIF, dưới 300 KB).
+  // Để trống = trang không hiện ô QR. Kiểm bằng menu 2; bộ nhớ đệm giữ ảnh tối đa 6 giờ.
+  BANK_QR_IMAGE: '',
 
   // Hạ tầng (Setup ghi)
   LESSON_CALENDAR_ID: '',
@@ -301,7 +307,7 @@ function props_() { return PropertiesService.getScriptProperties(); }
  * clearDbCache_ và các hàm ghi ENV, DB_ID gọi forgetEnvMemo_.
  */
 var ENV_MEMO_ = null, DBID_MEMO_ = {};
-function forgetEnvMemo_() { ENV_MEMO_ = null; DBID_MEMO_ = {}; }
+function forgetEnvMemo_() { ENV_MEMO_ = null; DBID_MEMO_ = {}; BANK_QR_REV_MEMO_ = null; }
 function getEnv_() { if (ENV_MEMO_ === null) ENV_MEMO_ = props_().getProperty('ENV') || 'STAGING'; return ENV_MEMO_; }
 function isProduction_() { return getEnv_() === 'PRODUCTION'; }
 function getDbId_() {
@@ -399,10 +405,13 @@ function loadConfigTab_() {
     var sh = dbSpreadsheet_().getSheetByName('CONFIG');   // chunk 5I: dùng chung file đã mở (không mở lần hai)
     if (!sh) return out;
     var values = sh.getDataRange().getValues();
+    var inv = {};   // soát X2 (L1): khoá có ký tự vô hình chỉ dự phòng khi không có dòng khoá sạch (không đổi dòng nào đang có hiệu lực của khoá sạch)
     for (var i = 1; i < values.length; i++) {
-      var k = String(values[i][0] || '').trim();
+      var raw = String(values[i][0] || ''), k = raw.trim(), kn = cfgKeyNorm_(raw);
       if (k) out[k] = values[i][1];
+      if (k && kn && kn !== k) inv[kn] = values[i][1];
     }
+    Object.keys(inv).forEach(function (kn) { if (!Object.prototype.hasOwnProperty.call(out, kn)) out[kn] = inv[kn]; });
     read = true;
   } catch (e) {
     // Chưa cài đặt DB: dùng mặc định. Lỗi thật sẽ lộ ra ở getDbId_() khi đọc dữ liệu.
@@ -416,6 +425,60 @@ function loadConfigTab_() {
   }
   return out;
 }
+
+/**
+ * Soát X2 (L1), hàm thuần: khoá CONFIG dùng để SO KHỚP. Bỏ ký tự vô hình (U+200B, U+200C, U+200D, U+2060, U+FEFF, dán từ web hay chat) rồi cắt khoảng trắng
+ * (trim của JS đã cắt cả dấu cách không ngắt U+00A0 ở hai đầu). Khoá sạch trả về nguyên văn.
+ */
+function cfgKeyNorm_(raw) { return String(raw === undefined || raw === null ? '' : raw).replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '').trim(); }
+/** Ô giá trị CONFIG coi là "mặc định hoặc trống" của khoá key (không so giá trị khác): trống, hoặc bằng mặc định trong code (khoá lạ: chỉ trống). */
+function cfgIsDefaultish_(key, value) {
+  var v = String(value === undefined || value === null ? '' : value).trim();
+  if (v === '') return true;
+  return Object.prototype.hasOwnProperty.call(DEFAULTS_, key) && v === String(DEFAULTS_[key]).trim();
+}
+/**
+ * Soát X2 (FIX C, L1, E1), hàm thuần: kế hoạch khoá của tab CONFIG. loadConfigTab_ cắt khoảng trắng khoá và dòng CUỐI thắng khi trùng (khoá có ký tự vô hình chỉ làm dự phòng khi
+ * không có dòng khoá sạch), nên "have" (khoá chuẩn → dòng đang có hiệu lực) theo đúng cách đó.
+ *   trim: dòng có khoá chưa sạch (khoảng trắng thừa, ký tự vô hình) và KHÔNG có dòng nào khác cùng khoá chuẩn → [{ row, from, to }] (menu 1 sửa ô khoá qua DbTable.update);
+ *   twins: nhóm có hai dòng trở lên cùng khoá chuẩn mà có dòng chưa sạch → [{ key, rows, keys, effective, suspect }]: không xoá, không đoán, chỉ báo. suspect (E1): dòng đang có hiệu lực
+ *   mang giá trị mặc định hoặc trống trong khi dòng khác cùng khoá có giá trị KHÁC mặc định: nhiều khả năng giá trị admin nhập không được dùng (kiểu hỏng của menu 1 bản 8.1.4).
+ */
+function cfgKeyPlan_(rows) {
+  var groups = Object.create(null), order = [], have = Object.create(null), trim = [], twins = [];
+  rows.forEach(function (r) {
+    var k = cfgKeyNorm_(r.key);
+    if (!k) return;
+    if (!groups[k]) { groups[k] = []; order.push(k); }
+    groups[k].push(r);
+  });
+  order.forEach(function (k) {
+    var g = groups[k], stray = g.filter(function (r) { return String(r.key) !== k; });
+    var plain = g.filter(function (r) { return String(r.key).trim() === k; }), eff = (plain.length ? plain : g)[(plain.length ? plain : g).length - 1];
+    have[k] = eff;
+    if (!stray.length) return;
+    if (g.length === 1) { trim.push({ row: g[0], from: String(g[0].key), to: k }); return; }
+    var others = g.filter(function (r) { return r !== eff && !cfgIsDefaultish_(k, r.value); });
+    twins.push({ key: k, rows: g.map(function (r) { return r._row; }), keys: g.map(function (r) { return String(r.key); }), effective: eff._row,
+      suspect: cfgIsDefaultish_(k, eff.value) && others.length ? { effective: eff._row, others: others.map(function (r) { return r._row; }) } : null });
+  });
+  return { have: have, trim: trim, twins: twins };
+}
+/** Hàm thuần: câu báo nhóm khoá CONFIG trùng chỉ khác dấu cách hay ký tự vô hình (menu 1, menu 2, RELEASE_LOG). en: tiếng Anh. Không in giá trị (CONFIG có thể chứa khoá bí mật). */
+function cfgTwinText_(w, en) {
+  var parts = w.rows.map(function (r, i) { return (en ? 'row ' : 'hàng ') + r + ' ' + JSON.stringify(w.keys[i]); }).join(', ');
+  var sus = w.suspect;
+  var extra = !sus ? '' : (en
+    ? ' ATTENTION: the row in effect (row ' + sus.effective + ') holds the DEFAULT or an EMPTY value while row ' + sus.others.join(', ') + ' (same key) holds a different, non-default value, so the value you typed is probably NOT the one in use. Manual repair: copy the wanted value into row ' + sus.effective + ', then delete row ' + sus.others.join(', ') + '. The system never changes a live value by itself.'
+    : ' CHÚ Ý: dòng đang có hiệu lực (hàng ' + sus.effective + ') đang mang giá trị MẶC ĐỊNH hoặc TRỐNG, trong khi hàng ' + sus.others.join(', ') + ' (cùng khoá) có giá trị KHÁC mặc định: nhiều khả năng giá trị bạn đã nhập KHÔNG phải là giá trị đang dùng. Sửa tay: chép giá trị muốn dùng vào hàng ' + sus.effective + ', rồi xoá hàng ' + sus.others.join(', ') + '. Hệ thống không tự đổi giá trị đang chạy.');
+  var lastRow = w.effective === w.rows[w.rows.length - 1];   // soát X2 M25: khoá có ký tự vô hình chỉ là dự phòng, nên dòng có hiệu lực có thể không phải dòng cuối
+  var inEffEn = lastRow ? 'In effect: the LAST row (row ' + w.effective + ')' : 'In effect: the row with the clean key (row ' + w.effective + '; a row with invisible characters is only a fallback), not the last row';
+  var inEffVi = lastRow ? 'Đang có hiệu lực: dòng CUỐI (hàng ' + w.effective + ')' : 'Đang có hiệu lực: dòng có khoá sạch (hàng ' + w.effective + '; dòng có ký tự vô hình chỉ là dự phòng), KHÔNG phải dòng cuối';
+  return (en ? 'CONFIG key "' + w.key + '" has ' + w.rows.length + ' rows that differ only by whitespace or invisible characters (' + parts + '). Not deleted and not guessed. ' + inEffEn + ', even if its value cell is empty (then the built-in default is used). Delete the extra row, or copy the right value into the row in effect.'
+    : 'khoá CONFIG "' + w.key + '" có ' + w.rows.length + ' dòng chỉ khác nhau ở dấu cách hoặc ký tự vô hình (' + parts + '). KHÔNG xoá, KHÔNG đoán. ' + inEffVi + ', kể cả khi ô giá trị của dòng đó trống (khi đó dùng mặc định trong code). Xoá dòng thừa, hoặc chép giá trị đúng sang dòng đang có hiệu lực.') + extra;
+}
+/** Menu 2: cảnh báo cho khoá CONFIG trùng chỉ khác dấu cách. */
+function cfgKeyWarnings_() { return cfgKeyPlan_(table_('CONFIG').all()).twins.map(function (w) { return 'CONFIG: ' + cfgTwinText_(w, false); }); }
 
 /** Bỏ bộ đệm CONFIG dùng chung (CacheService); lần đọc sau mở lại tab. Không đụng bộ nhớ của lần chạy hiện tại. */
 function dropConfigCache_() { try { var c = CacheService.getScriptCache(); c.put('cfg_ver', String(Date.now()) + Math.floor(Math.random() * 1000), 21600); c.remove(cfgCacheKey_()); } catch (e) { } }

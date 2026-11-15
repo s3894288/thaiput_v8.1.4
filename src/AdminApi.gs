@@ -71,7 +71,8 @@ function adminLessonsWaiting_(bks, now) {
   return bks.filter(function (b) {
     if (!(b.date instanceof Date)) return false;
     if (b.status === BOOKING_STATUS.CONFIRMED) return slotStart_(b.date, b.slot) <= now;
-    return b.status === BOOKING_STATUS.NOT_COMPLETED && b.date >= from;
+    // 5N: Không hoàn thành mà admin đã chọn "Đã xử lý (giữ nguyên)" (hoặc kết quả khác) thì không còn chờ, như ô Sheets hết đỏ.
+    return b.status === BOOKING_STATUS.NOT_COMPLETED && b.date >= from && !adminHandled_(b);
   });
 }
 
@@ -321,12 +322,14 @@ function apiAdminLogoutUser(token, id) {
 // ── Nhật ký (chunk 5I): dòng xem trước, bấm mở đọc đủ ──
 
 var LOG_PREVIEW_CHARS_ = 160;
+/** Chi tiết dòng nhật ký gửi đủ cho trang admin tối đa chừng này ký tự (dòng TEMPLATE_DEDUPE_TEXT của Setup.gs phải nhỏ hơn số này, nếu không trang cắt im lặng). */
+var LOG_DETAIL_FULL_MAX_ = 20000;
 function logTime_(l) { var t = l.time instanceof Date ? l.time : new Date(l.time); return isNaN(t.getTime()) ? null : t; }
 /** Một dòng nhật ký cho trang admin. full: gửi đủ chi tiết (mở đọc), không thì cắt còn LOG_PREVIEW_CHARS_. */
 function adminLogView_(l, full) {
   var t = logTime_(l), d = String(l.detail || '');
   return { row: l._row, ts: t ? t.getTime() : 0, time: t ? fmtDateTime_(t) : String(l.time || ''), actor: String(l.actor || ''), action: String(l.action || ''),
-    entity: String(l.entity || ''), entityId: String(l.entity_id || ''), detail: full ? d.substring(0, 20000) : d.substring(0, LOG_PREVIEW_CHARS_), more: !full && d.length > LOG_PREVIEW_CHARS_,
+    entity: String(l.entity || ''), entityId: String(l.entity_id || ''), detail: full ? d.substring(0, LOG_DETAIL_FULL_MAX_) : d.substring(0, LOG_PREVIEW_CHARS_), more: !full && d.length > LOG_PREVIEW_CHARS_,
     h: logHash_(l) };
 }
 /** Mã băm ngắn của chữ ký (trình duyệt gửi lại khi mở một dòng, để không mở nhầm dòng cùng giờ, cùng hành động). */

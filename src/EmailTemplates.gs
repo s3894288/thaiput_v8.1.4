@@ -1,7 +1,7 @@
 /**
  * EmailTemplates.gs · Mẫu email song ngữ chỉnh trên tab EMAIL_TEMPLATES (chunk 5C)
  *
- * Mỗi email: nửa trên tiếng Việt, nửa dưới tiếng Anh, cùng khung giao diện cũ (emailWrap_).
+ * Mỗi email: nửa trên tiếng Việt, nửa dưới tiếng Anh, cùng khung emailWrap_ (thiết kế 5O đen trắng, gạch vàng thương hiệu).
  * Tiêu đề: tiếng Việt trước rồi tiếng Anh; email cho tutor để tiếng Anh trước (dễ đọc trong hộp thư của tutor).
  * Ô trống trong tab = dùng mẫu gốc dưới đây. Ô chỉ có dấu - = cố ý để trống (ví dụ bỏ tiêu đề tiếng Anh).
  * Cột active = FALSE thì không gửi mẫu đó.
@@ -141,6 +141,12 @@ var DEFAULT_EMAIL_TEMPLATES_ = {
     '[Daily summary {{date}}] {{count}} notifications', 'Daily summary',
     '{{count}} notifications today. Full list above and in the NOTIFICATIONS tab.',
     'date, count, summary_html, table_html, sheet_link'],
+  // Chunk 5R: gửi một lần sau menu 1 khi phiên bản code đổi (Release.gs, releaseDeliver_). {{summary_html}} do code dựng, hai thứ tiếng (summary_html_en cho nửa tiếng Anh).
+  ADMIN_RELEASE_NOTES: ['ADMIN', 'thaiput đã cập nhật lên bản {{to}}', 'Tóm tắt cập nhật lên bản {{to}}',
+    'Hệ thống vừa cập nhật từ bản **{{from}}** lên bản **{{to}}** ({{date}}). Dưới đây là thay đổi của từng bản và những gì lượt chạy menu 1 vừa làm (đo thật).\n\n{{summary_html}}\n\n{{button:sheet_link|Mở tab RELEASE_LOG}}\n\nEmail này chỉ gửi một lần mỗi lần đổi phiên bản.',
+    'thaiput updated to version {{to}}', 'Update summary for version {{to}}',
+    'The system just updated from version **{{from}}** to version **{{to}}** ({{date}}). Below are the changes of each version and what the menu 1 run just did (measured).\n\n{{summary_html}}\n\n{{button:sheet_link|Open the RELEASE_LOG tab}}\n\nThis email is sent once per version change.',
+    'from, to, date, summary_html, sheet_link'],
   // Chunk 5I: menu "Kiểm tra gửi email": thư nhỏ có mã để tìm trong hộp thư và trong Email Log Search của admin.google.com.
   MAIL_TEST: ['ALL', 'Kiểm tra gửi email thaiput {{code}}', 'Email kiểm tra',
     'Đây là email kiểm tra admin gửi từ menu thaiput lúc **{{time}}**.\n\nMã kiểm tra: **{{code}}**. Thấy email này nghĩa là đường gửi từ {{sender}} tới hộp thư này đang hoạt động. Không cần trả lời.',
@@ -170,6 +176,7 @@ var TEMPLATE_UPGRADES_ = {
 var TEMPLATE_COLS_ = ['audience', 'subject_vi', 'title_vi', 'body_vi', 'subject_en', 'title_en', 'body_en', 'variables'];
 
 /** Mẫu đang dùng: dòng trong EMAIL_TEMPLATES ghi đè từng ô của mẫu gốc (ô trống thì dùng gốc). */
+/* Key trùng ở tab (chờ menu 1 gộp, dedupeDuplicateKeys_): dòng CUỐI thắng ở đây. DbTable.byId trả dòng ĐẦU, giữ nguyên vì mọi tab dùng; menu 2 báo key trùng. */
 function emailTemplate_(key) {
   if (!TEMPLATE_CACHE_) {
     TEMPLATE_CACHE_ = {};
@@ -183,9 +190,11 @@ function emailTemplate_(key) {
     if (v !== '' && d && TEMPLATE_UPGRADES_[key] && TEMPLATE_UPGRADES_[key][c] === v) v = '';
     t[c] = v.trim() === '-' ? '' : (v !== '' ? v : (d ? d[i] : ''));   // ô trống = mẫu gốc; dấu - = cố ý để trống
   });
-  if (row.active !== undefined && row.active !== '' && (row.active === false || String(row.active).toUpperCase() === 'FALSE')) t.active = false;
+  if (!emailActiveOn_(row.active)) t.active = false;
   return t;
 }
+/** Hàm thuần: giá trị ô active của EMAIL_TEMPLATES có nghĩa là MẪU ĐANG GỬI không. Chỉ FALSE (ô tick bỏ hoặc chữ FALSE) là tắt; trống hay giá trị khác là bật. Dùng chung với bước gộp dòng trùng (Setup.gs). */
+function emailActiveOn_(v) { return !(v !== undefined && v !== '' && (v === false || String(v).toUpperCase() === 'FALSE')); }
 
 /** Thay {{bien}} trong một dòng chữ thường (tiêu đề): không thoát HTML, biến _html bị bỏ. */
 function renderPlain_(text, vars, lang) {
@@ -230,24 +239,37 @@ function renderBody_(text, vars, lang) {
   }).join('');
 }
 
-/** Khung email song ngữ: giữ giao diện cũ. Mặc định tiếng Việt trên, tiếng Anh dưới; enFirst (email cho tutor) thì đảo lại. */
+/** Khung email song ngữ (khung 5O trong emailWrap_). Mặc định tiếng Việt trên, tiếng Anh dưới; enFirst (email cho tutor) thì đảo lại. */
 function emailWrapBi_(titleVi, htmlVi, titleEn, htmlEn, enFirst) {
   var first = enFirst && htmlEn ? [titleEn, htmlEn, titleVi, htmlVi, 'Tiếng Việt'] : [titleVi, htmlVi, titleEn, htmlEn, 'English'];
-  var second = first[3] ? '<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #d6d3cc">' +
-    '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#9ca3af;margin-bottom:8px">' + first[4] + '</div>' +
-    '<h2 style="margin:0 0 14px;font-size:19px;color:#14532d">' + esc_(first[2]) + '</h2>' + first[3] + '</div>' : '';
+  var second = first[3] ? '<div style="margin-top:22px;padding-top:18px;border-top:1px dashed #d6d6d1">' +
+    '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#63635d;margin-bottom:8px">' + first[4] + '</div>' +
+    '<h2 style="margin:0 0 14px;font-size:19px;color:#141414">' + esc_(first[2]) + '</h2>' + first[3] + '</div>' : '';
   return emailWrap_(first[0], first[1] + second, 'bi');
 }
 
 /**
- * Gửi email theo mẫu. opts: { enFirst (tiếng Anh trước khi người nhận chưa chọn ngôn ngữ, cho tutor), kind, priority }.
+ * Gửi email theo mẫu. opts: { enFirst (tiếng Anh trước khi người nhận chưa chọn ngôn ngữ, cho tutor), kind, priority, beforeSend, collect }.
  * Trả false nếu mẫu bị tắt (active FALSE), không có mẫu, hoặc gửi không được.
  */
 function sendTpl_(key, to, vars, opts) {
   opts = opts || {};
+  var r = tplRender_(key, to, vars, opts);
+  if (!r) return false;
+  // opts.beforeSend({ subject, html }): gọi SAU khi thư đã dựng và TRƯỚC khi gửi; trả false thì không gửi (sendTpl_ trả false). Dùng cho nơi phải "nhận việc gửi" rồi mới gửi (Release.gs).
+  // opts.collect: mảng nhận dòng MAIL_LOG thay vì ghi (nơi gọi tự ghi sau).
+  if (opts.beforeSend && opts.beforeSend({ subject: r.subject, html: r.html }) === false) return false;
+  return sendMail_(to, r.subject, r.html, opts.kind || key, opts.priority || 'high', opts.collect ? { collect: opts.collect } : undefined);
+}
+/**
+ * Dựng tiêu đề và HTML của một mẫu (không gửi). Trả { subject, html }, hoặc null nếu mẫu bị tắt (ghi MAIL_TEMPLATE_OFF). Ném lỗi nếu không có mẫu.
+ * Tách ra từ sendTpl_ (soát X2) để nơi cần "nhận việc gửi" trước khi gửi (Release.gs) dựng thư xong rồi mới nhận, cửa sổ giữa nhận và gửi chỉ còn lời gọi Google.
+ */
+function tplRender_(key, to, vars, opts) {
+  opts = opts || {};
   var t = emailTemplate_(key);
   if (!t) throw new Error('Không có mẫu email ' + key);
-  if (!t.active) { logActivity_('SYSTEM', 'MAIL_TEMPLATE_OFF', 'MAIL', key, to); return false; }
+  if (!t.active) { logActivity_('SYSTEM', 'MAIL_TEMPLATE_OFF', 'MAIL', key, to); return null; }
   vars = vars || {};
   // Chunk 5H: người nhận đã chọn ngôn ngữ (USERS.lang) thì thứ tiếng đó ở trên; chưa chọn thì theo mặc định của nơi gọi
   // (tutor tiếng Anh trước, còn lại tiếng Việt trước). Email vẫn luôn có cả hai thứ tiếng.
@@ -256,7 +278,7 @@ function sendTpl_(key, to, vars, opts) {
   var subject = sVi && sEn ? (enFirst ? sEn + ' | ' + sVi : sVi + ' | ' + sEn) : (sVi || sEn);
   var html = emailWrapBi_(renderPlain_(t.title_vi, vars, 'vi'), renderBody_(t.body_vi, vars, 'vi'),
     renderPlain_(t.title_en, vars, 'en'), t.body_en ? renderBody_(t.body_en, vars, 'en') : '', enFirst);
-  return sendMail_(to, subject, html, opts.kind || key, opts.priority || 'high');
+  return { subject: subject, html: html };
 }
 
 /** Dữ liệu mẫu để gửi thử (menu "Gửi thử một mẫu email cho tôi"): mọi biến có giá trị minh hoạ. */
@@ -274,6 +296,6 @@ function sampleTplVars_(key) {
     device: 'Chrome · Windows', via: 'link email', via_en: 'email link',
     tag: 'Cần xử lý', tag_en: 'Action needed', message: 'Ví dụ thông báo', message_en: 'Sample notification', code: 'MT0000', sender: 'admin@example.com', event: 'STUDENT_CANCELLED', time: fmtDateTime_(getNow_()),
     lesson_date: 'Thứ 2 20/10', lesson_slot: '19:00', days: 3, old_end: '20/10/2026',
-    summary_html: '<ul><li>RESULT_COMPLETED: <b>5</b></li></ul>', table_html: '', subject: 'Ví dụ lỗi', detail_html: '<pre>Ví dụ chi tiết lỗi</pre>'
+    summary_html: '<ul><li>RESULT_COMPLETED: <b>5</b></li></ul>', from: '8.1.4', to: '8.1.9', table_html: '', subject: 'Ví dụ lỗi', detail_html: '<pre>Ví dụ chi tiết lỗi</pre>'
   };
 }

@@ -33,7 +33,8 @@ function open(c, params, opts) {
   opts = opts || {};
   const { api } = c;
   const html = api.doGet({ parameter: params || {} }).getContent();
-  const errors = [], calls = [], violations = [], historyCalls = [];
+  const errors = [], calls = [], violations = [], historyCalls = [], held = {};
+  // opts.hold = { tênApi: n }: n lượt gọi đầu của API đó được máy chủ xử lý ngay nhưng phản hồi bị GIỮ (phản hồi chậm) tới khi p.release(tên). Thứ tự giữ = thứ tự gọi.
   const vc = new VirtualConsole();
   vc.on('jsdomError', e => errors.push(String(e && (e.stack || e.message) || e)));
   vc.on('error', e => errors.push(String(e)));
@@ -52,6 +53,11 @@ function open(c, params, opts) {
         win.localStorage.setItem('thaiput_session', JSON.stringify(opts.session));
       }
       if (opts.storage && !opts.blockStorage) Object.keys(opts.storage).forEach(k => win.localStorage.setItem(k, opts.storage[k]));
+      // opts.tabStorage = một object dùng chung giữa nhiều lần mở trang: sessionStorage (T.store.tab, bộ nhớ của MỘT tab trình duyệt) lưu vào đó, như tải lại trang trong cùng tab.
+      if (opts.tabStorage && !opts.blockStorage) {
+        const m = opts.tabStorage;
+        Object.defineProperty(win, 'sessionStorage', { configurable: true, value: { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; }, key: (i) => Object.keys(m)[i] || null, get length() { return Object.keys(m).length; } } });
+      }
       const makeRunner = () => {
         let ok = null, fail = null;
         const runner = new Proxy({}, {
@@ -69,9 +75,12 @@ function open(c, params, opts) {
                 try { api.clearDbCache_(); r = api[name](...sent); } catch (e) { if (fail) fail(new win.Error(e.message)); return; }
                 // Máy chủ đã làm xong nhưng mất phản hồi trên đường về: opts.loseResponse[tên] lần
                 if (opts.loseResponse && opts.loseResponse[name] > 0) { opts.loseResponse[name]--; calls.push({ name: String(name), args: sent, result: r, lost: true }); if (fail) fail(new win.Error('NetworkError')); return; }
-                calls.push({ name: String(name), args: sent, result: r });
+                const hold = !!(opts.hold && opts.hold[name] > 0 && opts.hold[name]--);
+                calls.push({ name: String(name), args: sent, result: r, held: hold || undefined });
                 if (hasIllegal(r)) { violations.push(String(name) + ': giá trị trả về chứa Date, Apps Script thật sẽ trả null'); r = null; }
-                if (ok) ok(r === null || r === undefined ? r : win.JSON.parse(JSON.stringify(r)));
+                const deliver = () => { if (ok) ok(r === null || r === undefined ? r : win.JSON.parse(JSON.stringify(r))); };
+                if (hold) { (held[name] = held[name] || []).push(deliver); return; }
+                deliver();
               }, 0);
             };
           }
@@ -87,6 +96,9 @@ function open(c, params, opts) {
   if (win.T) { win.T.retryDelays = [0, 0, 0, 0]; win.T.retryJitter = 0; }
   const p = {
     dom, win, doc, errors, calls, violations, history: historyCalls,
+    /** Số phản hồi đang bị giữ của một API; release(tên, i): trả phản hồi thứ i (mặc định mọi phản hồi, theo thứ tự gọi). */
+    heldCount: (name) => (held[name] || []).filter(Boolean).length,
+    release: (name, i) => { const l = held[name] || []; (i === undefined ? l.map((_, k) => k) : [i]).forEach(k => { const fn = l[k]; l[k] = null; if (fn) fn(); }); },
     $: (s) => doc.querySelector(s),
     $$: (s) => Array.from(doc.querySelectorAll(s)),
     text: (s) => { const el = doc.querySelector(s || 'body'); return el ? el.textContent.replace(/\s+/g, ' ').trim() : ''; },
@@ -1457,6 +1469,435 @@ t('U48', '5K: gói giá 0 hiện thẻ có nút Zalo, không chọn được; s�
   const reg = c.rows('REGISTRATIONS').find(r => r.email === 'somchai@test.com');
   assert.ok(reg && reg.phone === 'Line: somchai88', 'lưu nguyên văn: ' + (reg && reg.phone));
 });
+
+t('U49', '5O (05/11): trang chủ có ảnh thương hiệu nhúng base64, viên chữ Thái nền trắng viền vàng; khung email tông đen trắng có gạch vàng, nút viên thuốc đen', async () => {
+  const c = mk(), p = open(c, { page: 'home' });
+  await p.flush();
+  p.clean();
+  const img = p.$('.hero .hero-img');
+  assert.ok(img, 'có ảnh thương hiệu trong hero');
+  assert.ok(/^data:image\/jpeg;base64,/.test(img.getAttribute('src')), 'ảnh nhúng base64 (Apps Script không host file ảnh)');
+  assert.strictEqual(img.getAttribute('alt'), '', 'ảnh trang trí: alt rỗng, không cần key CONTENT');
+  assert.ok(p.$('.hero .th-word'), 'viên chữ Thái còn nguyên');
+  const css = p.$('style').textContent;
+  assert.ok(/\.hero \.th-word \{[^}]*background: var\(--surface\)/.test(css), 'viên chữ Thái nền trắng');
+  assert.ok(/\.hero \.th-word \{[^}]*border: 1\.5px solid var\(--yellow\)/.test(css), 'viên chữ Thái viền vàng');
+  const mail = c.api.emailWrap_('Tiêu đề thử', '<p>x</p>', 'vi');
+  assert.ok(mail.indexOf('#141414') !== -1, 'đầu trang email nền đen 5O');
+  assert.ok(mail.indexOf('border-bottom:3px solid #ffc933') !== -1, 'gạch vàng thương hiệu dưới đầu trang');
+  assert.ok(mail.indexOf('#14532d') === -1, 'hết màu xanh rừng cũ trong khung');
+  const btn = c.api.btn_('https://x.test', 'Mở');
+  assert.ok(btn.indexOf('background:#141414') !== -1 && btn.indexOf('border-radius:999px') !== -1, 'nút email viên thuốc đen');
+  const bi = c.api.emailWrapBi_('Tiêu đề VI', '<p>vi</p>', 'Title EN', '<p>en</p>');
+  assert.ok(bi.indexOf('border-top:1px dashed #d6d6d1') !== -1, 'gạch đứt giữa hai thứ tiếng theo tông 5O');
+  assert.ok(bi.indexOf('color:#141414">Title EN</h2>') !== -1, 'tiêu đề phần hai màu đen 5O');
+  assert.ok(bi.indexOf('color:#9ca3af') === -1 && bi.indexOf('color:#63635d') !== -1, 'nhãn ngôn ngữ hết xám cũ, đạt tương phản');
+});
+
+t('U50', '5O (BL22): gửi form đăng ký thiếu thì viền đỏ ĐÚNG từng ô sai (tên, email, ảnh, đồng ý, nhóm gói), ô trống không bắt buộc (điện thoại) không bị đỏ; con trỏ nhảy về ô sai đầu tiên; sửa ô nào thì ô đó hết đỏ ngay, không chờ bấm Gửi lại', async () => {
+  const c = mk(), p = open(c, { page: 'home' });
+  await p.flush();
+  const bad = (s) => p.$(s).classList.contains('invalid');
+  const all = ['#f-name', '#f-email', '#f-phone', '#f-file-box', '#f-consent-box', '#f-pkg-list'];
+  assert.ok(all.every(s => p.$(s)), 'đủ 6 ô có thể tô đỏ: ' + all.filter(s => !p.$(s)).join(','));
+  assert.ok(all.every(s => !bad(s)), 'lúc mới mở chưa ô nào đỏ');
+
+  // Gửi form rỗng: 4 ô sai đỏ. Điện thoại không bắt buộc và đang trống nên KHÔNG đỏ;
+  // nhóm gói đã có sẵn một gói chọn mặc định nên cũng KHÔNG đỏ.
+  assert.ok(p.$('input[name=pkg]:checked'), 'form mở ra đã chọn sẵn một gói');
+  p.submit('#reg');
+  await p.flush();
+  p.clean();
+  assert.deepStrictEqual(all.map(bad), [true, true, false, true, true, false], all.map(s => s + '=' + bad(s)).join(' '));
+  assert.strictEqual(p.doc.activeElement, p.$('#f-name'), 'con trỏ về ô sai đầu tiên');
+  assert.ok(/./.test(p.text('#reg-msg')), 'vẫn có hộp đỏ gộp câu báo ở trên');
+  assert.strictEqual(c.rows('REGISTRATIONS').length, 0, 'không gửi lên máy chủ khi còn ô sai');
+
+  // Bỏ chọn gói (người dùng bấm lại đúng gói đang chọn trên một số trình duyệt): nhóm gói đỏ
+  p.$('input[name=pkg]:checked').checked = false;
+  p.submit('#reg');
+  await p.flush();
+  assert.ok(bad('#f-pkg-list'), 'không chọn gói thì nhóm gói đỏ');
+
+  // Sửa từng ô thì ô đó hết đỏ ngay (không bấm Gửi lại)
+  p.type('#f-name', 'Minh Anh');
+  assert.ok(!bad('#f-name') && bad('#f-email'), 'sửa tên: chỉ ô tên hết đỏ');
+  p.type('#f-email', 'minhanh@test.com');
+  assert.ok(!bad('#f-email'));
+  p.click('#f-consent');
+  assert.ok(!bad('#f-consent-box'));
+  p.click('#pkg-PASS_1M');
+  assert.ok(!bad('#f-pkg-list'), 'chọn lại gói: nhóm gói hết đỏ');
+  p.file('#f-file', 'ck.pdf', 'application/pdf', '%PDF-1.4 x');
+  assert.ok(!bad('#f-file-box'));
+
+  // Email sai định dạng: chỉ ô email đỏ lại
+  p.type('#f-email', 'sai-dinh-dang');
+  p.submit('#reg');
+  await p.flush();
+  assert.deepStrictEqual(all.map(bad), [false, true, false, false, false, false], all.map(s => s + '=' + bad(s)).join(' '));
+  assert.strictEqual(p.doc.activeElement, p.$('#f-email'), 'con trỏ về ô email');
+
+  // Số điện thoại sai (quá dài) cũng đỏ đúng ô đó
+  p.type('#f-email', 'minhanh@test.com');
+  p.type('#f-phone', 'x'.repeat(60));
+  p.submit('#reg');
+  await p.flush();
+  assert.ok(bad('#f-phone') && !bad('#f-email'), 'chỉ ô điện thoại đỏ');
+
+  // Sửa hết thì gửi được, mọi ô hết đỏ
+  p.type('#f-phone', '0912 345 678');
+  p.submit('#reg');
+  await p.flush(60);
+  p.clean();
+  assert.ok(all.every(s => !bad(s)), 'gửi được: không ô nào còn đỏ');
+  assert.strictEqual(c.rows('REGISTRATIONS').length, 1, 'đã gửi lên máy chủ');
+});
+
+// ═══ T2: khung chuyển khoản có ô QR ═══
+function qrSetup(c, over) {
+  const id = 'QRFILE_ABCDEF123456';
+  c.env.state.drive.files[id] = Object.assign({ id, name: 'qr.png', parent: null, created: new Date(2026, 0, 1), trashed: false, mime: 'image/png', bytes: Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(2000, 7)]) }, over || {});
+  c.api.withLock_(() => { const t = c.api.table_('CONFIG'), r = t.byId('BANK_QR_IMAGE'); if (r) t.update(r, { value: 'https://drive.google.com/file/d/' + id + '/view?usp=sharing' }); else t.insert({ key: 'BANK_QR_IMAGE', value: 'https://drive.google.com/file/d/' + id + '/view?usp=sharing' }); });
+  c.api.clearConfigCache_();
+  return id;
+}
+t('U51', 'T2: khung chuyển khoản. Không QR: một cột, không ô trống, không gọi apiBankQr. Có QR: chừa khung vuông, nạp ảnh sau, đổi VI/EN không gọi lại; ảnh rỗng thì gỡ khung; lưu ý là khung nhấn (đậm, lớn); gia hạn dùng cùng bộ vẽ', async () => {
+  // Không cấu hình
+  let c = mk(), p = open(c, { page: 'home' });
+  await p.flush(); p.clean();
+  assert.ok(p.$('.panel.bank') && !p.$('.bank-qr') && !p.$('.bank.has-qr'), 'không QR: không ô trống');
+  assert.ok(p.$('.bank .bank-note') && /chỉ ghi số điện thoại/.test(p.text('.bank-note')), p.text('.bank-note'));
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 0, 'không có QR thì không gọi');
+  assert.strictEqual(p.calls.find(x => x.name === 'apiPublicInfo').result.data.bank.qr, '', 'dấu rỗng');
+  // CSS: lưu ý đậm, lớn hơn chữ thường, nền vàng bơ, vạch vàng; khung QR 200 và 184
+  const css = p.$('style').textContent;
+  assert.ok(/\.bank-note \{[^}]*font-size: 1\.05rem[^}]*font-weight: 700/.test(css) || /\.bank-note \{[^}]*font-weight: 700[^}]*font-size: 1\.05rem/.test(css), 'khung lưu ý đậm, lớn');
+  assert.ok(/\.bank-note \{[^}]*var\(--yellow\)/.test(css) && /\.bank-qr \{[^}]*width: 200px[^}]*aspect-ratio: 1 \/ 1/.test(css) && /@media \(min-width: 900px\) \{[^@]*\.bank-qr \{[^}]*width: 184px; height: 184px/.test(css), 'kích thước QR 200 và 184');
+
+  // Có QR
+  c = mk(); qrSetup(c);
+  p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  const mk1 = p.calls.find(x => x.name === 'apiPublicInfo').result.data.bank.qr;
+  assert.ok(/^[a-f0-9]{10}$/.test(mk1), 'có dấu: ' + mk1);
+  assert.ok(!JSON.stringify(p.calls.find(x => x.name === 'apiPublicInfo').result).includes('data:image'), 'ảnh không nằm trong apiPublicInfo');
+  assert.ok(p.$('.bank.has-qr .bank-qr img'), 'ảnh đã vào khung');
+  assert.ok(/^data:image\/png;base64,/.test(p.$('.bank-qr img').getAttribute('src')), 'src là data URI');
+  assert.strictEqual(p.$('.bank-qr img').getAttribute('alt'), 'Mã QR chuyển khoản ngân hàng');
+  assert.ok(p.$('.bank-qr img').getAttribute('width') && p.$('.bank-qr img').getAttribute('height'), 'có width, height');
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 1);
+  // Thứ tự trong khung: chữ ngân hàng, QR, lưu ý
+  const kids = Array.from(p.$('.bank').children).map(e => e.className.split(' ')[0]);
+  assert.deepStrictEqual(kids, ['bank-head', 'bank-qr', 'bank-note']);
+  // Đổi ngôn ngữ: không gọi lại, ảnh giữ, chữ đổi
+  p.click('[data-langsw]'); await p.flush(20);
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 1, 'đổi ngôn ngữ không gọi lại ảnh');
+  assert.ok(p.$('.bank-qr img'), 'ảnh vẫn còn sau khi đổi ngôn ngữ');
+  assert.strictEqual(p.text('.bank-note'), 'Transfer reference: Please enter only your phone number.');
+  assert.strictEqual(p.$('.bank-qr img').getAttribute('alt'), 'Bank transfer QR code');
+  p.clean();
+
+  // File hỏng (quá lớn): server trả ảnh rỗng, trang gỡ khung, panel về một cột
+  c = mk(); qrSetup(c, { bytes: Buffer.alloc(310 * 1024, 1) });
+  p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 1);
+  assert.ok(p.calls.find(x => x.name === 'apiBankQr').result.ok && p.calls.find(x => x.name === 'apiBankQr').result.data.src === '');
+  assert.ok(!p.$('.bank-qr') && !p.$('.bank.has-qr') && p.$('.bank .bank-note'), 'khung QR đã gỡ gọn');
+
+  // Gia hạn dùng cùng bộ vẽ
+  c = mk(); qrSetup(c);
+  const { session } = await uiLogin(c, 'S003');
+  p = open(c, { page: 'renew' }, { session });
+  await p.flush(60);
+  p.click('.tab[data-tab="account"]'); await p.flush(40);
+  p.clean();
+  assert.ok(p.$('#renew-bank .panel.bank.has-qr .bank-qr img') && p.$('#renew-bank .bank-note') && p.$('#renew-bank .eyebrow'), 'gia hạn: cùng khung, có QR, có lưu ý');
+  const nq = p.calls.filter(x => x.name === 'apiBankQr').length;
+  p.click('[data-langsw]'); await p.flush(20);
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, nq, 'đổi ngôn ngữ ở gia hạn không gọi lại');
+  assert.ok(p.$('#renew-bank .bank-qr img'));
+  p.clean();
+});
+
+t('U52', 'T3b: font nạp không chặn (media=print + onload, noscript dự phòng, đủ 3 họ font, display=swap, 2 preconnect); khung chờ tĩnh trong #app có sẵn trước script rồi bị T.go thay (trang chủ, đăng nhập, bảo trì); ảnh banner có width, height, decoding mà CSS vẫn width 100% height auto', async () => {
+  const c = mk();
+  const html = c.api.doGet({ parameter: { page: 'home' } }).getContent();
+  const link = html.match(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^>]*>/g) || [];
+  assert.strictEqual(link.length, 2, 'một link chính và một link trong noscript');
+  assert.ok(/media="print" onload="this\.media='all'"/.test(link[0]), link[0]);
+  assert.ok(/<noscript><link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com[^"]+"><\/noscript>/.test(html), 'noscript dự phòng');
+  ['Be+Vietnam+Pro:wght@400;500;600;700', 'Noto+Sans+Thai:wght@600', 'Noto+Sans+Thai+Looped:wght@600', 'display=swap'].forEach(f => assert.ok(link[0].indexOf(f) !== -1, 'thiếu ' + f));
+  assert.strictEqual((html.match(/rel="preconnect"/g) || []).length, 2, 'giữ 2 preconnect');
+  // Khung chờ có sẵn trong HTML tĩnh (trước khi script chạy)
+  const bare = new JSDOM(html);   // không chạy script
+  assert.strictEqual(bare.window.document.querySelectorAll('#app > .stack > .skeleton').length, 3, 'khung chờ tĩnh 3 dòng');
+  // Sau T.start: bị thay hẳn
+  for (const pg of ['home', 'login']) {
+    const p = open(c, { page: pg }); await p.flush(40); p.clean();
+    assert.strictEqual(p.$$('#app .skeleton').length, 0, pg + ': khung chờ tĩnh đã bị thay');
+    assert.ok(p.$('#app main') || p.$('#app form'), pg + ': nội dung thật đã vẽ');
+  }
+  // Bảo trì đóng: maintScreen thay cả nội dung
+  const m = open(c, { page: 'home' }); await m.flush(40);
+  m.win.T.maintScreen({ ok: false, reason: 'MAINT_CLOSED', message: 'x', msg: { vi: 'Đang bảo trì', en: 'Maintenance' } });
+  assert.ok(!m.$('#app .skeleton'), 'màn bảo trì không còn khung chờ');
+  // Ảnh banner
+  const h = open(c, { page: 'home' }); await h.flush(40);
+  const img = h.$('.hero-img');
+  assert.strictEqual(img.getAttribute('width'), '1101'); assert.strictEqual(img.getAttribute('height'), '630'); assert.strictEqual(img.getAttribute('decoding'), 'async');
+  assert.ok(/\.hero-img \{[^}]*width: 100%; height: auto/.test(h.$('style').textContent), 'CSS giữ width 100%, height auto');
+});
+
+t('U53', 'T3b: tutor tải trước giờ rảnh ở nền. Còn mới (dưới 60 giây) thì dùng, không gọi lại; quá 60 giây thì gọi như cũ; lỗi nền nuốt im, không đăng xuất; giờ rảnh đang sửa không bị ghi đè khi đổi ngôn ngữ; sau khi lưu bản tải trước bị bỏ', async () => {
+  const nAv = (p) => p.calls.filter(x => x.name === 'apiTutorAvailability' && !x.failed).length;
+  // 1. Còn mới: tải trước 1 lần, bấm tab dùng lại, không gọi thêm
+  let c = mk(); let s1 = (await uiLogin(c, 'T001')).session;
+  let p = open(c, { page: 'tutor' }, { session: s1 }); await p.flush(60);
+  assert.strictEqual(nAv(p), 1, 'tải trước đúng 1 lần khi đang ở tab lịch');
+  p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 1, 'dùng bản tải trước, không gọi lại');
+  assert.strictEqual(p.$$('.chip[data-key^="2026-10-19|"]').length, 32, 'lưới giờ rảnh vẽ đủ');
+  // Dùng một lần: ra rồi vào lại thì gọi mới
+  p.click('.tab[data-tab="schedule"]'); await p.flush(20); p.click('.tab[data-tab="avail"]'); await p.flush(60);
+  assert.strictEqual(nAv(p), 2, 'bản tải trước chỉ dùng một lần');
+  // 2. Giờ rảnh đang sửa chưa lưu: đổi ngôn ngữ không gọi lại, không mất chỗ đã chọn
+  p.click('.chip[data-key="2026-10-19|10:00"]');
+  p.click('[data-langsw]'); await p.flush(30);
+  assert.strictEqual(nAv(p), 2); assert.ok(p.$('.chip[data-key="2026-10-19|10:00"].dirty'), 'giữ giờ đang sửa');
+  // 3. Lưu: vẽ lại bằng lượt gọi mới (bản tải trước đã bỏ)
+  p.click('#ab-go'); await p.flush(60);
+  p.click('.sheet button'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 3, 'sau khi lưu gọi lại máy chủ');
+  assert.ok(c.rows('AVAILABILITY').some(a => a.tutor_id === 'T001' && c.keyOf(a.date) === '2026-10-19' && a.slot === '10:00' && a.status === 'OPEN'));
+  // 4. Quá 60 giây: gọi như cũ
+  c = mk(); s1 = (await uiLogin(c, 'T001')).session;
+  p = open(c, { page: 'tutor' }, { session: s1 }); await p.flush(60);
+  assert.strictEqual(nAv(p), 1);
+  const real = p.win.Date.now; p.win.Date.now = () => real.call(p.win.Date) + 61000;
+  p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 2, 'bản cũ hơn 60 giây không dùng');
+  assert.strictEqual(p.$$('details.day').length, 7);
+  // 5. Lỗi nền (4 lần thử đều hỏng) nuốt im, phiên còn nguyên; bấm tab thì gọi bình thường
+  c = mk(); s1 = (await uiLogin(c, 'T001')).session;
+  p = open(c, { page: 'tutor' }, { session: s1, failNext: { apiTutorAvailability: 4 } }); await p.flush(80); p.clean();
+  assert.strictEqual(nAv(p), 0, 'tải trước hỏng');
+  assert.ok(p.session() && p.session().token, 'không đăng xuất');
+  assert.strictEqual(p.$('body').getAttribute('data-page'), 'tutor', 'vẫn ở cổng tutor');
+  assert.ok(!p.$('.alert.bad'), 'không hiện lỗi');
+  p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(nAv(p), 1, 'gọi bình thường sau lỗi nền');
+  assert.strictEqual(p.$$('details.day').length, 7);
+});
+
+t('U54', 'Soát 5R (FIX 7): bản giờ rảnh tutor tải trước gắn với phiên đã tải: tutor A thoát, tutor B vào CÙNG tab trong 60 giây thì B không bao giờ được hiện giờ rảnh của A (cả khi đổi phiên không qua nút thoát); thoát xoá bản tải trước và dữ liệu đang sửa', async () => {
+  const avCalls = (p) => p.calls.filter(x => x.name === 'apiTutorAvailability' && !x.failed);
+  const mkTwo = async () => { const c = mk(); const a = (await uiLogin(c, 'T001')).session, b = (await uiLogin(c, 'T002')).session; assert.notStrictEqual(a.token, b.token); return { c, a, b }; };
+  // 1. Thoát bằng nút rồi B vào ngay (vào thẳng tab Giờ rảnh): B tự gọi máy chủ bằng phiên của B
+  let { c, a, b } = await mkTwo();
+  let p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60);
+  assert.strictEqual(avCalls(p).length, 1, 'A tải trước giờ rảnh'); assert.strictEqual(avCalls(p)[0].args[0], a.token);
+  p.click('#logout'); await p.flush(40);
+  p.win.T.session.set(b); p.win.T.go('tutor', { tab: 'avail' }); await p.flush(80); p.clean();
+  assert.ok(avCalls(p).some(x => x.args[0] === b.token), 'B gọi máy chủ bằng phiên của B (không dùng bản tải trước của A)');
+  assert.ok(!avCalls(p).slice(1).some(x => x.args[0] === a.token), 'không gọi lại bằng phiên của A');
+  // 2. Đổi phiên KHÔNG qua nút thoát (phiên bị thay thẳng, không gọi T.session.clear): ràng buộc theo phiên vẫn chặn
+  ({ c, a, b } = await mkTwo());
+  p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60);
+  assert.strictEqual(avCalls(p).length, 1);
+  p.win.T.session.set(b); p.win.T.go('tutor', { tab: 'avail' }); await p.flush(80); p.clean();
+  assert.strictEqual(p.win.T.token(), b.token, 'đã đổi sang phiên B');
+  assert.ok(avCalls(p).slice(1).some(x => x.args[0] === b.token), 'B gọi máy chủ bằng phiên của B: ' + JSON.stringify(avCalls(p).map(x => x.args[0].substring(0, 6))));
+  assert.strictEqual(p.$$('.chip[data-key^="2026-10-19|"]').length, 32, 'lưới của B vẽ đủ');
+  // 3. Đúng phiên vẫn dùng bản tải trước (không gọi lại), như U53
+  ({ c, a } = await mkTwo());
+  p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60); p.click('.tab[data-tab="avail"]'); await p.flush(60); p.clean();
+  assert.strictEqual(avCalls(p).length, 1, 'cùng phiên: dùng bản tải trước');
+});
+
+
+// ════════════════════════════════════════════════════════════════════════
+// X2 review: UI tests closing gaps found by mutation testing of chunk 5R (insert before "module.exports = { run };" in test/ui.js)
+// ════════════════════════════════════════════════════════════════════════
+t('U55', 'X2 (ex X2U1, F01, F02): ảnh QR rỗng (file hỏng): đổi ngôn ngữ vẽ lại trang nhưng KHÔNG gọi apiBankQr lần nữa', async () => {
+  const c = mk(); qrSetup(c, { bytes: Buffer.alloc(310 * 1024, 1) });
+  const p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  const n = () => p.calls.filter(x => x.name === 'apiBankQr').length;
+  assert.strictEqual(n(), 1); assert.ok(!p.$('.bank-qr'));
+  p.click('[data-langsw]'); await p.flush(30); p.clean();
+  assert.strictEqual(n(), 1, 'kết quả rỗng cũng nhớ trong trang: đổi ngôn ngữ không gọi lại');
+});
+
+t('U56', 'X2 (ex X2U2, F07): máy chủ trả src không phải data:image thì trang không dựng ảnh và gỡ khung QR', async () => {
+  const c = mk(); qrSetup(c);
+  c.api.apiBankQr = () => ({ ok: true, data: { qr: c.api.bankQrMarker_(), src: 'https://evil.example/x.png' } });
+  const p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  assert.ok(!p.$('.bank-qr img') && !p.$('.bank-qr') && !p.$('.bank.has-qr'), 'không nhận src ngoài data:image');
+  assert.ok(!p.doc.querySelector('img[src^="https://evil"]'));
+});
+
+t('U57', 'X2 (ex X2U3, F12): tải trước giờ rảnh gặp SESSION_INVALID thì nuốt im: không xoá phiên, không chuyển sang trang đăng nhập', async () => {
+  const c = mk(); const s1 = (await uiLogin(c, 'T001')).session;
+  c.api.apiTutorAvailability = () => ({ ok: false, reason: 'SESSION_INVALID', message: 'Phiên hết hạn' });
+  const p = open(c, { page: 'tutor' }, { session: s1 });
+  await p.flush(80); p.clean();
+  assert.ok(p.session() && p.session().token, 'phiên còn nguyên sau lượt nền hỏng');
+  assert.strictEqual(p.$('body').getAttribute('data-page'), 'tutor');
+});
+
+t('U58', 'X2 (ex X2U4, F19): CONFIG BANK_ACCOUNT trống thì trang đăng ký không dựng khung chuyển khoản (kể cả khi có BANK_QR_IMAGE)', async () => {
+  const c = mk(); qrSetup(c);
+  c.api.withLock_(() => { const tb = c.api.table_('CONFIG'), r = tb.byId('BANK_ACCOUNT'); if (r) tb.update(r, { value: '' }); else tb.insert({ key: 'BANK_ACCOUNT', value: '', note: '' }); }); c.api.clearConfigCache_();
+  const p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  assert.ok(!p.$('.panel.bank') && !p.$('.bank-qr'), 'không tài khoản thì không khung');
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 0);
+});
+
+t('U59', 'X2 (ex X2U5, F22): chữ thay thế (alt) của ảnh QR do admin sửa trong CONTENT có dấu nháy kép thì không chèn được thuộc tính vào thẻ img', async () => {
+  const c = mk(); qrSetup(c);
+  const evil = 'x" onerror="window.__x2=1" data-z="';
+  c.api.withLock_(() => { const tb = c.api.table_('CONTENT'), r = tb.byId('h.bank_qr_alt'); if (r) tb.update(r, { vi: evil, en: evil }); else tb.insert({ key: 'h.bank_qr_alt', vi: evil, en: evil, note: '' }); }); c.api.clearContentCache_();
+  const p = open(c, { page: 'home' });
+  await p.flush(40); p.clean();
+  const img = p.$('.bank-qr img'); assert.ok(img, 'có ảnh');
+  assert.ok(!img.hasAttribute('onerror') && !img.hasAttribute('data-z'), 'alt phải được thoát: ' + img.outerHTML.substring(0, 120));
+});
+
+t('U60', 'Soát X2: ảnh QR nhớ trong bộ nhớ của TAB (sessionStorage) theo dấu: mở trang lần hai trong cùng tab dùng lại ảnh, KHÔNG gọi apiBankQr; đổi dấu (admin thay ảnh) thì gọi lại và hiện ảnh mới, không dùng ảnh cũ', async () => {
+  const c = mk(); const id = qrSetup(c), tab = {};
+  const n = (p) => p.calls.filter(x => x.name === 'apiBankQr').length, src = (p) => p.$('.bank-qr img') && p.$('.bank-qr img').getAttribute('src');
+  let p = open(c, { page: 'home' }, { tabStorage: tab }); await p.flush(40); p.clean();
+  assert.strictEqual(n(p), 1); const s1 = src(p); assert.ok(/^data:image\/png/.test(s1));
+  const keys = Object.keys(tab).filter(k => /^thaiput_bankqr_/.test(k)); assert.strictEqual(keys.length, 1, 'ảnh được nhớ trong tab: ' + JSON.stringify(Object.keys(tab)));
+  // lần mở thứ hai, cùng tab, cùng dấu
+  p = open(c, { page: 'home' }, { tabStorage: tab }); await p.flush(40); p.clean();
+  assert.strictEqual(n(p), 0, 'dùng lại bản nhớ trong tab, không gọi máy chủ'); assert.strictEqual(src(p), s1, 'đúng ảnh đã nhớ');
+  // tab khác (không chung bộ nhớ tab): phải gọi
+  p = open(c, { page: 'home' }); await p.flush(40); assert.strictEqual(n(p), 1, 'tab mới không có bản nhớ');
+  // admin thay ảnh dưới cùng link rồi làm mới (dấu mới): không dùng ảnh cũ
+  c.env.state.drive.files[id].bytes = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(2000, 9)]); c.api.bankQrBump_();
+  p = open(c, { page: 'home' }, { tabStorage: tab }); await p.flush(40); p.clean();
+  assert.strictEqual(n(p), 1, 'dấu đã đổi: gọi lại máy chủ'); assert.ok(src(p) && src(p) !== s1, 'hiện ảnh MỚI, không phải ảnh cũ trong tab');
+  assert.strictEqual(Object.keys(tab).filter(k => /^thaiput_bankqr_/.test(k)).length, 2, 'bản nhớ theo từng dấu');
+});
+
+t('U61', 'Soát X2: phản hồi apiBankQr tới CHẬM (sau khi đổi ngôn ngữ, sau khi khung được vẽ lại với dấu mới) không vẽ ảnh cũ vào khung sai: khung hiện tại giữ ảnh đúng dấu của nó, đúng một ảnh, chữ thay thế theo ngôn ngữ hiện tại', async () => {
+  const c = mk(), id = qrSetup(c), hold = { apiBankQr: 1 };
+  const p = open(c, { page: 'home' }, { hold }); await p.flush(40); p.clean();
+  assert.strictEqual(p.heldCount('apiBankQr'), 1, 'phản hồi đầu bị giữ'); assert.ok(p.$('.bank-qr') && !p.$('.bank-qr img'), 'khung chờ ảnh');
+  const m1 = p.$('.bank-qr').getAttribute('data-qr'), img1 = p.calls.find(x => x.name === 'apiBankQr').result.data.src;
+  // (a) đổi ngôn ngữ trong lúc chờ: khung vẽ lại, vẫn chờ
+  p.click('[data-langsw]'); await p.flush(30); assert.ok(p.$('.bank-qr') && !p.$('.bank-qr img'), 'vẫn chờ sau khi đổi ngôn ngữ');
+  // (b) admin đổi ảnh (dấu mới) rồi khung được vẽ lại: lượt gọi thứ hai (không bị giữ) vẽ ảnh mới
+  c.env.state.drive.files[id].bytes = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(2000, 9)]); c.api.bankQrBump_();
+  p.win.T.go('home'); await p.flush(60);
+  const m2 = p.$('.bank-qr').getAttribute('data-qr'); assert.notStrictEqual(m2, m1, 'khung mới mang dấu mới');
+  const img2 = p.$('.bank-qr img') && p.$('.bank-qr img').getAttribute('src'); assert.ok(img2 && img2 !== img1, 'khung mới đã có ảnh mới');
+  assert.strictEqual(p.heldCount('apiBankQr'), 1, 'phản hồi cũ vẫn đang bị giữ');
+  // phản hồi CŨ tới muộn
+  p.release('apiBankQr'); await p.flush(30); p.clean();
+  assert.strictEqual(p.$$('.bank-qr img').length, 1, 'đúng một ảnh'); assert.strictEqual(p.$('.bank-qr img').getAttribute('src'), img2, 'ảnh cũ tới muộn KHÔNG đè ảnh của khung hiện tại');
+  assert.strictEqual(p.$('.bank-qr').getAttribute('data-qr'), m2); assert.strictEqual(p.$('.bank-qr img').getAttribute('alt'), 'Bank transfer QR code', 'chữ thay thế theo ngôn ngữ hiện tại');
+  // (c) chỉ đổi ngôn ngữ (cùng dấu), phản hồi tới muộn: vẽ đúng vào khung hiện tại, một ảnh
+  const c2 = mk(); qrSetup(c2); const q = open(c2, { page: 'home' }, { hold: { apiBankQr: 1 } }); await q.flush(40);
+  q.click('[data-langsw]'); await q.flush(30); q.release('apiBankQr'); await q.flush(30); q.clean();
+  assert.strictEqual(q.$$('.bank-qr img').length, 1); assert.strictEqual(q.$('.bank-qr img').getAttribute('alt'), 'Bank transfer QR code');
+});
+
+t('U62', 'Soát X2: giờ rảnh tutor tải trước (hoặc tải cho lần mở tab trước) tới CHẬM, sau khi tutor đã mở lại tab và chọn giờ chưa lưu: không bao giờ ghi đè giờ đang sửa, thanh lưu vẫn đếm đúng và lưu đúng thay đổi', async () => {
+  const c = mk(); const s1 = (await uiLogin(c, 'T001')).session;
+  const p = open(c, { page: 'tutor' }, { session: s1, hold: { apiTutorAvailability: 1 } }); await p.flush(60); p.clean();
+  assert.strictEqual(p.heldCount('apiTutorAvailability'), 1, 'bản tải trước đang bị giữ');
+  p.click('.tab[data-tab="avail"]'); await p.flush(20); assert.ok(p.$('#tab-body .skeleton'), 'đang chờ bản tải trước');
+  p.click('.tab[data-tab="schedule"]'); await p.flush(20);
+  p.click('.tab[data-tab="avail"]'); await p.flush(60);   // lần mở thứ hai: gọi mới (bản tải trước đã bị lấy), không bị giữ
+  const key = '2026-10-19|10:00', chip = () => p.$('.chip[data-key="' + key + '"]'); assert.ok(chip(), 'lưới đã vẽ bằng lượt gọi mới');
+  p.click(chip()); await p.flush(10); assert.ok(chip().classList.contains('dirty'), 'chọn giờ chưa lưu'); assert.ok(!p.$('#actionbar').hidden && /1/.test(p.text('#ab-text')));
+  // phản hồi tải trước tới muộn
+  p.release('apiTutorAvailability'); await p.flush(60); p.clean();
+  assert.ok(chip() && chip().classList.contains('dirty'), 'giờ đang sửa vẫn còn'); assert.ok(!p.$('#actionbar').hidden && /1/.test(p.text('#ab-text')), 'thanh lưu vẫn đếm 1 thay đổi: ' + p.text('#ab-text'));
+  p.click('#ab-go'); await p.flush(60); p.clean();
+  const sent = p.calls.filter(x => x.name === 'apiTutorSetAvailability'); assert.strictEqual(sent.length, 1); assert.deepStrictEqual(sent[0].args[1].map(x => x.date + '|' + x.slot + '|' + x.open), [key + '|true'], 'lưu đúng thay đổi đã chọn');
+});
+
+t('U63', 'Soát vòng 3 (D6 iii-a): chỉ riêng kiểm phiên của takePre: đổi phiên (T.session.set, không thoát, không vẽ lại cổng) rồi bấm tab Giờ rảnh thì tutor B gọi máy chủ bằng phiên của B, không dùng bản tải trước của A', async () => {
+  const avCalls = (p) => p.calls.filter(x => x.name === 'apiTutorAvailability' && !x.failed);
+  const c = mk(); const a = (await uiLogin(c, 'T001')).session, b = (await uiLogin(c, 'T002')).session;
+  const p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60);
+  assert.strictEqual(avCalls(p).length, 1, 'A tải trước'); assert.strictEqual(avCalls(p)[0].args[0], a.token);
+  p.win.T.session.set(b);   // đổi phiên không qua T.session.clear, không qua T.go: không hook, không vẽ lại
+  p.click('.tab[data-tab="avail"]'); await p.flush(80); p.clean();
+  assert.ok(avCalls(p).slice(1).some(x => x.args[0] === b.token), 'B gọi bằng phiên của B: ' + JSON.stringify(avCalls(p).map(x => x.args[0].substring(0, 6))));
+});
+
+t('U64', 'Soát vòng 3 (D6 iii-b): chỉ riêng hook T.sessionEnd: sau khi phiên bị xoá (T.session.clear), vẽ lại cổng tutor theo ngôn ngữ (relabel) không vẽ lại trang chủ của tutor trước', async () => {
+  const c = mk(); const a = (await uiLogin(c, 'T001')).session;
+  const p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60);
+  const name = p.$('.who').textContent; assert.ok(name && name.length > 1, 'tên tutor A hiện: ' + name);
+  p.win.T.session.clear();   // đường thoát và hết hạn đều đi qua đây
+  p.win.T.views.tutor.relabel(p.win.T.root()); await p.flush(60);
+  assert.ok(p.text('body').indexOf(name) === -1, 'không được vẽ lại dữ liệu của tutor A sau khi phiên đã xoá');
+});
+
+t('U65', 'Soát vòng 3 (D6 iii-c): chỉ riêng việc quên dữ liệu khi vào cổng bằng phiên khác: giờ rảnh chưa lưu của tutor A không bao giờ hiện thanh lưu của B và không bao giờ được gửi kèm phiên của B (cả khi đổi phiên không qua nút thoát, cả khi thoát rồi vào)', async () => {
+  const sets = (p) => p.calls.filter(x => x.name === 'apiTutorSetAvailability');
+  for (const viaLogout of [false, true]) {
+    const c = mk(); const a = (await uiLogin(c, 'T001')).session, b = (await uiLogin(c, 'T002')).session;
+    const p = open(c, { page: 'tutor' }, { session: a }); await p.flush(60);
+    p.click('.tab[data-tab="avail"]'); await p.flush(60);
+    p.click('.chip[data-key="2026-10-19|10:00"]'); assert.ok(p.$('#actionbar') && !p.$('#actionbar').hidden, 'A có giờ chưa lưu');
+    if (viaLogout) { p.click('#logout'); await p.flush(40); }
+    p.win.T.session.set(b); p.win.T.go('tutor', { tab: 'schedule' }); await p.flush(80); p.clean();
+    assert.strictEqual(p.win.T.token(), b.token);
+    assert.ok(p.$('#actionbar').hidden, (viaLogout ? 'thoát rồi vào: ' : 'đổi phiên: ') + 'thanh lưu của B phải ẩn');
+    p.click('#ab-go'); await p.flush(60);
+    assert.strictEqual(sets(p).length, 0, 'không gửi giờ chưa lưu của A kèm phiên của B');
+    p.click('.tab[data-tab="avail"]'); await p.flush(80);
+    assert.ok(!p.$('.chip[data-key="2026-10-19|10:00"].dirty'), 'ô giờ chưa lưu của A không hiện ở B');
+  }
+});
+
+t('U66', 'Soát vòng 3 (D9): ảnh QR đổi GIỮA apiPublicInfo và apiBankQr: ảnh mới được nhớ theo dấu máy chủ trả (không theo dấu cũ), khung nhận dấu mới cùng ảnh mới, đổi ngôn ngữ không gọi lại máy chủ', async () => {
+  const c = mk(), id = qrSetup(c), hold = { apiPublicInfo: 1 };
+  const p = open(c, { page: 'home' }, { hold }); await p.flush(40);
+  const m1 = c.api.bankQrMarker_(), imgOld = 'data:image/png;base64,' + c.env.state.drive.files[id].bytes.toString('base64');
+  assert.strictEqual(p.heldCount('apiPublicInfo'), 1, 'thông tin công khai (dấu m1) đang bị giữ');
+  // ảnh đổi (nội dung file, số phiên bản mới) trước khi trình duyệt kịp hỏi ảnh
+  c.env.state.drive.files[id].bytes = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(2000, 9)]); c.api.bankQrBump_();
+  const m2 = c.api.bankQrMarker_(), imgNew = 'data:image/png;base64,' + c.env.state.drive.files[id].bytes.toString('base64');
+  assert.notStrictEqual(m1, m2); assert.notStrictEqual(imgOld, imgNew);
+  p.release('apiPublicInfo'); await p.flush(60); p.clean();
+  assert.strictEqual(p.$('.bank-qr').getAttribute('data-qr'), m2, 'khung đổi sang dấu máy chủ trả'); assert.strictEqual(p.$('.bank-qr img').getAttribute('src'), imgNew, 'ảnh mới');
+  const tab = {}; for (let i = 0; i < p.win.sessionStorage.length; i++) { const k = p.win.sessionStorage.key(i); tab[k] = p.win.sessionStorage.getItem(k); }
+  assert.strictEqual(tab['thaiput_bankqr_' + m2], imgNew, 'nhớ theo dấu máy chủ trả'); assert.ok(!('thaiput_bankqr_' + m1 in tab), 'KHÔNG nhớ ảnh mới dưới dấu cũ m1');
+  // vẽ lại (đổi ngôn ngữ) vẫn dùng dấu m1 của thông tin công khai: không gọi lại, vẫn đúng ảnh mới, khung mang dấu mới
+  const n = () => p.calls.filter(x => x.name === 'apiBankQr').length; assert.strictEqual(n(), 1);
+  p.click('[data-langsw]'); await p.flush(40); p.clean();
+  assert.strictEqual(n(), 1, 'không gọi lại máy chủ'); assert.strictEqual(p.$$('.bank-qr img').length, 1); assert.strictEqual(p.$('.bank-qr img').getAttribute('src'), imgNew); assert.strictEqual(p.$('.bank-qr').getAttribute('data-qr'), m2);
+  // đúng MỘT lượt gọi apiBankQr cho cả hai lần vẽ (vẽ đầu và vẽ lại), lượt đó trả đúng dấu m2 và ảnh mới; bộ nhớ tab chỉ có một mục ảnh
+  const calls = p.calls.filter(x => x.name === 'apiBankQr'); assert.strictEqual(calls.length, 1, 'đúng một lượt gọi cho hai lần vẽ'); assert.strictEqual(calls[0].result.data.qr, m2); assert.strictEqual(calls[0].result.data.src, imgNew);
+  assert.strictEqual(Object.keys(tab).filter(k => /^thaiput_bankqr_/.test(k)).length, 1, 'chỉ một mục ảnh trong bộ nhớ tab');
+});
+
+t('U67', 'Soát X2 M34: sau khi lưu giờ rảnh, lượt tải lại (drawAvail trên cùng khung) tới CHẬM; tutor mở lại tab Giờ rảnh (lượt tải mới) và chọn giờ chưa lưu; phản hồi cũ tới muộn không được ghi đè giờ đang chọn (kiểm cả khung hiện tại và số thứ tự lượt vẽ)', async () => {
+  const c = mk(); const s1 = (await uiLogin(c, 'T001')).session, hold = {};
+  const p = open(c, { page: 'tutor' }, { session: s1, hold }); await p.flush(60);
+  p.click('.tab[data-tab="avail"]'); await p.flush(60);
+  p.click('.chip[data-key="2026-10-19|10:00"]'); p.click('#ab-go'); await p.flush(60);
+  hold.apiTutorAvailability = 1;   // lượt tải lại sau khi lưu sẽ chậm
+  p.click('.sheet button'); await p.flush(30);
+  assert.strictEqual(p.heldCount('apiTutorAvailability'), 1, 'lượt tải lại sau khi lưu đang bị giữ'); assert.ok(p.$('#tab-body .skeleton'));
+  p.click('.tab[data-tab="schedule"]'); await p.flush(20); p.click('.tab[data-tab="avail"]'); await p.flush(60);   // lượt tải mới
+  const key = '2026-10-19|11:00'; p.click('.chip[data-key="' + key + '"]'); await p.flush(10); assert.ok(p.$('.chip[data-key="' + key + '"]').classList.contains('dirty'));
+  p.release('apiTutorAvailability'); await p.flush(60); p.clean();
+  assert.ok(p.$('.chip[data-key="' + key + '"]').classList.contains('dirty'), 'giờ đang chọn còn nguyên'); assert.ok(!p.$('#actionbar').hidden && /1/.test(p.text('#ab-text')));
+  p.click('#ab-go'); await p.flush(60); const sent = p.calls.filter(x => x.name === 'apiTutorSetAvailability'); assert.deepStrictEqual(sent[sent.length - 1].args[1].map(x => x.slot), ['11:00'], 'lưu đúng giờ vừa chọn');
+});
+
 
 module.exports = { run };
 if (require.main === module) {

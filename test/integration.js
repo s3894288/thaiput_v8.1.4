@@ -6,12 +6,13 @@
  */
 'use strict';
 const assert = require('assert');
-const { load } = require('./load');
+const { load, attach } = require('./load');
 const { mk, K, EMAIL } = require('./scenarios');
 const { D } = require('./fixtures');
 
 const results = [];
 function t(id, title, fn) {
+  if (process.env.ONLY && process.env.ONLY.split(',').indexOf(id) === -1) return;   // ONLY=I196,I197: chỉ chạy các test này (khi thử đột biến)
   try { fn(); results.push({ id, title, ok: true }); }
   catch (e) { results.push({ id, title, ok: false, err: e.message }); }
 }
@@ -583,7 +584,9 @@ t('I34', 'Cài đặt tạo NOTIFY_RULES, tô màu 4 tab, ô tick read; link m�
   api.clearDbCache_(); api.clearConfigCache_();
   assert.strictEqual(api.table_('NOTIFY_RULES').all().length, Object.keys(api.DEFAULT_NOTIFY_RULES_).length);
   const sh = env.state.spreadsheets.NEW_DB.sheets;
-  assert.ok(sh.NOTIFICATIONS.cfRules.length === 3 && sh.REGISTRATIONS.cfRules.length === 1 && sh.AVAILABILITY.cfRules.length === 2 && sh.BOOKINGS.cfRules.length === 3);
+  // 5N: BOOKINGS 6 màu (đỏ, cam đậm, hồng, vàng, xanh dương nhạt, xám), STUDENT_PACKAGES 5 màu (đỏ, xám, vàng, tím, xanh dương).
+  assert.ok(sh.NOTIFICATIONS.cfRules.length === 3 && sh.REGISTRATIONS.cfRules.length === 1 && sh.AVAILABILITY.cfRules.length === 2 && sh.BOOKINGS.cfRules.length === 6 && sh.STUDENT_PACKAGES.cfRules.length === 5,
+    [sh.NOTIFICATIONS, sh.REGISTRATIONS, sh.AVAILABILITY, sh.BOOKINGS, sh.STUDENT_PACKAGES].map(x => x.cfRules.length).join(','));
   assert.ok(/^=AND\(\$C2="CRITICAL",\$P2<>TRUE\)$/.test(sh.NOTIFICATIONS.cfRules[1].formula), sh.NOTIFICATIONS.cfRules[1].formula);
   assert.ok(/#gid=REGISTRATIONS&range=A5$/.test(api.rowLink_('REGISTRATIONS', 5)));
   // Chạy lại không thêm trùng luật
@@ -4178,6 +4181,2283 @@ t('I135', 'Soát tài liệu 5Q (hồi quy): chọn Từ chối sau khi đã Duy
   assert.ok(after.tutor_id !== 'T001' || after.status !== 'CONFIRMED', JSON.stringify({ t: after.tutor_id, s: after.status, n: after.admin_note }));
 });
 
+// ══ Chunk 5N: tô màu Sheets, "Đã xử lý (giữ nguyên)", buổi kẹt Chờ đổi tutor ══
+
+/**
+ * Tính công thức tô màu như Google Sheets cho đúng phần cú pháp mà applyHighlights_ dùng (AND, OR, N, TODAY, COUNTIFS, INDIRECT,
+ * so sánh, trừ), trên dữ liệu thật của tab giả lập. Luật 14: ô trống so với "" là bằng, so với số là 0; chữ so không phân biệt hoa thường;
+ * ngày là số ngày kiểu Sheets. Trả màu của luật ĐẦU TIÊN khớp (Sheets chỉ áp một luật), hoặc '' nếu không luật nào khớp.
+ */
+function cfColor(c, table, rowNum, today) {
+  const ss = c.env.state.spreadsheets.DB_STAGING_TEST, sh = ss.sheets[table];
+  const serial = (d) => (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(1899, 11, 30)) / 86400000 + (d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()) / 86400;
+  const blank = (v) => v === '' || v === null || v === undefined;
+  const norm = (v) => v instanceof Date ? serial(v) : v;
+  const colIdx = (L) => { let n = 0; for (const ch of L) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
+  const cell = (tab, r, L) => { const line = ss.sheets[tab].values[r - 1] || []; const v = line[colIdx(L)]; return v === undefined ? '' : v; };
+  const cmp = (a, b, op) => {
+    a = norm(a); b = norm(b);
+    let x = a, y = b;
+    if (blank(x) && typeof y === 'number') x = 0; if (blank(y) && typeof x === 'number') y = 0;
+    if (blank(x) && typeof y === 'string') x = ''; if (blank(y) && typeof x === 'string') y = '';
+    if (blank(x) && typeof y === 'boolean') x = false; if (blank(y) && typeof x === 'boolean') y = false;
+    if (typeof x === 'string' && typeof y === 'string') { x = x.toLowerCase(); y = y.toLowerCase(); }
+    const eq = typeof x === typeof y ? x === y : false;
+    switch (op) { case '=': return eq; case '<>': return !eq; case '<': return typeof x === typeof y && x < y; case '>': return typeof x === typeof y && x > y; case '<=': return typeof x === typeof y && x <= y; case '>=': return typeof x === typeof y && x >= y; }
+    throw new Error('op ' + op);
+  };
+  const crit = (v, cr) => { const m = typeof cr === 'string' && cr.match(/^(<>|>=|<=|=|<|>)(.*)$/); if (!m) return cmp(v, cr, '='); let rhs = m[2]; if (/^true$/i.test(rhs)) rhs = true; else if (/^false$/i.test(rhs)) rhs = false; else if (rhs !== '' && !isNaN(Number(rhs))) rhs = Number(rhs); return cmp(v, rhs, m[1]); };
+  const evalAt = (formula, r) => {
+    const toks = formula.replace(/^=/, '').match(/"[^"]*"|\$?[A-Z]+\$?\d+|[A-Z]+(?=\()|TRUE|FALSE|\d+(?:\.\d+)?|<>|<=|>=|[=<>+\-(),]/g);
+    let i = 0;
+    const peek = () => toks[i], next = () => toks[i++];
+    const fns = {
+      AND: (a) => a.every(Boolean), OR: (a) => a.some(Boolean), IF: (a) => (a[0] ? a[1] : a[2]),
+      N: (a) => { const v = norm(a[0]); return typeof v === 'number' ? v : 0; },
+      TODAY: () => Math.floor(serial(today)),   // Sheets: TODAY() chỉ là ngày, không có giờ
+      INDIRECT: (a) => { const m = a[0].match(/^(\w+)!\$?([A-Z]+)\$?(\d+):\$?([A-Z]+)$/); const vals = ss.sheets[m[1]].values, out = []; for (let k = Number(m[3]); k <= vals.length; k++) out.push(cell(m[1], k, m[2])); return out; },
+      COUNTIFS: (a) => { let n = 0; for (let k = 0; k < a[0].length; k++) { let ok = true; for (let p = 0; p < a.length; p += 2) if (!crit(a[p][k], a[p + 1])) { ok = false; break; } if (ok) n++; } return n; }
+    };
+    const primary = () => {
+      const t = next();
+      if (t === '(') { const v = expr(); next(); return v; }
+      if (t[0] === '"') return t.slice(1, -1);
+      if (t === 'TRUE') return true; if (t === 'FALSE') return false;
+      if (/^\d/.test(t)) return Number(t);
+      const ref = t.match(/^\$?([A-Z]+)\$?(\d+)$/);
+      if (ref && peek() !== '(') return cell(table, r + Number(ref[2]) - 2, ref[1]);
+      if (!fns[t]) throw new Error('Hàm chưa hỗ trợ trong bộ tính: ' + t);
+      next(); const args = [];
+      if (peek() !== ')') { args.push(expr()); while (peek() === ',') { next(); args.push(expr()); } }
+      next(); return fns[t](args);
+    };
+    const add = () => { let v = primary(); while (peek() === '+' || peek() === '-') { const op = next(), w = primary(); const a = norm(v), b = norm(w); v = (blank(a) ? 0 : a) + (op === '+' ? 1 : -1) * (blank(b) ? 0 : b); } return v; };
+    const expr = () => { const a = add(); if (['=', '<>', '<', '>', '<=', '>='].includes(peek())) { const op = next(); return cmp(a, add(), op); } return a; };
+    const v = expr();
+    if (i !== toks.length) throw new Error('Còn token chưa đọc: ' + toks.slice(i).join(' ') + ' trong ' + formula);
+    return v;
+  };
+  for (const rule of sh.cfRules || []) { if (evalAt(rule.formula, rowNum) === true) return rule.bg; }
+  return '';
+}
+const HL5N = { RED: '#ea9999', ORANGE: '#f6b26b', PINK: '#f9d2e4', YELLOW: '#fff3cd', LIGHT_BLUE: '#cfe2f3', BLUE: '#9fc5e8', PURPLE: '#d9d2e9', GREY: '#e9ecef' };
+const bkSet = (c, id, patch) => c.api.withLock_(() => { const t = c.api.table_('BOOKINGS'); t.update(t.byId(id), patch); });
+const bkColor = (c, id) => { const b = c.row('BOOKINGS', id); return cfColor(c, 'BOOKINGS', b._row, c.api.getNow_()); };
+
+t('I136', '5N BOOKINGS: đúng 6 màu theo thứ tự ưu tiên; "Đã xử lý (giữ nguyên)" ghi admin_done_at, hết vàng Vắng học viên và đỏ Không hoàn thành, hiện lại khi kết quả đổi sau đó; không cho chọn ở buổi chưa có kết quả, chờ đổi tutor, kỹ thuật chưa chọn lỗi; lựa chọn khác chạy được cũng ghi admin_done_at', () => {
+  const c = mk('2026-10-12 10:00'), { api } = c;
+  api.applyHighlights_(api.dbSpreadsheet_());
+  const days = ['13', '14', '15', '16', '17', '19', '20', '21'];
+  days.forEach(d => c.onlyOpen('2026-10-' + d, '19:00', ['T001']));
+  const ids = days.map((d) => { const r = c.book('S003', [['2026-10-' + d, '19:00']]); assert.ok(r[0].ok, d + ' ' + JSON.stringify(r)); return r[0].bookingId; });
+  const [bConf, bOver, bNot, bPend, bTech, bAbs, bComp, bLate] = ids;
+  c.onlyOpen('2026-10-22', '19:00', ['T001']);
+  const [rx] = c.book('S003', [['2026-10-22', '19:00']]);
+  assert.ok(rx.ok, JSON.stringify(rx));
+  c.at('2026-10-25 10:00');
+  const at = (s) => { const [d, h] = s.split(' '); const [y, m, dd] = d.split('-').map(Number); const [hh, mm] = h.split(':').map(Number); return new Date(y, m - 1, dd, hh, mm); };
+  bkSet(c, bConf, { date: new Date(2026, 10, 30) });
+  bkSet(c, bOver, { result_notice_at: at('2026-10-15 20:00') });
+  bkSet(c, bNot, { status: 'NOT_COMPLETED', result_at: at('2026-10-18 20:00'), result_by: 'SYSTEM' });
+  bkSet(c, bPend, { status: 'PENDING_REASSIGN', admin_done_at: at('2026-10-20 10:00') });
+  bkSet(c, bTech, { status: 'TECH_ISSUE', result_at: at('2026-10-17 20:00') });
+  bkSet(c, bAbs, { status: 'STUDENT_ABSENT', result_at: at('2026-10-19 20:00') });
+  bkSet(c, bComp, { status: 'TUTOR_ABSENT', result_at: at('2026-10-20 20:00'), comp_days: 3 });
+  bkSet(c, bLate, { status: 'CANCELLED_LATE' });
+  assert.deepStrictEqual(ids.map(id => bkColor(c, id)), ['', HL5N.RED, HL5N.RED, HL5N.ORANGE, HL5N.PINK, HL5N.YELLOW, HL5N.LIGHT_BLUE, HL5N.GREY]);
+  // Ưu tiên: buổi được bù mà đang Chờ đổi tutor vẫn cam đậm; kỹ thuật chưa chọn lỗi có ngày bù vẫn hồng.
+  bkSet(c, bPend, { comp_days: 2 }); bkSet(c, bTech, { comp_days: 2 });
+  assert.strictEqual(bkColor(c, bPend), HL5N.ORANGE); assert.strictEqual(bkColor(c, bTech), HL5N.PINK);
+  bkSet(c, bTech, { comp_days: '' });
+
+  // Đã xử lý (giữ nguyên): Vắng học viên hết vàng, không đổi trạng thái, có nhật ký
+  const r1 = pickAdmin(c, bAbs, 'Đã xử lý (giữ nguyên)');
+  assert.ok(r1.ok, JSON.stringify(r1));
+  let b = c.row('BOOKINGS', bAbs);
+  assert.strictEqual(b.status, 'STUDENT_ABSENT'); assert.ok(b.admin_done_at instanceof Date); assert.strictEqual(b.admin_action, '');
+  assert.ok(/^Đã: Đã xử lý \(giữ nguyên\)/.test(b.admin_note), b.admin_note);
+  assert.strictEqual(bkColor(c, bAbs), '');
+  assert.ok(c.rows('ACTIVITY_LOG').some(l => l.action === 'ADMIN_MARK_DONE' && l.entity_id === bAbs));
+  // Kết quả đổi sau lần xử lý (tutor sửa lại, result_at mới hơn): vàng lại
+  c.at('2026-10-25 12:00');
+  bkSet(c, bAbs, { result_at: api.getNow_() });
+  assert.strictEqual(bkColor(c, bAbs), HL5N.YELLOW, 'result_at mới hơn admin_done_at: hiện lại');
+  // Không hoàn thành: Đã xử lý hết đỏ (giữ Không hoàn thành, không lương)
+  assert.ok(pickAdmin(c, bNot, 'Đã xử lý (giữ nguyên)').ok);
+  assert.strictEqual(c.row('BOOKINGS', bNot).status, 'NOT_COMPLETED'); assert.strictEqual(bkColor(c, bNot), '');
+
+  // Không cho: buổi chưa có kết quả (đỏ quá hạn giữ nguyên), Chờ đổi tutor, kỹ thuật chưa chọn lỗi. Không ghi admin_done_at.
+  [[bOver, /chưa có gì để giữ nguyên/], [bPend, /chưa có gì để giữ nguyên/], [bTech, /chưa chọn lỗi/]].forEach(([id, re]) => {
+    const before = c.row('BOOKINGS', id).admin_done_at;
+    const r = pickAdmin(c, id, 'Đã xử lý (giữ nguyên)');
+    assert.ok(!r.ok && re.test(r.message), id + ': ' + JSON.stringify(r));
+    const after = c.row('BOOKINGS', id);
+    assert.strictEqual(String(after.admin_done_at), String(before), id + ' không ghi admin_done_at');
+    assert.ok(/^Lỗi: Đã xử lý \(giữ nguyên\)/.test(after.admin_note), after.admin_note);
+  });
+  assert.strictEqual(bkColor(c, bOver), HL5N.RED); assert.strictEqual(bkColor(c, bPend), HL5N.ORANGE); assert.strictEqual(bkColor(c, bTech), HL5N.PINK);
+  assert.ok(!c.rows('ACTIVITY_LOG').some(l => l.action === 'ADMIN_MARK_DONE' && [bOver, bPend, bTech].includes(l.entity_id)));
+
+  // Admin tự chọn kết quả Vắng học viên (result_at và admin_done_at cùng lúc): không vàng
+  c.at('2026-10-23 10:00');
+  assert.ok(pickAdmin(c, rx.bookingId, 'Vắng học viên (admin chọn)').ok);
+  const bx = c.row('BOOKINGS', rx.bookingId);
+  assert.strictEqual(bx.status, 'STUDENT_ABSENT');
+  assert.strictEqual(bkColor(c, rx.bookingId), '', 'admin tự chọn kết quả: đã xử lý, không vàng');
+  c.at('2026-10-25 12:00');
+  // Kỹ thuật: chọn lỗi thì hết hồng; lựa chọn chạy được cũng ghi admin_done_at
+  assert.ok(pickAdmin(c, bTech, 'Không tính lương buổi kỹ thuật').ok);
+  b = c.row('BOOKINGS', bTech);
+  assert.ok(b.tech_decided_at && b.admin_done_at instanceof Date);
+  assert.notStrictEqual(bkColor(c, bTech), HL5N.PINK);
+  // Kỹ thuật đã chọn lỗi: Đã xử lý cho phép
+  assert.ok(pickAdmin(c, bTech, 'Đã xử lý (giữ nguyên)').ok);
+  // Lựa chọn chạy hỏng (Đổi tutor sau giờ học) không ghi admin_done_at
+  const late = c.row('BOOKINGS', bLate).admin_done_at;
+  assert.ok(!pickAdmin(c, bLate, 'Đổi tutor').ok);
+  assert.strictEqual(String(c.row('BOOKINGS', bLate).admin_done_at), String(late));
+  // Dropdown có lựa chọn mới
+  assert.ok(api.BOOKING_ADMIN_ACTIONS.includes('Đã xử lý (giữ nguyên)'));
+});
+
+t('I137', '5N STUDENT_PACKAGES: đỏ khi còn thông báo COMP_ON_EXPIRED chưa đọc của gói (đọc rồi thì hết), xám hết hạn, vàng còn EXPIRY_NOTICE_DAYS ngày (tính theo hôm nay, đổi CONFIG thì đổi), tím admin cộng tay, xanh dương có ngày bù', () => {
+  const c = mk('2026-10-12 10:00'), { api } = c;
+  const sps = c.rows('STUDENT_PACKAGES');
+  assert.ok(sps.length >= 4, 'cần ít nhất 4 gói mẫu');
+  const [p1, p2, p3, p4] = sps.map(x => x.sp_id);
+  const spSet = (id, patch) => api.withLock_(() => { const t = api.table_('STUDENT_PACKAGES'); t.update(t.byId(id), patch); });
+  const color = (id) => cfColor(c, 'STUDENT_PACKAGES', c.sp(id)._row, api.getNow_());
+  const today = new Date(2026, 9, 12);
+  const plus = (n) => new Date(2026, 9, 12 + n);
+  sps.forEach(x => spSet(x.sp_id, { status: 'ACTIVE', end_date: plus(20), comp_days: '', comp_days_admin: '' }));
+  api.applyHighlights_(api.dbSpreadsheet_());
+  spSet(p1, { end_date: plus(3) });
+  spSet(p2, { end_date: plus(4) });
+  spSet(p3, { status: 'EXPIRED', end_date: plus(-2) });
+  spSet(p4, { comp_days_admin: 2, comp_days: 3 });
+  assert.deepStrictEqual([p1, p2, p3, p4].map(color), [HL5N.YELLOW, '', HL5N.GREY, HL5N.PURPLE]);
+  spSet(p4, { comp_days_admin: '' });
+  assert.strictEqual(color(p4), HL5N.BLUE);
+  spSet(p1, { end_date: today });
+  assert.strictEqual(color(p1), HL5N.YELLOW, 'hết hạn hôm nay vẫn vàng');
+  spSet(p1, { end_date: plus(-1) });
+  assert.strictEqual(color(p1), '', 'ACTIVE quá hạn (chưa qua job ngày) không vàng');
+  // EXPIRY_NOTICE_DAYS đổi: chạy lại menu 1 (applyHighlights_) thì vùng vàng đổi theo
+  spSet(p2, { end_date: plus(4) });
+  cfgSet(c, 'EXPIRY_NOTICE_DAYS', 5); api.applyHighlights_(api.dbSpreadsheet_());
+  assert.strictEqual(color(p2), HL5N.YELLOW);
+  // Đỏ: thông báo COMP_ON_EXPIRED chưa đọc của đúng gói; gói khác không đỏ; đánh dấu đã đọc thì về xám
+  const n = api.withLock_(() => api.table_('NOTIFICATIONS').insert({ notif_id: api.nextId_('NOTIFICATIONS'), time: api.getNow_(), level: 'WARNING', event: 'COMP_ON_EXPIRED', channel: 'EMAIL', actor: 'SYSTEM', entity: 'STUDENT_PACKAGE', entity_id: p3, message: 'x', read: false }));
+  api.withLock_(() => api.table_('NOTIFICATIONS').insert({ notif_id: api.nextId_('NOTIFICATIONS'), time: api.getNow_(), level: 'WARNING', event: 'COMP_EXTENDED', channel: 'EMAIL', actor: 'SYSTEM', entity: 'STUDENT_PACKAGE', entity_id: p4, message: 'x', read: false }));
+  api.clearDbCache_();
+  assert.strictEqual(color(p3), HL5N.RED);
+  assert.strictEqual(color(p4), HL5N.BLUE, 'sự kiện khác không đỏ');
+  api.withLock_(() => { const t = api.table_('NOTIFICATIONS'); t.update(t.byId(n.notif_id), { read: true }); });
+  assert.strictEqual(color(p3), HL5N.GREY, 'đọc rồi: hết đỏ');
+});
+
+t('I138', '5N hourlyJob báo buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: một lần mỗi lần kẹt (email Khẩn, nhật ký), chịu lệch nhịp trigger vài phút, nhiều buổi kẹt cùng lượt chỉ một email, buổi ra khỏi trạng thái thì xoá mốc và kẹt lại được báo lại; đổi giờ trong CONFIG, -1 tắt', () => {
+  const c = mk('2026-10-12 10:00'), { api, env } = c;
+  c.onlyOpen('2026-10-20', '19:00', ['T001']); c.onlyOpen('2026-10-21', '19:00', ['T002']); c.onlyOpen('2026-10-22', '19:00', ['T003']);
+  const [r] = c.book('S001', [['2026-10-20', '19:00']]), [r2] = c.book('S002', [['2026-10-21', '19:00']]), [r3] = c.book('S003', [['2026-10-22', '19:00']]);
+  const id = r.bookingId;
+  const stuckN = () => c.rows('NOTIFICATIONS').filter(x => x.event === 'REASSIGN_STUCK');
+  const has = (n, bid) => String(n.entity_id).split(',').includes(bid);
+  const adminMails = () => c.mailsTo(EMAIL.ADMIN).filter(m => /kẹt ở Chờ đổi tutor/.test(JSON.stringify(m))).length;
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-13 08:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 0, 'lần đầu thấy: chưa báo');
+  assert.ok(Number(env.state.props['STUCK_' + id]) > 0, 'ghi mốc lần đầu thấy');
+  c.at('2026-10-13 08:45'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 0, 'chưa đủ 1 giờ (trừ 15 phút lệch nhịp)');
+  // Trigger mỗi giờ của Google lệch: lượt sau chạy sau 59 phút vẫn báo
+  c.at('2026-10-13 09:04'); api.hourlyJob();
+  let ns = stuckN();
+  assert.strictEqual(ns.length, 1, 'lượt sau 59 phút: báo');
+  assert.ok(has(ns[0], id)); assert.strictEqual(ns[0].level, 'CRITICAL'); assert.ok(ns[0].message_en && /stuck/.test(ns[0].message_en));
+  assert.ok(/1 buổi kẹt ở Chờ đổi tutor quá 1 giờ/.test(ns[0].message) && /Đổi tutor hoặc Huỷ bởi admin/.test(ns[0].message) && /Vắng tutor/.test(ns[0].message), ns[0].message);
+  assert.strictEqual(adminMails(), 1, 'email admin');
+  assert.ok(c.rows('ACTIVITY_LOG').some(l => l.action === 'REASSIGN_STUCK' && l.entity_id === id));
+  ['10:05', '11:05', '14:05', '17:05'].forEach(h => { c.at('2026-10-13 ' + h); api.hourlyJob(); });
+  assert.strictEqual(stuckN().length, 1, 'còn kẹt nhiều giờ sau: không báo trùng');
+  // Thông báo bị mất (khoá lỗi, dòng không ghi được): giờ sau báo lại, vì "đã báo" chính là dòng thông báo
+  api.withLock_(() => { const t = api.table_('NOTIFICATIONS'); t.update(t.byId(stuckN()[0].notif_id), { event: 'X_LOST' }); });
+  c.at('2026-10-13 18:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 1, 'thiếu dòng thông báo: báo lại');
+  // Ra khỏi trạng thái: xoá mốc
+  bkSet(c, id, { status: 'CONFIRMED' });
+  c.at('2026-10-13 19:05'); api.hourlyJob();
+  assert.ok(!env.state.props['STUCK_' + id], 'xoá mốc khi ra khỏi trạng thái');
+  // Ba buổi kẹt cùng lúc (ví dụ khoá tutor lỗi giữa chừng): một email liệt kê cả ba
+  const before = adminMails();
+  [id, r2.bookingId, r3.bookingId].forEach(x => bkSet(c, x, { status: 'PENDING_REASSIGN' }));
+  c.at('2026-10-13 20:05'); api.hourlyJob();
+  c.at('2026-10-13 21:05'); api.hourlyJob();
+  ns = stuckN();
+  assert.strictEqual(ns.length, 2);
+  const last = ns[ns.length - 1];
+  assert.ok([id, r2.bookingId, r3.bookingId].every(x => has(last, x)), last.entity_id);
+  assert.ok(/^3 buổi kẹt/.test(last.message), last.message);
+  assert.strictEqual(adminMails() - before, 1, 'một email cho cả ba buổi');
+  // CONFIG 3 giờ: buổi kẹt lại sau đó chờ đủ 3 giờ
+  cfgSet(c, 'REASSIGN_STUCK_HOURS', 3);
+  [r2.bookingId, r3.bookingId].forEach(x => bkSet(c, x, { status: 'CONFIRMED' }));
+  bkSet(c, id, { status: 'CONFIRMED' }); c.at('2026-10-13 22:05'); api.hourlyJob();
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-14 08:05'); api.hourlyJob();
+  c.at('2026-10-14 10:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 2, 'CONFIG 3 giờ: 2 giờ chưa báo');
+  c.at('2026-10-14 11:05'); api.hourlyJob();
+  assert.strictEqual(stuckN().length, 3, 'kẹt lại: báo lần nữa');
+  // -1 tắt: không báo, không giữ mốc
+  cfgSet(c, 'REASSIGN_STUCK_HOURS', -1);
+  bkSet(c, id, { status: 'CONFIRMED' }); c.at('2026-10-14 12:05'); api.hourlyJob();
+  bkSet(c, id, { status: 'PENDING_REASSIGN' });
+  ['13:05', '15:05', '19:05'].forEach(h => { c.at('2026-10-14 ' + h); api.hourlyJob(); });
+  assert.strictEqual(stuckN().length, 3, '-1: tắt');
+  assert.ok(!Object.keys(env.state.props).some(k => /^STUCK_/.test(k)), '-1: không giữ mốc');
+});
+
+t('I139', '5N vùng tô màu phủ tới hết tab: tab tự thêm hàng (ensureRows_) thì nới vùng mọi luật đang chạm hàng cuối (cả luật admin tự thêm), không thay, không nhân đôi; luật vùng nhỏ không đổi; lỗi tô màu không làm hỏng lượt ghi; thiếu cột mới (chưa chạy menu 1) không có công thức trỏ cột không tồn tại', () => {
+  const c = mk('2026-10-12 10:00'), { api, env } = c;
+  const sh = env.state.spreadsheets.DB_STAGING_TEST.sheets.BOOKINGS;
+  const sheet = api.dbSpreadsheet_().getSheetByName('BOOKINGS');
+  sheet.insertRowsAfter(sheet.getMaxRows(), 37);   // tab không tròn 1.000 hàng: menu 1 phủ đúng tới hàng cuối thật
+  api.applyHighlights_(api.dbSpreadsheet_());
+  const max0 = sheet.getMaxRows();
+  assert.strictEqual(sh.cfRules[0].ranges[0].getNumRows(), max0 - 1);
+  // Admin tự thêm 2 luật: một phủ tới hết tab, một chỉ vài hàng đầu
+  const own = env.globals.SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$B2="S001"').setBackground('#000001').setRanges([sheet.getRange(2, 2, max0 - 1, 1)]).build();
+  const small = env.globals.SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied('=$B2="S002"').setBackground('#000002').setRanges([sheet.getRange(2, 2, 10, 1)]).build();
+  sheet.setConditionalFormatRules(sheet.getConditionalFormatRules().concat([own, small]));
+  const formulas0 = sh.cfRules.map(r => r.formula + r.bg).join('|');
+  api.ensureRows_(sheet, 'BOOKINGS', max0 + 1);
+  const max1 = sheet.getMaxRows();
+  assert.ok(max1 > max0);
+  assert.strictEqual(sh.cfRules.length, 8, 'không thay, không nhân đôi');
+  assert.strictEqual(sh.cfRules.map(r => r.formula + r.bg).join('|'), formulas0, 'giữ nguyên công thức, màu, thứ tự (cả luật của admin)');
+  assert.ok(sh.cfRules.slice(0, 7).every(r => r.ranges[0].getNumRows() === max1 - 1 && r.ranges[0].getRow() === 2), 'phủ tới hàng cuối mới');
+  assert.strictEqual(sh.cfRules[7].ranges[0].getNumRows(), 10, 'luật vùng nhỏ không đổi');
+  // Tô màu lỗi: lượt ghi vẫn thành công
+  sh.cfRules.push({ formula: '=1', bg: '#x', getRanges: () => { throw new Error('giả lập lỗi tô màu'); } });
+  api.ensureRows_(sheet, 'BOOKINGS', sheet.getMaxRows() + 1);
+  assert.ok(sheet.getMaxRows() > max1, 'vẫn thêm hàng');
+  sh.cfRules.pop();
+  // Tab không có luật: không đặt luật
+  const us = api.dbSpreadsheet_().getSheetByName('USERS');
+  api.ensureRows_(us, 'USERS', us.getMaxRows() + 1);
+  assert.ok(!(env.state.spreadsheets.DB_STAGING_TEST.sheets.USERS.cfRules || []).length);
+  // Thiếu cột admin_done_at và comp_days (dán code mới, chưa chạy menu 1): không công thức nào trỏ $null
+  const hdr = sh.values[0];
+  ['admin_done_at', 'comp_days'].forEach(col => { hdr[hdr.indexOf(col)] = 'x_' + col; });
+  api.applyHighlights_(api.dbSpreadsheet_());
+  assert.ok(sh.cfRules.every(r => !/null|undefined/.test(r.formula)), sh.cfRules.map(r => r.formula).join(' | '));
+  assert.strictEqual(sh.cfRules.length, 5, 'bỏ luật xanh dương nhạt khi thiếu comp_days');
+});
+
+t('I140', 'Soát 5N (hồi quy): buổi kẹt Chờ đổi tutor xử lý được đúng như thư báo: Đổi tutor ra CONFIRMED với tutor khác; chỉ định tutor bận thì vẫn kẹt (không thành CONFIRMED với tutor cũ); Huỷ bởi admin sau mốc huỷ muộn vẫn là Huỷ bởi admin (lỗi phía trường, không trừ lượt), không phải Huỷ muộn; trang quản trị bỏ buổi Không hoàn thành đã "Đã xử lý" khỏi danh sách chờ', () => {
+  const c = mk('2026-10-12 10:00'), { api } = c;
+  c.onlyOpen('2026-10-20', '19:00', ['T001', 'T002']);
+  c.onlyOpen('2026-10-21', '19:00', ['T001']);
+  const [r] = c.book('S001', [['2026-10-20', '19:00']]);
+  const [r2] = c.book('S002', [['2026-10-21', '19:00']]);
+  const t0 = c.row('BOOKINGS', r.bookingId).tutor_id;
+  bkSet(c, r.bookingId, { status: 'PENDING_REASSIGN' });
+  // Chỉ định tutor không rảnh: vẫn kẹt
+  bkSet(c, r.bookingId, { admin_note: 'T004' });
+  const f = pickAdmin(c, r.bookingId, 'Đổi tutor');
+  assert.ok(!f.ok, JSON.stringify(f));
+  let b = c.row('BOOKINGS', r.bookingId);
+  assert.strictEqual(b.status, 'PENDING_REASSIGN', 'chỉ định hỏng: vẫn kẹt, không thành CONFIRMED');
+  assert.strictEqual(b.tutor_id, t0);
+  // Để trống: hệ thống tự chọn tutor khác
+  bkSet(c, r.bookingId, { admin_note: '' });
+  const ok = pickAdmin(c, r.bookingId, 'Đổi tutor');
+  assert.ok(ok.ok, JSON.stringify(ok));
+  b = c.row('BOOKINGS', r.bookingId);
+  assert.strictEqual(b.status, 'CONFIRMED'); assert.notStrictEqual(b.tutor_id, t0);
+  assert.ok(b.admin_done_at instanceof Date);
+  // Huỷ bởi admin sau mốc huỷ muộn (16:00 hôm trước): buổi kẹt vẫn là Huỷ bởi admin
+  bkSet(c, r2.bookingId, { status: 'PENDING_REASSIGN' });
+  c.at('2026-10-20 16:30');
+  const cx = pickAdmin(c, r2.bookingId, 'Huỷ bởi admin');
+  assert.ok(cx.ok, JSON.stringify(cx));
+  assert.strictEqual(c.row('BOOKINGS', r2.bookingId).status, 'CANCELLED_ADMIN');
+  // Buổi bình thường (CONFIRMED) huỷ sau mốc vẫn là Huỷ muộn như cũ
+  c.at('2026-10-12 10:00');
+  c.onlyOpen('2026-10-23', '19:00', ['T001']);
+  const [r3] = c.book('S003', [['2026-10-23', '19:00']]);
+  c.at('2026-10-22 16:30');
+  assert.ok(pickAdmin(c, r3.bookingId, 'Huỷ bởi admin').ok);
+  assert.strictEqual(c.row('BOOKINGS', r3.bookingId).status, 'CANCELLED_LATE');
+  // Trang quản trị: Không hoàn thành đã xử lý không còn trong danh sách chờ (cùng nghĩa với ô Sheets hết đỏ)
+  bkSet(c, r.bookingId, { status: 'NOT_COMPLETED', result_at: new Date(2026, 9, 21, 20, 0), result_by: 'SYSTEM' });
+  const waiting = () => api.adminLessonsWaiting_(c.rows('BOOKINGS'), api.getNow_()).map(x => x.booking_id);
+  assert.ok(waiting().includes(r.bookingId));
+  assert.ok(pickAdmin(c, r.bookingId, 'Đã xử lý (giữ nguyên)').ok);
+  assert.ok(!waiting().includes(r.bookingId), 'đã xử lý: bỏ khỏi danh sách chờ');
+  assert.strictEqual(bkColor(c, r.bookingId), '', 'ô Sheets cũng hết đỏ');
+  // Hàm thuần dùng chung
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2), result_at: new Date(2026, 1, 1) }), true);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 1), result_at: new Date(2026, 1, 2) }), false);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: '', result_at: new Date(2026, 1, 2) }), false);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2), result_at: '' }), true);
+  assert.strictEqual(api.adminHandled_({ admin_done_at: new Date(2026, 1, 2, 9), result_at: new Date(2026, 1, 2, 9) }), true, 'admin tự chọn kết quả (cùng lúc): đã xử lý');
+});
+
+// ── Soát T1: dòng trùng key ở EMAIL_TEMPLATES và CONTENT ──
+function dupEnv() {
+  const { api, env } = freshEnv();
+  api.setupFirstRun(); api.clearDbCache_(); api.clearContentCache_();
+  return { api, env };
+}
+/** Thêm một dòng trùng key (bản sao dòng có sẵn, sửa theo patch) ở cuối tab, như admin chép dòng hoặc bản cũ gieo thừa. */
+function addDup(api, tab, key, patch) {
+  api.withLock_(() => { const t = api.table_(tab), r = t.all().find(x => String(x.key).trim() === key), o = {}; api.SCHEMA[tab].cols.forEach(c => { o[c] = r[c]; }); t.insert(Object.assign(o, patch || {})); });
+  api.clearDbCache_(); api.clearContentCache_();
+}
+const rowsOf = (api, tab, key) => api.table_(tab).all().filter(x => String(x.key).trim() === key);
+const snapshot = (env, tab) => JSON.stringify(env.state.spreadsheets.NEW_DB.sheets[tab].values);
+const actLog = (api, action) => api.table_('ACTIVITY_LOG').all().filter(r => r.action === action);
+
+t('I141', 'T1 (a)(d): dòng trùng giống nhau gộp thành một ở vị trí dòng đầu, email vẫn render y như cũ; chạy lại không làm gì; tab không trùng không bị đụng; có nhật ký TEMPLATE_DEDUPE và dòng báo cho menu 1', () => {
+  const { api, env } = dupEnv();
+  const n0 = api.table_('EMAIL_TEMPLATES').all().length, c0 = api.table_('CONTENT').all().length;
+  const pos = rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0]._row;
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK'); addDup(api, 'EMAIL_TEMPLATES', 'REG_RECEIVED'); addDup(api, 'EMAIL_TEMPLATES', 'REG_RECEIVED');
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, n0 + 3);
+  const before = { l: api.emailTemplate_('LOGIN_LINK'), r: api.emailTemplate_('REG_RECEIVED') };
+  const contentBefore = snapshot(env, 'CONTENT');
+  const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+  assert.deepStrictEqual(rep.map(x => x.key + ':' + x.removed), ['LOGIN_LINK:1', 'REG_RECEIVED:2']);
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, n0);
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK').length, 1);
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0]._row, pos, 'dòng giữ ở vị trí dòng đầu');
+  assert.deepStrictEqual(api.emailTemplate_('LOGIN_LINK'), before.l); assert.deepStrictEqual(api.emailTemplate_('REG_RECEIVED'), before.r);
+  assert.strictEqual(snapshot(env, 'CONTENT'), contentBefore, 'tab không trùng không bị đụng');
+  const lines = api.dupReportLines_(rep);
+  assert.ok(lines.length === 2 && /^Gộp dòng trùng EMAIL_TEMPLATES: key LOGIN_LINK/.test(lines[0]), lines.join('|'));
+  const log = actLog(api, 'TEMPLATE_DEDUPE'); assert.strictEqual(log.length, 1); assert.strictEqual(log[0].entity, 'EMAIL_TEMPLATES');
+  assert.strictEqual(JSON.parse(log[0].detail).length, 2);
+  // chạy lại: không đổi gì, không ghi nhật ký
+  const snap = snapshot(env, 'EMAIL_TEMPLATES');
+  assert.deepStrictEqual(api.dedupeDuplicateKeys_(), []); api.clearDbCache_();
+  assert.strictEqual(snapshot(env, 'EMAIL_TEMPLATES'), snap); assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE').length, 1);
+  // menu 1 chạy lại cũng không gieo thêm
+  const r1 = api.setupFirstRun(); api.clearDbCache_();
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, n0); assert.strictEqual(api.table_('CONTENT').all().length, c0);
+  assert.ok(!r1.lines.some(l => /Gộp dòng trùng/.test(l)));
+});
+
+t('I142', 'T1 (b)(c): dòng đầu có chữ admin sửa, dòng cuối là chữ gốc thì chữ admin giữ lại; hai bản admin sửa khác nhau thì dòng cuối thắng, dòng menu 1 chỉ hiện 300 ký tự đầu của chữ bị bỏ và chữ đầy đủ nằm trong ACTIVITY_LOG; ô active theo DÒNG CUỐI (5R soát: không bao giờ đổi việc gửi thư); chữ gốc cũ (TEMPLATE_UPGRADES_) coi là chữ gốc', () => {
+  const { api, env } = dupEnv();
+  const edit = (tab, key, i, patch) => api.withLock_(() => { const t = api.table_(tab); t.update(rowsOf(api, tab, key)[i], patch); }); 
+  // (b) WELCOME: dòng đầu admin sửa body_vi và tắt active; dòng cuối còn gốc (đang BẬT: gửi thư dùng dòng cuối, nên mẫu đang gửi)
+  addDup(api, 'EMAIL_TEMPLATES', 'WELCOME');
+  edit('EMAIL_TEMPLATES', 'WELCOME', 0, { body_vi: 'Chữ admin sửa ở dòng đầu', active: false, note: 'ghi chú admin' });
+  // (c) LOGIN_LINK: hai bản khác nhau, bản dòng đầu dài 400 ký tự
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  const long = 'A'.repeat(400);
+  edit('EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { subject_vi: long, body_en: 'English first' });
+  edit('EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { subject_vi: 'Bản dòng cuối', body_en: 'English first' });
+  // chữ gốc cũ ở dòng cuối: không thắng chữ admin ở dòng đầu
+  addDup(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND');
+  edit('EMAIL_TEMPLATES', 'TUTOR_REMIND', 0, { body_vi: 'Tutor tự viết' });
+  edit('EMAIL_TEMPLATES', 'TUTOR_REMIND', 1, { body_vi: api.TEMPLATE_UPGRADES_.TUTOR_REMIND.body_vi });
+  const effBefore = api.emailTemplate_('LOGIN_LINK').subject_vi; assert.strictEqual(effBefore, 'Bản dòng cuối');
+  assert.strictEqual(api.emailTemplate_('WELCOME').active, true, 'trước khi gộp: dòng cuối thắng, mẫu WELCOME đang gửi');
+  const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+  const w = rowsOf(api, 'EMAIL_TEMPLATES', 'WELCOME'); assert.strictEqual(w.length, 1);
+  assert.strictEqual(w[0].body_vi, 'Chữ admin sửa ở dòng đầu'); assert.ok(String(w[0].active).toUpperCase() !== 'FALSE', 'active theo dòng cuối (đang bật), không theo FALSE ở dòng đầu'); assert.strictEqual(w[0].note, 'ghi chú admin');
+  assert.strictEqual(api.emailTemplate_('WELCOME').active, true, 'hành vi gửi thư không đổi sau khi gộp');
+  const l = rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0];
+  assert.strictEqual(l.subject_vi, 'Bản dòng cuối', 'dòng cuối (đang dùng khi gửi) thắng'); assert.strictEqual(l.body_en, 'English first');
+  assert.strictEqual(api.emailTemplate_('LOGIN_LINK').subject_vi, 'Bản dòng cuối', 'hành vi gửi thư không đổi');
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND')[0].body_vi, 'Tutor tự viết');
+  const lr = rep.find(x => x.key === 'LOGIN_LINK'), cell = lr.cells.find(c => c.col === 'subject_vi');
+  assert.strictEqual(cell.discarded.length, 1); assert.strictEqual(cell.discarded[0].text, 'A'.repeat(300) + '...'); assert.ok(!lr.cells.some(c => c.col === 'body_en'), 'hai dòng giống nhau: không báo');
+  const lines = api.dupReportLines_(rep).join('\n'); assert.ok(/BỎ bản ở hàng \d+: "A{300}\.\.\."/.test(lines), lines);
+  assert.ok(/ô body_vi lấy chữ admin đã sửa ở hàng/.test(lines));
+  const log = actLog(api, 'TEMPLATE_DEDUPE')[0]; assert.ok(log.detail.indexOf('A'.repeat(20)) === -1, 'dòng tóm tắt không chứa chữ bị bỏ (đã có dòng TEMPLATE_DEDUPE_TEXT riêng)');
+  const full = actLog(api, 'TEMPLATE_DEDUPE_TEXT'); assert.strictEqual(full.length, 1); assert.strictEqual(JSON.parse(full[0].detail).text, long, 'chữ ĐẦY ĐỦ (400 ký tự, không cắt) nằm trong nhật ký');
+  assert.ok(/\(400 ký tự, dòng này chỉ hiện 300 ký tự đầu\)/.test(lines) && /ACTIVITY_LOG: hành động TEMPLATE_DEDUPE_TEXT/.test(lines), lines);
+  // menu 1 đưa các dòng này vào kết quả
+  const { api: a2 } = dupEnv(); addDup(a2, 'EMAIL_TEMPLATES', 'LOGIN_LINK', { subject_vi: 'Khác' });
+  assert.ok(a2.setupFirstRun().lines.some(x => /Gộp dòng trùng EMAIL_TEMPLATES: key LOGIN_LINK/.test(x)));
+});
+
+t('I143', 'T1 (3): CONTENT trùng key gộp cùng luật (vi, en, note; cột code quản lý lấy dòng đầu); chữ admin ở dòng đầu thắng chữ gốc ở dòng cuối; key có dấu cách thừa tính là trùng và được cắt', () => {
+  const { api, env } = dupEnv();
+  const key = 'h.hero_title', n0 = api.table_('CONTENT').all().length;
+  addDup(api, 'CONTENT', key); addDup(api, 'CONTENT', 's.pill_active', { key: 's.pill_active ' });
+  api.withLock_(() => { const t = api.table_('CONTENT'); t.update(rowsOf(api, 'CONTENT', key)[0], { vi: 'Admin vi', note: 'n' }); t.update(rowsOf(api, 'CONTENT', key)[1], { en: 'Admin en cuối' }); });
+  api.withLock_(() => { const t = api.table_('CONTENT'); t.update(rowsOf(api, 'CONTENT', key)[0], { en: 'Admin en đầu' }); });
+  api.clearDbCache_(); api.clearContentCache_();
+  const dupsBefore = api.dupKeysOf_(api.table_('CONTENT').all()).map(d => d.key).sort(); assert.deepStrictEqual(dupsBefore, [key, 's.pill_active']);
+  const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+  assert.strictEqual(api.table_('CONTENT').all().length, n0);
+  const r = rowsOf(api, 'CONTENT', key)[0];
+  assert.strictEqual(r.vi, 'Admin vi'); assert.strictEqual(r.en, 'Admin en cuối', 'hai bản en khác nhau: dòng cuối thắng'); assert.strictEqual(r.note, 'n');
+  assert.ok(rep.find(x => x.key === key).cells.find(c => c.col === 'en').discarded[0].text === 'Admin en đầu');
+  assert.deepStrictEqual(api.contentMap_()[key], ['Admin vi', 'Admin en cuối']);
+  const pill = api.table_('CONTENT').all().filter(x => String(x.key).trim() === 's.pill_active'); assert.strictEqual(pill.length, 1); assert.strictEqual(pill[0].key, 's.pill_active', 'key được cắt dấu cách');
+  assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE').filter(x => x.entity === 'CONTENT').length, 1);
+  assert.deepStrictEqual(api.dedupeDuplicateKeys_(), []);
+});
+
+t('I144', 'T1 (e): menu 2 (testSystem) và nút cập nhật chữ cảnh báo tiếng Việt khi key trùng ở EMAIL_TEMPLATES hoặc CONTENT, nhắc chạy menu 1; hết cảnh báo sau khi gộp', () => {
+  const { api } = dupEnv();
+  const warns = () => api.testSystem().lines.filter(l => /key "/.test(l));
+  assert.deepStrictEqual(warns(), []);
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK'); addDup(api, 'CONTENT', 'h.hero_title');
+  const w = warns();
+  assert.strictEqual(w.length, 2, w.join('\n'));
+  assert.ok(/LƯU Ý  EMAIL_TEMPLATES: key "LOGIN_LINK" xuất hiện 2 lần \(hàng \d+, \d+\).*menu 1/.test(w[0]), w[0]);
+  assert.ok(/CONTENT: key "h.hero_title"/.test(w[1]));
+  assert.ok(api.refreshContent_().warnings.some(x => /EMAIL_TEMPLATES: key "LOGIN_LINK" xuất hiện 2 lần/.test(x)));
+  api.setupFirstRun(); api.clearDbCache_();
+  assert.deepStrictEqual(warns(), []);
+});
+
+t('I145', 'T1 (f) hồi quy nguyên nhân: ô key có dấu cách thừa ("LOGIN_LINK ") không làm menu 1 gieo thêm dòng trùng ở EMAIL_TEMPLATES và CONTENT (byId so nguyên văn, lúc chạy thì cắt khoảng trắng); chữ nâng cấp mẫu vẫn áp lên dòng đó', () => {
+  const { api } = dupEnv();
+  const nE = api.table_('EMAIL_TEMPLATES').all().length, nC = api.table_('CONTENT').all().length;
+  api.withLock_(() => {
+    const e = api.table_('EMAIL_TEMPLATES'), c = api.table_('CONTENT');
+    e.update(e.byId('LOGIN_LINK'), { key: 'LOGIN_LINK ' }); e.update(e.byId('TUTOR_REMIND'), { body_vi: api.TEMPLATE_UPGRADES_.TUTOR_REMIND.body_vi, key: ' TUTOR_REMIND' });
+    c.update(c.byId('h.hero_title'), { key: 'h.hero_title ' });
+  });
+  api.clearDbCache_(); api.setupFirstRun(); api.clearDbCache_(); api.clearContentCache_();
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().length, nE, 'không gieo thêm mẫu email');
+  assert.strictEqual(api.table_('CONTENT').all().length, nC, 'không gieo thêm chữ web');
+  assert.deepStrictEqual(api.dupKeysOf_(api.table_('EMAIL_TEMPLATES').all()), []);
+  assert.strictEqual(api.table_('EMAIL_TEMPLATES').all().find(r => String(r.key).trim() === 'TUTOR_REMIND').body_vi, api.DEFAULT_EMAIL_TEMPLATES_.TUTOR_REMIND[3], 'chữ gốc cũ được nâng cấp');
+  assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE').length, 0);
+});
+
+t('I146', 'T2: ảnh QR chuyển khoản. Tách mã từ các dạng link; từ chối sai loại, quá 300 KB; bộ nhớ đệm chia mảnh dưới 100 KB, khoá đổi theo CONFIG; apiBankQr không ghi Sheets, không lấy khoá; menu 2 báo trống, hợp lệ, hỏng', () => {
+  const c = mk(), { api, env } = c;
+  const ID = 'AbC_dEf-1234567890xyz';
+  // 1. Tách mã
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/file/d/' + ID + '/view?usp=sharing'), ID);
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/file/d/' + ID + '/view'), ID);
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/open?id=' + ID), ID);
+  assert.strictEqual(api.bankQrId_('https://drive.google.com/uc?export=view&id=' + ID), ID);
+  assert.strictEqual(api.bankQrId_('  ' + ID + ' '), ID);
+  ['', 'abc', 'https://example.com/file/d/' + ID + '/view', 'https://drive.google.com/drive/folders/' + ID, 'có dấu cách ' + ID, null].forEach(v => assert.strictEqual(api.bankQrId_(v), '', 'không hợp lệ: ' + v));
+  // 2. Trống: không gọi Drive, dấu rỗng
+  assert.strictEqual(api.bankQrMarker_(), '');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(api.apiBankQr())).data, { qr: '', src: '' });
+  assert.strictEqual(api.apiPublicInfo().data.bank.qr, '');
+  // 3. Đọc file: loại, cỡ
+  const put = (id, mime, n) => { env.state.drive.files[id] = { id, name: 'qr', parent: null, created: new Date(2026, 0, 1), trashed: false, mime, bytes: Buffer.alloc(n, 5) }; return id; };
+  put(ID, 'image/png', 3000);
+  const rd = (v) => api.bankQrRead_(v);
+  const good = rd(ID);
+  assert.ok(good.ok && good.type === 'image/png' && good.kb === 3 && good.src === 'data:image/png;base64,' + Buffer.alloc(3000, 5).toString('base64'));
+  ['image/jpeg', 'image/webp', 'image/gif'].forEach(m => { put(ID, m, 100); assert.ok(rd(ID).ok, m); });
+  ['image/svg+xml', 'application/pdf', 'image/bmp', 'text/html', ''].forEach(m => { put(ID, m, 100); assert.strictEqual(rd(ID).code, 'BAD_TYPE', m); });
+  put(ID, 'image/png', 300 * 1024); assert.ok(rd(ID).ok, '300 KB đúng vẫn được');
+  put(ID, 'image/png', 300 * 1024 + 1); assert.strictEqual(rd(ID).code, 'TOO_LARGE');
+  put(ID, 'image/png', 0); assert.strictEqual(rd(ID).code, 'EMPTY');
+  put(ID, 'image/png', 100); env.state.drive.files[ID].trashed = true; assert.strictEqual(rd(ID).code, 'TRASHED');
+  assert.strictEqual(rd('KhongTonTai1234567').code, 'NO_ACCESS');
+  assert.strictEqual(rd('x').code, 'BAD_LINK');
+  // 4. Bộ nhớ đệm chia mảnh, mock giữ giới hạn 100 KB mỗi khoá
+  put(ID, 'image/png', 250 * 1024);
+  cfgSet(c, 'BANK_QR_IMAGE', 'https://drive.google.com/file/d/' + ID + '/view');
+  const m1 = api.bankQrMarker_();
+  assert.ok(/^[a-f0-9]{10}$/.test(m1));
+  const l0 = env.state.lockCalls, sheetsBefore = JSON.stringify(Object.keys(env.state.spreadsheets).map(k => env.state.spreadsheets[k].sheets));
+  const r1 = api.apiBankQr();
+  assert.ok(r1.ok && r1.data.qr === m1 && r1.data.src === 'data:image/png;base64,' + Buffer.alloc(250 * 1024, 5).toString('base64'));
+  const keys = Object.keys(env.state.cache).filter(k => k.indexOf('bq_' + m1) === 0);
+  assert.ok(keys.length >= 5, 'nhiều mảnh: ' + keys.length);
+  keys.forEach(k => assert.ok(Buffer.byteLength(env.state.cache[k]) <= 100 * 1024, k));
+  // Lần hai: đọc từ bộ nhớ đệm, không đụng Drive
+  env.state.drive.files[ID].trashed = true;
+  assert.strictEqual(api.apiBankQr().data.src, r1.data.src, 'lấy từ bộ nhớ đệm');
+  // Mất một mảnh: đọc lại từ Drive (file đang ở thùng rác thì rỗng), không ném lỗi
+  delete env.state.cache['bq_' + m1 + '_1'];
+  assert.strictEqual(api.apiBankQr().data.src, '', 'thiếu mảnh thì không ghép sai');
+  assert.strictEqual(env.state.lockCalls, l0, 'không lấy khoá');
+  assert.strictEqual(JSON.stringify(Object.keys(env.state.spreadsheets).map(k => env.state.spreadsheets[k].sheets)), sheetsBefore, 'không ghi Sheets');
+  assert.strictEqual(c.mailsTo(EMAIL.ADMIN).filter(m => /apiBankQr/.test(m.subject)).length, 0, 'không email admin');
+  // Lỗi nhớ ngắn (không dồn Drive): lần sau vẫn rỗng dù file đã khôi phục, tới khi hết hạn nhớ lỗi
+  env.state.drive.files[ID].trashed = false;
+  assert.strictEqual(api.apiBankQr().data.src, '', 'lỗi nhớ ngắn');
+  // Khoá đổi theo CONFIG
+  const ID2 = 'ZzZ_second-file-0987654';
+  put(ID2, 'image/jpeg', 2000);
+  cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  const m2 = api.bankQrMarker_();
+  assert.notStrictEqual(m2, m1);
+  assert.ok(api.apiBankQr().data.src.indexOf('data:image/jpeg;base64,') === 0, 'đổi CONFIG: ảnh mới, không dính bộ nhớ cũ');
+  assert.strictEqual(api.apiPublicInfo().data.bank.qr, m2);
+  // CONFIG sai dạng: dấu rỗng
+  cfgSet(c, 'BANK_QR_IMAGE', 'không phải link'); assert.strictEqual(api.bankQrMarker_(), ''); assert.strictEqual(api.apiBankQr().data.src, '');
+  // 5. Menu 2
+  const text = () => api.testSystem().lines.join('\n');
+  cfgSet(c, 'BANK_QR_IMAGE', '');
+  assert.ok(/ĐẠT\s+BANK_QR_IMAGE để trống/.test(text()), 'trống: chỉ thông tin');
+  assert.ok(!/BANK_QR_IMAGE hỏng/.test(text()));
+  cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  assert.ok(/ĐẠT\s+BANK_QR_IMAGE hợp lệ: image\/jpeg, 2 KB/.test(text()), text().split('\n').filter(x => /QR/.test(x)).join('|'));
+  put(ID2, 'application/pdf', 100); cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  assert.ok(/BANK_QR_IMAGE hỏng \(BAD_TYPE\).*không phải ảnh PNG/.test(text()));
+  put(ID2, 'image/png', 400 * 1024); cfgSet(c, 'BANK_QR_IMAGE', ID2);
+  assert.ok(/BANK_QR_IMAGE hỏng \(TOO_LARGE\).*quá 300 KB/.test(text()));
+  cfgSet(c, 'BANK_QR_IMAGE', 'KhongCoFileNay12345');
+  assert.ok(/BANK_QR_IMAGE hỏng \(NO_ACCESS\).*chia sẻ/.test(text()));
+  cfgSet(c, 'BANK_QR_IMAGE', 'abc');
+  assert.ok(/BANK_QR_IMAGE hỏng \(BAD_LINK\).*link Drive/.test(text()));
+  // 6. Mặc định và ghi chú đã đủ: CONFIG có khoá, mặc định rỗng; chữ web đủ 4 phần
+  assert.strictEqual(api.DEFAULTS_.BANK_QR_IMAGE, '');
+  assert.ok(api.DEFAULT_CONTENT_['h.bank_qr_alt'].length >= 4 && api.DEFAULT_CONTENT_['h.bank_qr_alt'][1]);
+  assert.deepStrictEqual(api.DEFAULT_CONTENT_['h.bank_note'].slice(0, 2), ['Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn.', 'Transfer reference: Please enter only your phone number.']);
+  assert.ok(/apiBankQr: 1/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'ui', 'App.html'), 'utf8').match(/var READ_APIS = (\{[\s\S]*?\});/)[1]), 'trình duyệt tự thử lại theo READ_APIS');
+});
+
+t('I147', 'T3b: bộ chuẩn hoá cột chọn sẵn một lần (cellNormalizer_) cho kết quả y hệt normalizeCell_ ở mọi cột của mọi tab SCHEMA, với ngày, Date, số, trống, boolean, slot và chữ có dấu nháy; table_() đọc đúng như cũ', () => {
+  const c = mk(), { api } = c;
+  c.onlyOpen('2026-10-14', '20:00', ['T001']); assert.ok(c.book('S003', [['2026-10-14', '20:00']])[0].ok);
+  const vals = [new Date(2026, 9, 5), new Date(2026, 9, 5, 13, 45), new Date(1899, 11, 30, 8, 0), new Date(1899, 11, 30, 23, 30), new Date(NaN),
+    '2026-10-05', '05/10/2026', '2026-02-31', '08:00', ' 19:30 ', '', null, undefined, 0, 7, 1234567890, 84912345678, true, false,
+    "'0912345678", "'=SUM(1)", '+84912345678', '=x', 'Chữ có dấu', '  ', 'S001', 'T002'];
+  let n = 0;
+  Object.keys(api.SCHEMA).forEach(tab => {
+    const sc = api.SCHEMA[tab];
+    sc.cols.forEach(col => {
+      const f = api.cellNormalizer_(sc, col);
+      vals.forEach(v => { assert.deepStrictEqual(f(v), api.normalizeCell_(sc, col, v), tab + '.' + col + ' với ' + String(v)); n++; });
+    });
+  });
+  assert.ok(n > 1000, 'đã so ' + n + ' ô');
+  // Ba loại cột đều có mặt trong SCHEMA thật: ngày, chữ (kể cả slot), thường
+  const kinds = new Set(); Object.keys(api.SCHEMA).forEach(tab => api.SCHEMA[tab].cols.forEach(col => { const sc = api.SCHEMA[tab]; kinds.add((sc.dates || []).indexOf(col) !== -1 ? 'date' : (sc.text || []).indexOf(col) !== -1 ? (col === 'slot' ? 'slot' : 'text') : 'raw'); }));
+  assert.deepStrictEqual(Array.from(kinds).sort(), ['date', 'raw', 'slot', 'text']);
+  // Schema giả: cột vừa trong dates vừa trong text thì ngày thắng (như normalizeCell_); không có dates/text thì giữ nguyên
+  const fake = { cols: ['a', 'slot', 'b'], dates: ['a'], text: ['a', 'slot'] };
+  vals.forEach(v => ['a', 'slot', 'b'].forEach(col => assert.deepStrictEqual(api.cellNormalizer_(fake, col)(v), api.normalizeCell_(fake, col, v))));
+  const bare = { cols: ['x'] };
+  vals.forEach(v => assert.deepStrictEqual(api.cellNormalizer_(bare, 'x')(v), api.normalizeCell_(bare, 'x', v)));
+  // table_() đầu cuối: từng ô của mọi dòng AVAILABILITY và BOOKINGS khớp normalizeCell_ trên giá trị thô trong Sheets
+  ['AVAILABILITY', 'BOOKINGS', 'USERS'].forEach(tab => {
+    api.clearDbCache_();
+    const tb = api.table_(tab), sh = api.dbSpreadsheet_().getSheetByName(tab), raw = sh.getDataRange().getValues(), head = raw[0].map(h => String(h).trim());
+    assert.ok(tb.rows.length > 0, tab + ' có dữ liệu');
+    tb.rows.forEach(o => { api.SCHEMA[tab].cols.forEach(col => { const j = head.indexOf(col); assert.deepStrictEqual(o[col], j === -1 ? '' : api.normalizeCell_(api.SCHEMA[tab], col, raw[o._row - 1][j]), tab + ' dòng ' + o._row + ' cột ' + col); }); });
+  });
+});
+
+// ── Soát 5R (Opus + auditor): chữ admin bị bỏ khi gộp key trùng không bao giờ mất; ô active theo dòng cuối ──
+const bigCell = (env) => { let m = 0; Object.values(env.state.spreadsheets).forEach(ss => Object.values(ss.sheets).forEach(sh => sh.values.forEach(l => l.forEach(v => { if (typeof v === 'string' && v.length > m) m = v.length; })))); return m; };
+/**
+ * Khôi phục chữ bị bỏ từ dòng TEMPLATE_DEDUPE_TEXT trong Sheets THÔ, đúng quy tắc ghi ở Setup.gs: nhóm theo CÙNG run, entity, entity_id, col, row; nối text theo part
+ * (part liền nhau, đủ parts, đủ chars). Trả { run: { 'col|hàng': chữ } }.
+ */
+function dedupeTextRuns(env, tab, key) {
+  const v = env.state.spreadsheets.NEW_DB.sheets.ACTIVITY_LOG.values, ix = (n) => v[0].indexOf(n), by = {};
+  v.slice(1).forEach(r => { if (r[ix('action')] !== 'TEMPLATE_DEDUPE_TEXT' || r[ix('entity')] !== tab || String(r[ix('entity_id')]) !== key) return; const d = JSON.parse(r[ix('detail')]); assert.ok(/^[0-9a-f]{8}$/.test(d.run), 'dòng chữ có mã run'); const k = d.run + '#' + d.col + '|' + d.row; (by[k] = by[k] || []).push(d); });
+  const out = {};
+  Object.keys(by).forEach(k => {
+    const l = by[k].sort((a, b) => a.part - b.part); assert.deepStrictEqual(l.map(x => x.part), l.map((x, i) => i + 1), 'part liền nhau'); assert.strictEqual(l[0].parts, l.length);
+    const txt = l.map(x => x.text).join(''); assert.strictEqual(txt.length, l[0].chars);
+    const run = k.split('#')[0]; (out[run] = out[run] || {})[k.split('#')[1]] = txt;
+  });
+  return out;
+}
+/** Như dedupeTextRuns nhưng đúng MỘT lượt gộp: { 'col|hàng': chữ }. */
+function dedupeTextFromLog(env, tab, key) {
+  const runs = dedupeTextRuns(env, tab, key), ids = Object.keys(runs);
+  assert.ok(ids.length <= 1, 'nhiều hơn một lượt gộp: ' + ids.join(','));
+  return ids.length ? runs[ids[0]] : {};
+}
+const edit1 = (api, tab, key, i, patch) => api.withLock_(() => { api.table_(tab).update(rowsOf(api, tab, key)[i], patch); });
+
+t('I159', 'Soát 5R (FIX 2a, d): chữ admin bị bỏ khi gộp key trùng được ghi ĐỦ, từng byte, vào ACTIVITY_LOG (TEMPLATE_DEDUPE_TEXT, chia nhiều dòng nếu dài); không ô nào vượt cỡ an toàn; dòng menu 1 chỉ cắt hiển thị và chỉ chỗ xem chữ đủ; dòng tóm tắt không phình', () => {
+  const body = (n, seed) => { let o = ''; const piece = 'Chào {{name}}, "đây" là \\ chữ Việt có dấu ăềộ 😀 ' + seed + '\n'; while (o.length < n) o += piece; return o.substring(0, n); };
+  const cases = { 'ba nghìn ký tự': body(3000, 'a'), 'tối đa của một ô Sheets': body(49999, 'b'), 'toàn dấu nháy và xuống dòng (JSON gấp đôi)': '"\n'.repeat(24999) + 'x' };
+  Object.keys(cases).forEach(name => {
+    const { api, env } = dupEnv(), txt = cases[name];
+    addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+    edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { body_vi: txt }); edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { body_vi: 'Bản dòng cuối' });
+    const rowDiscarded = rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0]._row;
+    const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+    assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0].body_vi, 'Bản dòng cuối', name);
+    const got = dedupeTextFromLog(env, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+    assert.deepStrictEqual(Object.keys(got), ['body_vi|' + rowDiscarded], name);
+    assert.ok(got['body_vi|' + rowDiscarded] === txt, name + ': chữ khôi phục từ nhật ký phải y hệt từng byte (' + got['body_vi|' + rowDiscarded].length + '/' + txt.length + ')');
+    assert.ok(bigCell(env) < 50000, name + ': ô lớn nhất ' + bigCell(env));
+    const sum = actLog(api, 'TEMPLATE_DEDUPE')[0]; assert.ok(sum.detail.length < api.DUP_SUMMARY_MAX_ && sum.detail.indexOf('Chào {{name}}') === -1, 'tóm tắt không chứa chữ bị bỏ');
+    const line = api.dupReportLines_(rep).join('\n');
+    assert.ok(line.indexOf(txt.substring(0, 300)) !== -1, 'đầu chữ hiện ở dòng menu'); assert.ok(line.length < 1500, 'dòng menu vẫn ngắn: ' + line.length);
+    assert.ok(new RegExp('\\(' + txt.length + ' ký tự, dòng này chỉ hiện 300 ký tự đầu\\)').test(line) && /ACTIVITY_LOG: hành động TEMPLATE_DEDUPE_TEXT, run [0-9a-f]{8}, entity EMAIL_TEMPLATES, entity_id LOGIN_LINK/.test(line), line.substring(line.length - 400));
+    if (txt.length > 19000) assert.ok(actLog(api, 'TEMPLATE_DEDUPE_TEXT').length >= 2, name + ': chữ dài chia nhiều dòng');
+  });
+  // 120.000 ký tự: vượt cả giới hạn một ô của Google (mock từ chối), nên chứng minh ở hàm thuần (đúng phần code chia và nối)
+  const { api } = dupEnv(), huge = body(120000, 'h') + '"\n\\\u0001'.repeat(5000), plan = { tab: 'EMAIL_TEMPLATES', key: 'K', cells: [{ col: 'body_vi', kept_row: 9, discarded: [{ row: 5, text: 'x', full: huge }] }] };
+  const rows = api.dupTextLogRows_(plan), bits = rows.map(r => JSON.parse(r.detail));
+  assert.ok(rows.length >= 5 && rows.every(r => r.detail.length < api.LOG_DETAIL_FULL_MAX_), 'mỗi ô nhỏ hơn cỡ trang quản trị gửi đủ (LOG_DETAIL_FULL_MAX_): ' + Math.max.apply(null, rows.map(r => r.detail.length)));
+  assert.ok(bits.map(b => b.text).join('') === huge && bits.every((b, i) => b.part === i + 1 && b.parts === bits.length && b.chars === huge.length), 'nối lại đúng từng byte');
+  assert.strictEqual(api.dupSplitText_('', 10).join(''), ''); assert.strictEqual(api.dupSplitText_('😀😀😀', 4).join(''), '😀😀😀'); assert.ok(api.dupSplitText_('😀😀😀', 4).every(p => p.length % 2 === 0), 'không cắt giữa cặp thay thế');
+  // dòng tóm tắt không bao giờ quá cỡ dù bao nhiêu key trùng
+  const many = []; for (let i = 0; i < 3000; i++) many.push({ tab: 'CONTENT', key: 'k.' + i + 'x'.repeat(200), rows: [2, 3 + i, 4 + i], cells: [{ col: 'vi', adopted_from: null, kept_row: 3, discarded: [{ row: 2, text: 't', full: 'y'.repeat(1000) }] }] });
+  const sd = api.dupSummaryDetail_(many), arr = JSON.parse(sd); assert.ok(sd.length <= api.DUP_SUMMARY_MAX_, 'tóm tắt ' + sd.length); assert.ok(arr[arr.length - 1].truncated > 0 && arr.length > 10, 'cắt bớt kèm số còn lại'); assert.strictEqual(arr.length - 1 + arr[arr.length - 1].truncated, 3000);
+});
+
+t('I160', 'Soát 5R (FIX 2b): nhật ký chữ bị bỏ được GHI XUỐNG SHEETS trước khi ghi đè dòng nào; ghi nhật ký lỗi thì ném lỗi và không đụng tab; menu 1 báo CẢNH BÁO và vẫn chạy tiếp', () => {
+  // (1) thứ tự: tại mỗi lần DbTable.update của bước gộp, dòng TEMPLATE_DEDUPE_TEXT đã nằm trong Sheets
+  const a = dupEnv(), seen = [];
+  addDup(a.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  edit1(a.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { subject_vi: 'Bản đầu của admin' }); edit1(a.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { subject_vi: 'Bản cuối của admin', body_vi: 'Chữ cuối' });
+  const proto = a.api.DbTable_.prototype, upd = proto.update;
+  proto.update = function (row, patch) { if (this.name === 'EMAIL_TEMPLATES' && 'subject_vi' in patch) seen.push(a.env.state.spreadsheets.NEW_DB.sheets.ACTIVITY_LOG.values.filter(r => r[a.env.state.spreadsheets.NEW_DB.sheets.ACTIVITY_LOG.values[0].indexOf('action')] === 'TEMPLATE_DEDUPE_TEXT').length); return upd.apply(this, arguments); };
+  try { a.api.dedupeDuplicateKeys_(); } finally { proto.update = upd; }
+  assert.deepStrictEqual(seen, [1], 'khi ghi đè dòng đầu, nhật ký chữ bị bỏ đã có trong Sheets');
+  // (2) ghi nhật ký lỗi: ném lỗi, tab không bị đụng
+  const b = dupEnv(); addDup(b.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  edit1(b.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { subject_vi: 'Bản đầu' }); edit1(b.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { subject_vi: 'Bản cuối' });
+  const snap = snapshot(b.env, 'EMAIL_TEMPLATES'); b.env.state.failSetValuesOnce = 'ACTIVITY_LOG';
+  assert.throws(() => b.api.dedupeDuplicateKeys_(), /Service Spreadsheets timed out/);
+  assert.strictEqual(snapshot(b.env, 'EMAIL_TEMPLATES'), snap, 'chưa ghi đè gì');
+  b.env.state.failSetValuesOnce = null;
+  // (3) menu 1: CẢNH BÁO, vẫn chạy tiếp (còn thêm khoá CONFIG...), key vẫn trùng để lần sau; lần sau ổn thì gộp và có đủ chữ trong nhật ký
+  const c = dupEnv(); addDup(c.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  edit1(c.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { subject_vi: 'Bản đầu' }); edit1(c.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { subject_vi: 'Bản cuối' });
+  c.env.state.failSetValuesOnce = 'ACTIVITY_LOG';
+  const r1 = c.api.setupFirstRun(); c.api.clearDbCache_();
+  assert.ok(r1.lines.some(l => /^CẢNH BÁO: chưa gộp được dòng trùng key ở EMAIL_TEMPLATES, CONTENT \(.*timed out/.test(l)), r1.lines.join('|'));
+  assert.strictEqual(rowsOf(c.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK').length, 2, 'key vẫn trùng, chưa mất gì'); assert.ok(r1.lines.some(l => /ĐẠT|Sao lưu|Thêm|Môi trường/.test(l)));
+  const r2 = c.api.setupFirstRun(); c.api.clearDbCache_();
+  assert.strictEqual(rowsOf(c.api, 'EMAIL_TEMPLATES', 'LOGIN_LINK').length, 1); assert.deepStrictEqual(Object.values(dedupeTextFromLog(c.env, 'EMAIL_TEMPLATES', 'LOGIN_LINK')), ['Bản đầu']);
+  assert.ok(r2.lines.some(l => /^Gộp dòng trùng EMAIL_TEMPLATES: key LOGIN_LINK/.test(l)));
+});
+
+t('I161', 'Soát 5R (FIX 2c): sao lưu trước cập nhật HỎNG thì không gộp key nào sẽ bỏ chữ admin (để nguyên dòng, cảnh báo, ghi RELEASE_LOG DUP_SKIPPED, menu 2 vẫn nhắc); dòng giống nhau hoặc chữ admin so với chữ gốc vẫn gộp; sao lưu được thì gộp và giữ đủ chữ', () => {
+  const { api, env } = dupEnv();
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK'); addDup(api, 'EMAIL_TEMPLATES', 'REG_RECEIVED'); addDup(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND');
+  edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { subject_vi: 'Admin bản đầu' }); edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { subject_vi: 'Admin bản cuối' });
+  edit1(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND', 0, { body_vi: 'Tutor tự viết' });   // admin so với gốc: không bỏ chữ nào
+  addDup(api, 'CONTENT', 'h.hero_title'); edit1(api, 'CONTENT', 'h.hero_title', 0, { vi: 'CONTENT admin đầu' }); edit1(api, 'CONTENT', 'h.hero_title', 1, { vi: 'CONTENT admin cuối' });
+  env.state.props.APP_VERSION_LAST = '8.1.4';
+  const DA = env.globals.DriveApp, orig = DA.getFileById;
+  DA.getFileById = (id) => Object.assign({}, orig(id), { makeCopy: () => { throw new Error('Drive đầy'); } });
+  const r1 = api.setupFirstRun(); api.clearDbCache_(); api.clearContentCache_();
+  assert.ok(r1.lines.some(l => /CẢNH BÁO: chưa sao lưu được/.test(l)));
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK').length, 2, 'bỏ chữ admin: để nguyên'); assert.strictEqual(rowsOf(api, 'CONTENT', 'h.hero_title').length, 2, 'CONTENT cũng vậy');
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'REG_RECEIVED').length, 1, 'dòng giống nhau: gộp'); assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND').length, 1, 'chữ admin so với gốc: gộp');
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'TUTOR_REMIND')[0].body_vi, 'Tutor tự viết');
+  const skipLines = r1.lines.filter(l => /^CẢNH BÁO: KHÔNG gộp key trùng/.test(l)); assert.strictEqual(skipLines.length, 2, r1.lines.join('|'));
+  assert.ok(/EMAIL_TEMPLATES: LOGIN_LINK/.test(skipLines[0]) && /sao lưu/.test(skipLines[0]));
+  assert.strictEqual(actLog(api, 'TEMPLATE_DEDUPE_TEXT').length, 0, 'không gộp thì không có gì bị bỏ');
+  assert.ok(api.testSystem().lines.some(l => /EMAIL_TEMPLATES: key "LOGIN_LINK" xuất hiện 2 lần/.test(l)), 'menu 2 vẫn nhắc');
+  assert.strictEqual(env.state.props.APP_VERSION_LAST, '8.1.4', 'chưa ghi nhận phiên bản'); assert.ok(env.state.props.RELEASE_PENDING && JSON.parse(env.state.props.RELEASE_PENDING).items.some(x => x.kind === 'DUP_SKIPPED'));
+  // sao lưu được ở lần sau: gộp, giữ đủ chữ, RELEASE_LOG ghi cả hai
+  DA.getFileById = orig;
+  const r2 = api.setupFirstRun(); api.clearDbCache_(); api.clearContentCache_();
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK').length, 1); assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0].subject_vi, 'Admin bản cuối');
+  assert.deepStrictEqual(Object.values(dedupeTextFromLog(env, 'EMAIL_TEMPLATES', 'LOGIN_LINK')), ['Admin bản đầu']); assert.deepStrictEqual(Object.values(dedupeTextFromLog(env, 'CONTENT', 'h.hero_title')), ['CONTENT admin đầu']);
+  const kinds = api.table_('RELEASE_LOG').all().map(x => x.kind + ':' + x.item);
+  assert.ok(kinds.indexOf('DUP_SKIPPED:EMAIL_TEMPLATES.LOGIN_LINK') !== -1 && kinds.indexOf('DUP_MERGED:EMAIL_TEMPLATES.LOGIN_LINK') !== -1, kinds.filter(k => /^DUP_/.test(k)).join(', '));
+  assert.ok(r2.lines.some(l => /^Gộp dòng trùng EMAIL_TEMPLATES: key LOGIN_LINK/.test(l)));
+});
+
+t('I162', 'Soát 5R (FIX 3): ô active của EMAIL_TEMPLATES theo DÒNG CUỐI ở cả hai chiều: trạng thái gửi thư trước và sau khi gộp y hệt trong mọi cấu hình; mâu thuẫn có dòng cảnh báo riêng (menu 1) và có trong RELEASE_LOG, tóm tắt và email', () => {
+  const T = true, F = false, E = '', S = 'FALSE';
+  const configs = [[T, F], [F, T], [F, F], [T, T], [E, F], [F, E], [S, T], [T, S], [F, T, F], [F, F, T], [T, F, T], [T, T, F], [E, E]];
+  configs.forEach(cfg => {
+    const { api, env } = dupEnv(); const key = 'WELCOME';
+    for (let i = 1; i < cfg.length; i++) addDup(api, 'EMAIL_TEMPLATES', key);
+    cfg.forEach((v, i) => edit1(api, 'EMAIL_TEMPLATES', key, i, { active: v }));
+    api.clearDbCache_(); api.clearContentCache_();
+    const before = api.emailTemplate_(key).active, name = JSON.stringify(cfg);
+    const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+    assert.strictEqual(api.emailTemplate_(key).active, before, 'trạng thái gửi thư không đổi ' + name);
+    assert.strictEqual(before, api.emailActiveOn_(cfg[cfg.length - 1]), 'đúng là dòng cuối ' + name);
+    const w = api.dupActiveWarnings_(rep), opposite = cfg.some(v => api.emailActiveOn_(v) !== api.emailActiveOn_(cfg[cfg.length - 1]));
+    assert.strictEqual(w.length, opposite ? 1 : 0, 'cảnh báo khi có dòng nói ngược ' + name);
+    if (opposite) { assert.strictEqual(w[0].state, before ? 'ON' : 'OFF'); assert.ok(/CHÚ Ý QUAN TRỌNG: mẫu email WELCOME/.test(w[0].vi) && new RegExp(before ? 'ĐANG GỬI' : 'ĐANG TẮT').test(w[0].vi) && /ngược lại/.test(w[0].vi) && /IMPORTANT/.test(w[0].en)); }
+  });
+  // menu 1 và tóm tắt cập nhật: cả hai chiều
+  [[F, T, 'ĐANG GỬI'], [T, F, 'ĐANG TẮT']].forEach(([first, last, word]) => {
+    const { api, env } = dupEnv(); addDup(api, 'EMAIL_TEMPLATES', 'WELCOME');
+    edit1(api, 'EMAIL_TEMPLATES', 'WELCOME', 0, { active: first }); edit1(api, 'EMAIL_TEMPLATES', 'WELCOME', 1, { active: last });
+    api.clearDbCache_(); api.clearContentCache_(); const before = api.emailTemplate_('WELCOME').active; env.state.props.APP_VERSION_LAST = '8.1.4';
+    const r = api.setupFirstRun(); api.clearDbCache_(); api.clearContentCache_();
+    assert.strictEqual(api.emailTemplate_('WELCOME').active, before);
+    const own = r.lines.filter(l => /^CHÚ Ý QUAN TRỌNG: mẫu email WELCOME/.test(l)); assert.strictEqual(own.length, 1, r.lines.join('|')); assert.ok(own[0].indexOf(word) !== -1 && !/^Gộp dòng trùng/.test(own[0]), own[0]);
+    assert.ok(!r.lines.some(l => /^Gộp dòng trùng/.test(l) && /CHÚ Ý QUAN TRỌNG/.test(l)), 'cảnh báo không chôn trong dòng gộp');
+    assert.ok(r.lines.some(l => /^CHÚ Ý: 1 mẫu email có các dòng trùng key nói KHÁC NHAU về ô active.*EMAIL_TEMPLATES\.WELCOME/.test(l)), 'tóm tắt cập nhật có dòng riêng');
+    const log = api.table_('RELEASE_LOG').all().filter(x => x.kind === 'DUP_ACTIVE'); assert.strictEqual(log.length, 1); assert.strictEqual(log[0].item, 'EMAIL_TEMPLATES.WELCOME'); assert.ok(log[0].detail.indexOf(word) !== -1);
+    const mail = env.state.mails.find(m => /ADMIN_RELEASE_NOTES|cập nhật/i.test(m.subject) && /WELCOME/.test(m.htmlBody || m.body || '')); assert.ok(mail, 'email tóm tắt nhắc mẫu WELCOME'); assert.ok(/Cần bạn xem|Needs your attention/.test(mail.htmlBody || mail.body));
+  });
+});
+
+t('I163', 'Soát 5R (FIX 5), sửa X2: bản ghi số đo cắt theo BYTE UTF-8 (giới hạn Script Properties 9 KB mỗi giá trị): chữ Việt có dấu nhiều mục KHÔNG còn bị bỏ, phần quá 8.000 byte chuyển sang RELEASE_PENDING_1, _2...; mỗi giá trị JSON hợp lệ và dưới giới hạn; đọc lại đủ và đúng thứ tự; mock đếm byte như Google', () => {
+  const { api, env } = dupEnv();
+  const viet = 'Dòng chữ web mới ăâêôơư ĐƯỢC ghi tiếng Việt có dấu '.repeat(4);
+  const items = []; for (let i = 0; i < 80; i++) items.push({ kind: 'CONTENT_ADDED', item: 'khoa.' + i, vi: viet + i, en: 'English text ' + i });
+  assert.ok(JSON.stringify({ target: api.APP.VERSION, items }).length > 8000, 'ví dụ vượt 8.000 ký tự');
+  // mock đếm byte (đúng Google): chữ Việt dưới 8.000 ký tự nhưng trên 9 KB byte bị từ chối
+  const big = 'ă'.repeat(4700); assert.ok(big.length < 8000 && Buffer.byteLength(big, 'utf8') > 9 * 1024); assert.throws(() => env.globals.PropertiesService.getScriptProperties().setProperty('X_TEST', big), /9 KB/);
+  env.state.props.APP_VERSION_LAST = '8.1.4';   // đang nâng cấp từ 8.1.4 (chưa ghi nhận phiên bản mới)
+  api.upgradeStart_(api.dbSpreadsheet_()); items.forEach(x => api.upgradeAdd_(x.kind, x.item, x.vi, x.en));   // UPGRADE_RUN_ của lượt menu 1 đang chạy (file đã có dữ liệu)
+  api.releasePendingSave_();
+  const raw = env.state.props.RELEASE_PENDING; assert.ok(raw, 'đã lưu được (không còn nuốt lỗi)');
+  assert.ok(Buffer.byteLength(raw, 'utf8') <= api.RELEASE_PENDING_MAX_BYTES_ && api.RELEASE_PENDING_MAX_BYTES_ < 9 * 1024, 'dưới giới hạn byte: ' + Buffer.byteLength(raw, 'utf8'));
+  const o = JSON.parse(raw); assert.strictEqual(o.target, api.APP.VERSION); assert.ok(o.items.length > 5 && o.items.length < 80, 'phần đầu nằm ở RELEASE_PENDING: ' + o.items.length);
+  const partKeys = Object.keys(env.state.props).filter(k => /^RELEASE_PENDING_\d+$/.test(k)); assert.ok(partKeys.length >= 1 && o.parts === partKeys.length + 1, 'phần còn lại ở RELEASE_PENDING_n: ' + partKeys);
+  partKeys.forEach(k => { assert.ok(Buffer.byteLength(k + env.state.props[k], 'utf8') <= 9 * 1024, k); assert.ok(Array.isArray(JSON.parse(env.state.props[k]))); });
+  const back = api.releasePendingRead_(); assert.deepStrictEqual(back.items, items, 'đọc lại ĐỦ 80 mục đúng thứ tự, không mục nào bị bỏ'); assert.strictEqual(back.trunc, 0);
+  // ít mục thì chỉ một giá trị; mục toàn ký tự ngoài BMP vẫn đếm đúng 4 byte
+  ['RELEASE_PENDING'].concat(partKeys).forEach(k => delete env.state.props[k]); api.upgradeStart_(api.dbSpreadsheet_()); items.slice(0, 3).forEach(x => api.upgradeAdd_(x.kind, x.item, x.vi, x.en)); api.releasePendingSave_(); assert.strictEqual(JSON.parse(env.state.props.RELEASE_PENDING).items.length, 3);
+  assert.strictEqual(api.utf8Len_('aă€😀'), 1 + 2 + 3 + 4); assert.strictEqual(api.utf8Len_(viet), Buffer.byteLength(viet, 'utf8'));
+});
+
+t('I164', 'Soát 5R (FIX 6): gộp CONTENT trùng key lấy default_vi, default_en từ CÙNG dòng với vi, en đã chọn; ô chưa sửa (bằng chữ gốc cũ của dòng đó) không bị báo nhầm là admin đã sửa và được nâng lên chữ gốc mới', () => {
+  const { api } = dupEnv(), key = 'h.hero_title', d = api.contentDefaults_()[key];
+  // dòng đầu: chữ gốc cũ D0 (ô vi bằng default_vi); dòng cuối: chữ gốc cũ D1 (ô vi bằng default_vi). Chữ gốc trong code nay là d.vi (khác cả hai).
+  addDup(api, 'CONTENT', key);
+  edit1(api, 'CONTENT', key, 0, { vi: 'Chữ gốc cũ D0', default_vi: 'Chữ gốc cũ D0' }); edit1(api, 'CONTENT', key, 1, { vi: 'Chữ gốc cũ D1', default_vi: 'Chữ gốc cũ D1' });
+  api.clearDbCache_(); api.clearContentCache_();
+  const rep = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_();
+  assert.strictEqual(rep.length, 1); const r = rowsOf(api, 'CONTENT', key)[0];
+  assert.strictEqual(r.vi, 'Chữ gốc cũ D1', 'dòng cuối đang dùng'); assert.strictEqual(r.default_vi, 'Chữ gốc cũ D1', 'default_vi lấy từ CÙNG dòng với vi (không phải dòng đầu)');
+  const cs = api.seedContent_(); api.clearDbCache_();
+  assert.ok(!cs.kept.some(x => x.key === key), 'không báo nhầm "admin đã sửa": ' + JSON.stringify(cs.kept));
+  assert.ok(cs.refreshed.some(x => x.key === key && x.col === 'vi'), 'được nâng lên chữ gốc mới');
+  const after = rowsOf(api, 'CONTENT', key)[0]; assert.strictEqual(after.vi, d.vi); assert.strictEqual(after.default_vi, d.vi);
+  // chữ admin thật sự sửa (ở dòng khác) vẫn thắng và vẫn được báo là đã sửa; default_vi theo dòng của nó
+  const { api: b } = dupEnv(); addDup(b, 'CONTENT', key);
+  edit1(b, 'CONTENT', key, 0, { vi: 'Chữ admin thật', default_vi: 'Chữ gốc cũ D0' }); edit1(b, 'CONTENT', key, 1, { vi: 'Chữ gốc cũ D1', default_vi: 'Chữ gốc cũ D1' });
+  b.dedupeDuplicateKeys_(); b.clearDbCache_(); b.clearContentCache_();
+  const r2 = rowsOf(b, 'CONTENT', key)[0]; assert.strictEqual(r2.vi, 'Chữ admin thật'); assert.strictEqual(r2.default_vi, 'Chữ gốc cũ D0');
+  assert.ok(b.seedContent_().kept.some(x => x.key === key && x.col === 'vi'), 'chữ admin sửa thật: GIỮ và báo');
+  assert.strictEqual(rowsOf(b, 'CONTENT', key)[0].vi, 'Chữ admin thật');
+});
+
+t('I165', 'Soát 5R (FIX 4): ảnh QR cũ không sống sót sau khi thay file nguyên link: số phiên bản BANK_QR_REV nằm trong dấu và khoá bộ nhớ đệm; tăng bởi menu 2, sửa tay CONFIG (ảnh, tên, số, chủ tài khoản) và menu Làm mới ảnh QR; mục lỗi 300 giây cũng bỏ; apiPublicInfo không gọi Drive; apiBankQr không khoá, không ghi Sheets', () => {
+  const c = mk(), { api, env } = c, ID = 'AbC_dEf-1234567890xyz', link = 'https://drive.google.com/file/d/' + ID + '/view';
+  const put = (mime, n, fill) => { env.state.drive.files[ID] = { id: ID, name: 'qr', parent: null, created: new Date(2026, 0, 1), trashed: false, mime, bytes: Buffer.alloc(n, fill) }; };
+  const b64 = (n, fill) => 'data:image/png;base64,' + Buffer.alloc(n, fill).toString('base64');
+  put('image/png', 3000, 5); cfgSet(c, 'BANK_QR_IMAGE', link);
+  const m1 = api.bankQrMarker_(), r1 = api.apiBankQr();
+  assert.ok(r1.data.qr === m1 && r1.data.src === b64(3000, 5));
+  // Thay nội dung file dưới CÙNG mã: không có gì báo cho trang, bộ nhớ đệm đang đúng ý đồ (6 giờ)
+  put('image/png', 3000, 7);
+  assert.strictEqual(api.apiBankQr().data.src, b64(3000, 5), 'chưa làm mới: bộ nhớ đệm giữ ảnh cũ'); assert.strictEqual(api.bankQrMarker_(), m1);
+  // (i) menu 2: mỗi lần kiểm là một lần làm mới, dòng báo cho admin
+  const lines = api.testSystem().lines.join('\n');
+  assert.ok(/ĐẠT\s+BANK_QR_IMAGE hợp lệ: image\/png, 3 KB\. Đã làm mới ảnh cho khách xem trang.*CÙNG link: chạy lại menu 2 này hoặc menu Email > Làm mới ảnh QR chuyển khoản/.test(lines), lines.split('\n').filter(x => /QR/.test(x)).join('|'));
+  const m2 = api.bankQrMarker_(); assert.notStrictEqual(m2, m1, 'dấu đổi'); assert.strictEqual(api.apiPublicInfo().data.bank.qr, m2, 'trang nhận dấu mới, trình duyệt khoá theo dấu nên bỏ ảnh cũ');
+  assert.strictEqual(api.apiBankQr().data.src, b64(3000, 7), 'ảnh mới hiện ngay'); assert.strictEqual(api.apiBankQr().data.qr, m2);
+  assert.ok(env.state.props.BANK_QR_REV && Object.keys(env.state.cache).some(k => k.indexOf('bq_' + m2) === 0) && !Object.keys(env.state.cache).some(k => k.indexOf('bq_' + m2) === 0 && k === 'bq_' + m1), 'khoá bộ nhớ đệm theo dấu mới');
+  // (iii) menu Làm mới ảnh QR chuyển khoản: chỉ người vận hành, ghi nhật ký, báo ảnh dùng được hay không
+  put('image/png', 3000, 9); env.state.uiLog = []; env.state.uiScript = [];
+  api.menuRefreshBankQr();
+  assert.strictEqual(api.apiBankQr().data.src, b64(3000, 9)); assert.notStrictEqual(api.bankQrMarker_(), m2);
+  assert.ok(/Đã làm mới ảnh QR cho khách.*image\/png, 3 KB/.test(env.state.uiLog.filter(x => x.kind === 'alert').map(x => x.title + x.msg).pop()));
+  const lg = api.table_('ACTIVITY_LOG').all().filter(x => x.action === 'BANK_QR_REFRESH'); assert.strictEqual(lg.length, 1); assert.deepStrictEqual(JSON.parse(lg[0].detail), { result: 'OK' });
+  assert.ok(api.DEFAULT_CONTENT_['ad.act.BANK_QR_REFRESH'][0] && api.DEFAULT_CONTENT_['ad.act.BANK_QR_REFRESH'][1], 'tên hành động nhật ký song ngữ (luật 52)');
+  const adm = env.state.activeUserEmail; env.state.activeUserEmail = 's003@student.test'; assert.throws(() => api.menuRefreshBankQr(), /Không có quyền/); env.state.activeUserEmail = adm;
+  // (ii) sửa tay CONFIG: BANK_QR_IMAGE, BANK_NAME, BANK_ACCOUNT, BANK_HOLDER làm mới; khoá khác thì không
+  ['BANK_NAME', 'BANK_ACCOUNT', 'BANK_HOLDER', 'SCHOOL_NAME'].forEach(k => cfgSet(c, k, 'Giá trị ' + k)); api.clearDbCache_();
+  const cs = env.globals.SpreadsheetApp.openById(api.getDbId_()).getSheetByName('CONFIG'), editKey = (key, nr) => { const row = api.table_('CONFIG').byId(key)._row; const rg = cs.getRange(row, 2, nr || 1, 1); api.onEditInstallable({ range: rg, value: 'x', user: { getEmail: () => EMAIL.ADMIN } }); };
+  ['BANK_QR_IMAGE', 'BANK_NAME', 'BANK_ACCOUNT', 'BANK_HOLDER'].forEach((k, i) => {
+    api.clearDbCache_(); const before = api.bankQrMarker_(); put('image/png', 3000, 20 + i);
+    editKey(k); api.clearConfigCache_();
+    assert.notStrictEqual(api.bankQrMarker_(), before, 'sửa ' + k + ' làm mới'); assert.strictEqual(api.apiBankQr().data.src, b64(3000, 20 + i), k);
+  });
+  api.clearDbCache_(); const keep = api.bankQrMarker_(); editKey('SCHOOL_NAME'); api.clearConfigCache_(); assert.strictEqual(api.bankQrMarker_(), keep, 'khoá không liên quan thì không làm mới');
+  // vùng nhiều ô phủ lên dòng BANK_ACCOUNT (dán nhiều dòng)
+  const rowAcc = api.table_('CONFIG').byId('BANK_ACCOUNT')._row; api.onEditInstallable({ range: cs.getRange(rowAcc - 1, 2, 3, 1), user: { getEmail: () => EMAIL.ADMIN } }); api.clearConfigCache_(); assert.notStrictEqual(api.bankQrMarker_(), keep, 'dán nhiều dòng chạm BANK_ACCOUNT');
+  // (c) lỗi nhớ 300 giây: file hỏng rồi sửa; sau menu 2 thấy ngay
+  api.clearDbCache_(); env.state.drive.files[ID].trashed = true; api.testSystem(); assert.strictEqual(api.apiBankQr().data.src, '');
+  env.state.drive.files[ID].trashed = false; put('image/png', 3000, 33);
+  assert.strictEqual(api.apiBankQr().data.src, '', 'còn trong thời gian nhớ lỗi');
+  api.testSystem(); assert.strictEqual(api.apiBankQr().data.src, b64(3000, 33), 'bump bỏ cả mục lỗi: file đã sửa hiện ngay');
+  // apiPublicInfo: không gọi Drive, đọc số phiên bản rẻ (một Script Property, nhớ trong lần chạy)
+  const calls = []; const DA = env.globals.DriveApp; Object.keys(DA).forEach(k => { if (typeof DA[k] === 'function') { const o = DA[k]; DA[k] = function () { calls.push(k); return o.apply(this, arguments); }; } });
+  let revReads = 0; const ps = env.globals.PropertiesService.getScriptProperties(), og = ps.getProperty; ps.getProperty = (k) => { if (k === 'BANK_QR_REV') revReads++; return og(k); };
+  const pi = api.apiPublicInfo(); assert.ok(pi.ok && pi.data.bank.qr); api.apiPublicInfo();
+  assert.deepStrictEqual(calls, [], 'apiPublicInfo không gọi Drive'); assert.ok(revReads <= 2, 'mỗi lượt API đọc số phiên bản tối đa một lần: ' + revReads);
+  revReads = 0; for (let i = 0; i < 6; i++) api.bankQrMarker_(); assert.ok(revReads <= 1, 'nhớ trong lần chạy: ' + revReads);
+  ps.getProperty = og;
+  // apiBankQr vẫn không khoá, không ghi Sheets
+  const l0 = env.state.lockCalls, w0 = env.state.writeCalls || 0; api.apiBankQr(); assert.strictEqual(env.state.lockCalls, l0, 'không lấy khoá'); assert.strictEqual(env.state.writeCalls || 0, w0, 'không ghi Sheets');
+});
+
+t('I190', 'Soát vòng 3 (D1): chữ bị bỏ khi gộp cùng một key ở HAI lượt khác nhau khôi phục được riêng từng lượt, đúng từng byte (mã run ở mọi dòng TEMPLATE_DEDUPE_TEXT và dòng tóm tắt TEMPLATE_DEDUPE); lượt chạy lại sau khi bị ngắt cũng vậy', () => {
+  const { api, env } = dupEnv();
+  const merge = (a, b) => { addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK'); edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { body_vi: a }); edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { body_vi: b }); const r = api.dedupeDuplicateKeys_(); api.clearDbCache_(); api.clearContentCache_(); return r; };
+  const r1 = merge('RUN1 first', 'RUN1 last'), row1 = r1[0].cells[0].discarded[0].row;
+  const r2 = merge('RUN2 first', 'RUN2 last'), row2 = r2[0].cells[0].discarded[0].row;
+  assert.strictEqual(row1, row2, 'dòng đầu của key giữ nguyên số hàng: số hàng KHÔNG đủ để phân biệt hai lượt');
+  assert.ok(r1[0].run && r2[0].run && r1[0].run !== r2[0].run, 'mỗi lượt gộp một tab có mã run riêng');
+  const runs = dedupeTextRuns(env, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  assert.deepStrictEqual(Object.keys(runs).sort(), [r1[0].run, r2[0].run].sort());
+  assert.deepStrictEqual(runs[r1[0].run], { ['body_vi|' + row1]: 'RUN1 first' }); assert.deepStrictEqual(runs[r2[0].run], { ['body_vi|' + row2]: 'RUN2 first' });
+  // dòng tóm tắt cùng mã run (ghép được hai dòng)
+  const sums = actLog(api, 'TEMPLATE_DEDUPE').map(x => JSON.parse(x.detail)[0].run); assert.deepStrictEqual(sums.sort(), [r1[0].run, r2[0].run].sort());
+  assert.ok(/run [0-9a-f]{8}, entity EMAIL_TEMPLATES/.test(api.dupReportLines_(r2).join('\n')), 'dòng menu 1 ghi mã run');
+  assert.ok(/CÙNG run, entity, entity_id, col, row/.test(api.DEFAULT_CONTENT_['ad.act.TEMPLATE_DEDUPE_TEXT'][2]) && /cùng run, entity, entity_id, col, row/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'Setup.gs'), 'utf8')), 'chữ hướng dẫn khôi phục (Content.gs, chú thích dupTextLogRows_) nhắc run');
+  // chạy lại sau khi bị ngắt SAU khi nhật ký đã ghi: lượt 1 ghi chữ của cả hai key, ngắt ở lần ghi ô thứ hai; lượt 2 ghi lại chữ của key chưa gộp bằng run khác
+  const e2 = dupEnv(); const A = e2.api;
+  ['LOGIN_LINK', 'REG_RECEIVED'].forEach(k => { addDup(A, 'EMAIL_TEMPLATES', k); edit1(A, 'EMAIL_TEMPLATES', k, 0, { subject_vi: k + ' đầu' }); edit1(A, 'EMAIL_TEMPLATES', k, 1, { subject_vi: k + ' cuối' }); });
+  const proto = A.DbTable_.prototype, upd = proto.update; let n = 0;
+  proto.update = function (row, patch) { if (this.name === 'EMAIL_TEMPLATES' && 'subject_vi' in patch && ++n === 2) throw new Error('ghi ô lần hai hỏng (giả lập)'); return upd.apply(this, arguments); };
+  try { assert.throws(() => A.dedupeDuplicateKeys_(), /giả lập/); } finally { proto.update = upd; }
+  A.clearDbCache_(); A.dedupeDuplicateKeys_(); A.clearDbCache_(); A.clearContentCache_();
+  ['LOGIN_LINK', 'REG_RECEIVED'].forEach(k => {
+    const rr = dedupeTextRuns(e2.env, 'EMAIL_TEMPLATES', k), ids = Object.keys(rr);
+    assert.ok(ids.some(id => Object.values(rr[id]).indexOf(k + ' đầu') !== -1), k + ': chữ gốc của lượt bị ngắt vẫn còn');
+    ids.forEach(id => Object.values(rr[id]).forEach(v => assert.ok(v === k + ' đầu', k + ': mỗi lượt khôi phục đúng một chữ, không nối hai lượt: ' + JSON.stringify(v))));
+  });
+  assert.strictEqual(Object.keys(dedupeTextRuns(e2.env, 'EMAIL_TEMPLATES', 'REG_RECEIVED')).length, 2, 'key chưa gộp ở lượt 1 được ghi lại bằng run khác ở lượt 2');
+});
+
+t('I191', 'Soát vòng 3 (D2): lượt gộp bị ngắt SAU khi nhật ký đã ghi (lần ghi ô thứ hai lỗi) thì menu 1 có dòng "CẢNH BÁO: gộp dở" cho từng key đã ghi nhật ký, trỏ tới chữ đã lưu, và chữ khôi phục được; lượt chạy lại không cần báo lại', () => {
+  const { api, env } = dupEnv();
+  ['LOGIN_LINK', 'REG_RECEIVED'].forEach(k => { addDup(api, 'EMAIL_TEMPLATES', k); edit1(api, 'EMAIL_TEMPLATES', k, 0, { subject_vi: k + ' đầu' }); edit1(api, 'EMAIL_TEMPLATES', k, 1, { subject_vi: k + ' cuối' }); });
+  const proto = api.DbTable_.prototype, upd = proto.update; let n = 0;
+  proto.update = function (row, patch) { if (this.name === 'EMAIL_TEMPLATES' && 'subject_vi' in patch && ++n === 2) throw new Error('ghi ô lần hai hỏng (giả lập)'); return upd.apply(this, arguments); };
+  let r; try { r = api.setupFirstRun(); } finally { proto.update = upd; }
+  const ab = r.lines.filter(l => /^CẢNH BÁO: gộp dở, chữ bị bỏ đã lưu ở ACTIVITY_LOG/.test(l)); assert.strictEqual(ab.length, 2, r.lines.join('\n'));
+  ['LOGIN_LINK', 'REG_RECEIVED'].forEach((k, i) => { assert.ok(ab.some(l => l.indexOf('key ' + k) !== -1 && /run [0-9a-f]{8}, entity EMAIL_TEMPLATES, entity_id /.test(l) && l.indexOf('entity_id ' + k) !== -1)); });
+  assert.ok(r.lines.some(l => /^CẢNH BÁO: chưa gộp được dòng trùng key/.test(l)), 'dòng lỗi chung vẫn còn');
+  api.clearDbCache_();
+  // dòng đầu của key thứ nhất đã bị ghi đè, chữ gốc nằm ở nhật ký
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK')[0].subject_vi, 'LOGIN_LINK cuối');
+  const rr = dedupeTextRuns(env, 'EMAIL_TEMPLATES', 'LOGIN_LINK'), runId = Object.keys(rr)[0];
+  assert.deepStrictEqual(Object.values(rr[runId]), ['LOGIN_LINK đầu']); assert.ok(ab.some(l => l.indexOf('run ' + runId) !== -1), 'dòng báo ghi đúng mã run của chữ đã lưu');
+  // số đo cập nhật vẫn ghi các key này (một mục mỗi key)
+  const mi = api.UPGRADE_RUN_ ? api.UPGRADE_RUN_.items.filter(x => x.kind === 'DUP_MERGED').map(x => x.item).sort() : null;
+  if (mi) assert.deepStrictEqual(mi, ['EMAIL_TEMPLATES.LOGIN_LINK', 'EMAIL_TEMPLATES.REG_RECEIVED']);
+  const r2 = api.setupFirstRun(); api.clearDbCache_();
+  assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK').length, 1); assert.strictEqual(rowsOf(api, 'EMAIL_TEMPLATES', 'REG_RECEIVED').length, 1);
+  assert.ok(!r2.lines.some(l => /gộp dở/.test(l)));
+});
+
+t('I192', 'Soát vòng 3 (D3): mọi dòng TEMPLATE_DEDUPE_TEXT, kể cả chữ toàn ký tự điều khiển (JSON gấp 6 lần) và mã run, nhỏ hơn cỡ chi tiết trang quản trị gửi đủ (LOG_DETAIL_FULL_MAX_, hằng số adminLogView_ dùng): không bị cắt im lặng', () => {
+  const { api } = dupEnv();
+  assert.ok(api.DUP_TEXT_CHUNK_ < api.LOG_DETAIL_FULL_MAX_);
+  const worst = '\u0001'.repeat(60000) + '"\n'.repeat(30000), plan = { tab: 'EMAIL_TEMPLATES', key: 'K'.repeat(50), cells: [{ col: 'subject_en', kept_row: 99999, discarded: [{ row: 99998, text: 'x', full: worst }] }] };
+  const rows = api.dupTextLogRows_(plan, 'abcd1234'), bits = rows.map(r => JSON.parse(r.detail));
+  assert.ok(rows.length >= 7);
+  rows.forEach(r => { assert.ok(r.detail.length < api.LOG_DETAIL_FULL_MAX_, 'detail ' + r.detail.length + ' phải nhỏ hơn ' + api.LOG_DETAIL_FULL_MAX_); const v = api.adminLogView_({ _row: 2, time: new Date(2026, 10, 14), actor: 'a', action: 'TEMPLATE_DEDUPE_TEXT', entity: 'E', entity_id: 'K', detail: r.detail }, true); assert.strictEqual(v.detail, r.detail, 'trang quản trị gửi đủ, không cắt'); });
+  assert.strictEqual(bits.map(b => b.text).join(''), worst);
+});
+
+t('I193', 'Soát vòng 3 (D6 i): emailActiveOn_ khớp BIỂU THỨC của bản 8.1.4 (sao nguyên văn từ src/EmailTemplates.gs ở commit 7bb6780) trên 18 giá trị; chỉ false và chữ FALSE (mọi kiểu hoa thường, không cắt khoảng trắng) là TẮT', () => {
+  const { api } = dupEnv();
+  // Nguyên văn từ git show 7bb6780:src/EmailTemplates.gs (emailTemplate_): `if (row.active !== undefined && row.active !== '' && (row.active === false || String(row.active).toUpperCase() === 'FALSE')) t.active = false;`
+  const ref814 = (v) => { const row = { active: v }, t = { active: true }; if (row.active !== undefined && row.active !== '' && (row.active === false || String(row.active).toUpperCase() === 'FALSE')) t.active = false; return t.active; };
+  const matrix = [[true, true], [false, false], ['TRUE', true], ['FALSE', false], ['false', false], ['False', false], [' FALSE', true], ['FALSE ', true], ['0', true], [0, true], [1, true], ['no', true], ['NO', true], ['', true], [undefined, true], [null, true], ['x', true], [NaN, true]];
+  assert.strictEqual(matrix.length, 18);
+  matrix.forEach(([v, on]) => { const name = typeof v === 'string' ? JSON.stringify(v) : String(v); assert.strictEqual(ref814(v), on, 'bảng kỳ vọng khớp biểu thức 8.1.4: ' + name); assert.strictEqual(api.emailActiveOn_(v), ref814(v), 'emailActiveOn_ khác 8.1.4 ở giá trị ' + name); });
+  // và emailTemplate_ (đường gửi thư thật) dùng đúng hàm đó với giá trị đọc từ ô
+  [false, 'FALSE', 'false', true, '', ' FALSE'].forEach(v => { edit1(api, 'EMAIL_TEMPLATES', 'WELCOME', 0, { active: v }); api.clearDbCache_(); api.clearContentCache_(); assert.strictEqual(api.emailTemplate_('WELCOME').active, ref814(v === '' ? '' : v), 'emailTemplate_ ô ' + JSON.stringify(v)); });
+});
+
+t('I194', 'Soát vòng 3 (D6 ii): số phiên bản ảnh QR (BANK_QR_REV) nhớ trong một lượt chạy và forgetEnvMemo_ quên nó: lượt chạy khác tăng số thì điểm vào kế tiếp thấy dấu mới', () => {
+  const c = mk(), { api, env } = c, ID = 'AbC_dEf-1234567890xyz';
+  env.state.drive.files[ID] = { id: ID, name: 'qr', parent: null, created: new Date(2026, 0, 1), trashed: false, mime: 'image/png', bytes: Buffer.alloc(100, 5) };
+  cfgSet(c, 'BANK_QR_IMAGE', ID);
+  const m1 = api.bankQrMarker_();
+  env.state.props.BANK_QR_REV = 'luot-khac-vua-tang';   // một lượt chạy khác (menu, onEdit) vừa tăng số
+  assert.strictEqual(api.bankQrMarker_(), m1, 'trong cùng lượt chạy: dùng số đã nhớ (một lần đọc)');
+  api.forgetEnvMemo_();
+  const m2 = api.bankQrMarker_(); assert.notStrictEqual(m2, m1, 'forgetEnvMemo_ quên số đã nhớ');
+  env.state.props.BANK_QR_REV = 'lan-nua';
+  assert.strictEqual(api.apiPublicInfo().data.bank.qr !== m2, true, 'điểm vào API (apiWrap_ gọi forgetEnvMemo_) thấy số mới');
+  assert.ok(/^[0-9a-f]{12}$/.test(api.bankQrBump_()) && /^[0-9a-f]{12}$/.test(env.state.props.BANK_QR_REV), 'số mới là mã ngẫu nhiên, không lấy từ đồng hồ (luật 1)');
+  const a = api.bankQrBump_(), b = api.bankQrBump_(); assert.notStrictEqual(a, b);
+  assert.ok(!/realNowMs_|Date\.now/.test(api.bankQrBump_.toString()), 'bankQrBump_ không dùng đồng hồ');
+});
+
+t('I195', 'Soát vòng 3 (D5): --same-version phải kèm ĐÚNG APP.VERSION hiện tại; chỉ cần khi mặc định đổi mà phiên bản không đổi', () => {
+  const rb = require('./tools/release_baseline'), g = rb.writeGuard, V = '8.1.9';
+  assert.strictEqual(g(['--write'], V, V, 0), null, 'không có thay đổi: ghi được');
+  assert.strictEqual(g(['--write'], '8.1.8', V, 3), null, 'phiên bản đã tăng: ghi được');
+  assert.ok(/Tăng phiên bản trước.*--same-version=8\.1\.9/.test(g(['--write'], V, V, 3)), 'không cờ: từ chối');
+  assert.ok(/phải kèm đúng số phiên bản hiện tại.*--same-version=8\.1\.9/.test(g(['--write', '--same-version'], V, V, 3)), 'cờ trần: từ chối');
+  assert.ok(/phải kèm đúng/.test(g(['--write', '--same-version=8.1.4'], V, V, 3)), 'sai số: từ chối (bản đã phát hành)');
+  assert.ok(/phải kèm đúng/.test(g(['--write', '--same-version='], V, V, 3)), 'cờ rỗng: từ chối');
+  assert.strictEqual(g(['--write', '--same-version=8.1.9'], V, V, 3), null, 'đúng số: được');
+  assert.ok(/--same-version=8\.1\.9/.test(fs.readFileSync(path.join(__dirname, 'tools', 'release_baseline.js'), 'utf8')), 'phần đầu của công cụ ghi cách dùng dạng có số');
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+// Chunk 5R · T4a: ghi chú phát hành, tóm tắt cập nhật của menu 1, và NÂNG CẤP TỪ BẢN 8.1.4 ĐANG CHẠY THẬT
+// Dữ liệu thử là bản sao trạng thái một hệ thống 8.1.4 (test/fixtures/db_8_1_4.json, dựng bằng test/tools/make_fixture_8_1_4.js từ chính
+// mã 8.1.4 và API thật của bản đó), nạp vào môi trường giả lập rồi chạy MÃ HIỆN TẠI lên trên, đúng như admin dán code mới rồi bấm menu 1.
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+const fxio = require('./tools/fixture_io'), relb = require('./tools/release_baseline');
+const FX814_TEXT = fs.readFileSync(path.join(__dirname, 'fixtures', 'db_8_1_4.json'), 'utf8');
+const FX_DB = 'NEW_DB';
+/** Số dòng RELEASE_LOG khi nâng 8.1.4 lên bản này: mọi gạch đầu dòng của 5 bản + 18 việc đo thật (2 khoá CONFIG, 1 khoá lạ, 1 tab, 1 cột, 8 dòng chữ web, 1 mẫu email, 2 luật thông báo, 2 key trùng). */
+const UPG_MEASURED = 18;
+const UPG_LOG_ROWS = (api) => api.releaseNoteItems_(api.releaseNotesBetween_('8.1.4', api.APP.VERSION)).length + UPG_MEASURED;
+
+/** Hệ thống 8.1.4 đang chạy thật (giờ giả lập thứ Ba 10/11/2026 10:00), chưa dán code mới vào. */
+function fx814(o) {
+  o = o || {};
+  const { api, env } = load({ props: {} }), data = fxio.parse(FX814_TEXT);
+  // Fixture lưu các mốc ĐỒNG HỒ THẬT (nhịp tim job, BACKUP_OK_AT, MET_LAST) lúc dựng; healthStatus_ so chúng với đồng hồ thật (luật 1). Dời về "bây giờ"
+  // mỗi lần nạp để test không đỏ chỉ vì fixture cũ. o.ageMs: giả lập fixture cũ hơn (kiểm chính cơ chế dời); o.noRebase: bỏ dời (chứng minh test nhạy).
+  if (o.ageMs) Object.keys(data.props).forEach(k => { if (/^1[5-9]\d{11}$/.test(data.props[k])) data.props[k] = String(Number(data.props[k]) - o.ageMs); });
+  if (!o.noRebase) fxio.rebaseRealClock(data, Date.now());
+  fxio.restore(env, data);
+  return { api, env, st: env.state };
+}
+const fxCell = (x) => (x instanceof Date ? 'D:' + x.getTime() : x === undefined || x === null ? '' : x);
+/** Mọi tab: { head, rows } (rows là mảng ô đã chuẩn hoá theo đúng thứ tự cột, bỏ hàng trống). Đọc giá trị THÔ trong mock (công thức giữ nguyên chuỗi). */
+function fxModel(f) {
+  const o = {}, sheets = f.env.state.spreadsheets[FX_DB].sheets;
+  Object.keys(sheets).forEach(n => {
+    const v = sheets[n].values, head = (v[0] || []).map(String);
+    o[n] = { head, rows: v.slice(1).filter(r => r.some(x => x !== '' && x !== null && x !== undefined)).map(r => head.map((h, j) => fxCell(r[j]))) };
+  });
+  return o;
+}
+/**
+ * So hai mô hình tab theo từng ô. Tab có cột khoá (SCHEMA.id): ghép dòng theo (khoá, lần xuất hiện); tab nhật ký không có khoá: so theo vị trí
+ * (dòng cũ phải còn nguyên ở đầu tab). Trả { tab: { newTab, headAdded, added, removed, cells: ['khoá|cột|cũ|mới'], newColFilled } } chỉ cho tab có khác biệt.
+ */
+function fxDiff(api, before, after) {
+  const out = {};
+  Object.keys(after).forEach(n => {
+    const b = before[n], a = after[n], d = { newTab: !b, headAdded: [], added: [], removed: [], cells: [], newColFilled: 0 };
+    if (!b) { out[n] = d; return; }
+    assert.deepStrictEqual(a.head.slice(0, b.head.length), b.head, 'cột cũ của tab ' + n + ' phải giữ nguyên vị trí');
+    d.headAdded = a.head.slice(b.head.length);
+    const idc = api.SCHEMA[n] && api.SCHEMA[n].id, ki = idc ? b.head.indexOf(idc) : -1;
+    const keysOf = (rows) => { const m = {}; return rows.map((r, i) => { if (ki < 0) return '#' + i; const k = String(r[ki]).trim(); m[k] = (m[k] || 0) + 1; return k + '#' + m[k]; }); };
+    const bk = keysOf(b.rows), ak = keysOf(a.rows), am = {};
+    ak.forEach((k, i) => { am[k] = i; });
+    bk.forEach((k, i) => {
+      if (!(k in am)) { d.removed.push(k); return; }
+      const ar = a.rows[am[k]];
+      b.head.forEach((h, j) => { if (String(b.rows[i][j]) !== String(ar[j])) d.cells.push(k + '|' + h + '|' + b.rows[i][j] + '|' + ar[j]); });
+      for (let j = b.head.length; j < a.head.length; j++) if (String(ar[j]) !== '') d.newColFilled++;
+    });
+    const bs = {}; bk.forEach(k => { bs[k] = true; });
+    ak.forEach(k => { if (!bs[k]) d.added.push(k); });
+    if (d.headAdded.length || d.added.length || d.removed.length || d.cells.length || d.newColFilled) out[n] = d;
+  });
+  return out;
+}
+const fxRows = (model, tab) => model[tab].rows.map(r => Object.fromEntries(model[tab].head.map((h, j) => [h, r[j]])));
+const fxLogin = (f, email) => {
+  const url = f.api.withLock_(() => f.api.createLoginLinkInLock_(f.api.userByEmail_(email)));
+  const r = f.api.apiExchangeToken(url.match(/[?&]t=([a-f0-9]{64})/)[1], 'Test');
+  if (!r.ok) throw new Error('đăng nhập ' + email + ': ' + r.reason);
+  return r.data.sessionToken;
+};
+/** Chạy menu 1 (chủ file bấm), ghi lại thời điểm sao lưu Releases để biết sao lưu có đứng TRƯỚC khi đổi cấu trúc không. */
+function fxMenu1(f) {
+  const rec = { copies: [] }, DA = f.env.globals.DriveApp, orig = DA.getFileById;
+  DA.getFileById = (id) => {
+    const file = orig(id);
+    return Object.assign({}, file, { makeCopy: (name, folder) => {
+      const ss = f.env.state.spreadsheets[FX_DB];
+      rec.copies.push({ name, bookingsCols: (ss.sheets.BOOKINGS.values[0] || []).length, hasReleaseLog: !!ss.sheets.RELEASE_LOG, configRows: ss.sheets.CONFIG.values.length });
+      return file.makeCopy(name, folder);
+    } });
+  };
+  try { rec.result = f.api.setupFirstRun(); } finally { DA.getFileById = orig; }
+  return rec;
+}
+
+t('I148', 'Ghi chú phát hành bắt buộc (5R): đổi mặc định CONFIG, chữ web gốc, mẫu email gốc, luật thông báo, cột hoặc tab mà không có ghi chú khớp cho bản hiện tại thì ĐỎ; baseline khớp code; RELEASE_NOTES_ đủ và đúng thứ tự', () => {
+  const { api } = load(), cur = relb.fingerprint(api), base = JSON.parse(fs.readFileSync(relb.BASELINE, 'utf8'));
+  const d = relb.diff(base, cur), items = relb.diffItems(d).map(i => i.group + ' ' + i.key + ' ' + i.kind);
+  assert.deepStrictEqual(items, [], 'Mặc định đã đổi so với baseline ' + base.version + ' (' + items.join('; ') + '). Việc cần làm: (1) tăng APP.VERSION, (2) thêm phần tử RELEASE_NOTES_ (src/Release.gs) có mục key và kind cho từng thay đổi, (3) node test/tools/release_baseline.js --write');
+  const nowNotes = api.RELEASE_NOTES_.filter(n => n.version === api.APP.VERSION);
+  assert.strictEqual(nowNotes.length, 1, 'RELEASE_NOTES_ phải có đúng một phần tử cho bản ' + api.APP.VERSION);
+  assert.strictEqual(api.RELEASE_NOTES_[api.RELEASE_NOTES_.length - 1].version, api.APP.VERSION, 'phần tử cuối của RELEASE_NOTES_ là bản đang cài');
+  assert.strictEqual(nowNotes[0].date, api.APP.VERSION_DATE, 'ngày ghi chú khớp VERSION_DATE');
+  for (let i = 1; i < api.RELEASE_NOTES_.length; i++) assert.ok(api.cmpVersion_(api.RELEASE_NOTES_[i].version, api.RELEASE_NOTES_[i - 1].version) > 0, 'RELEASE_NOTES_ tăng dần');
+  api.RELEASE_NOTES_.forEach(n => assert.ok(/^\d{2}\/\d{2}\/\d{4}$/.test(n.date) && /^8\.\d+\.\d+$/.test(n.version), 'bản và ngày: ' + n.version));
+  // Không viết cứng bản và ngày: bản kế tiếp không phải sửa test. Vẫn giữ chốt: bản đang cài đúng dạng, mới hơn baseline đã ghi, ngày đúng dạng và khớp ghi chú cuối (hai dòng assert phía trên).
+  assert.ok(/^8\.\d+\.\d+$/.test(api.APP.VERSION) && /^\d{2}\/\d{2}\/\d{4}$/.test(api.APP.VERSION_DATE), 'APP.VERSION và VERSION_DATE đúng dạng: ' + api.APP.VERSION + ' ' + api.APP.VERSION_DATE);
+  assert.ok(api.cmpVersion_(api.APP.VERSION, base.version) >= 0, 'bản đang cài (' + api.APP.VERSION + ') không cũ hơn baseline (' + base.version + ')');
+  assert.strictEqual(nowNotes[0].version, api.RELEASE_NOTES_[api.RELEASE_NOTES_.length - 1].version, 'ghi chú của bản đang cài là phần tử cuối');
+  // Chính cái chốt này phải bắt được: giả lập đổi một mặc định, thêm một khoá, thêm một cột, thêm một tab, đổi chữ gốc
+  const fake = JSON.parse(JSON.stringify(cur));
+  fake.config.SLOT_MINUTES = 45; fake.config.KHOA_MOI = 1; fake.content['h.hero_title'] = 'doi'; delete fake.templates.WELCOME; fake.notify.MOI = 'x'; fake.schema.USERS.push('cot_moi'); fake.schema.TAB_MOI = ['a'];
+  const dd = relb.diff(cur, fake), got = relb.diffItems(dd).map(i => i.group + ' ' + i.key + ' ' + i.kind).sort();
+  assert.deepStrictEqual(got, ['config KHOA_MOI ADDED', 'config SLOT_MINUTES CHANGED', 'content h.hero_title CHANGED', 'data TAB_MOI ADDED', 'data USERS.cot_moi ADDED', 'notify MOI ADDED', 'templates WELCOME REMOVED'], 'dấu vân tay thấy mọi loại thay đổi');
+  assert.strictEqual(relb.uncovered(dd, nowNotes).length, 7, 'không ghi chú: cả 7 thay đổi đều thiếu');
+  const withNotes = [{ version: 'x', config: [{ key: 'KHOA_MOI', kind: 'ADDED' }, { key: 'SLOT_MINUTES', kind: 'CHANGED' }], content: [{ key: 'h.hero_title', kind: 'CHANGED' }], templates: [{ key: 'WELCOME', kind: 'REMOVED' }],
+    notify: [{ key: 'MOI', kind: 'ADDED' }], data: [{ key: 'TAB_MOI', kind: 'ADDED' }, { key: 'USERS.cot_moi', kind: 'ADDED' }] }];
+  assert.deepStrictEqual(relb.uncovered(dd, withNotes), [], 'có ghi chú khớp thì hết đỏ');
+  assert.deepStrictEqual(relb.invented(dd, withNotes), [], 'ghi chú khớp, không có mục bịa');
+  assert.strictEqual(relb.invented(dd, [{ version: 'x', config: [{ key: 'KHONG_CO', kind: 'ADDED' }] }]).length, 1, 'ghi chú về khoá không đổi bị bắt là bịa');
+});
+
+t('I149', 'Ghi chú 8.1.5 đến 8.1.9 khớp so sánh thật mã 8.1.4 với mã hiện tại (16 thay đổi: 2 khoá CONFIG, 9 chữ web, 1 mẫu email, 2 luật thông báo, 1 tab, 1 cột), không bịa, đủ hai thứ tiếng; chọn bản theo phiên bản trước; ghi chú CONFIG "Mới ở <bản>:"', () => {
+  const { api } = load(), old = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'release_baseline_8_1_4.json'), 'utf8')), cur = relb.fingerprint(api);
+  assert.strictEqual(old.version, '8.1.4');
+  const d = relb.diff(old, cur), notes = api.RELEASE_NOTES_.filter(n => api.cmpVersion_(n.version, '8.1.4') > 0);
+  // Danh sách ghi chú 8.1.5 trở đi là thứ được bảo vệ: năm bản đầu cố định, phần tử cuối luôn là bản đang cài (bản sau thêm vào cuối, không phải sửa dòng này).
+  assert.deepStrictEqual(notes.slice(0, 5).map(n => n.version), ['8.1.5', '8.1.6', '8.1.7', '8.1.8', '8.1.9']); assert.strictEqual(notes[notes.length - 1].version, api.APP.VERSION);
+  assert.deepStrictEqual(relb.diffItems(d).map(i => i.group + ' ' + i.key + ' ' + i.kind).sort(), [
+    'config BANK_QR_IMAGE ADDED', 'config REASSIGN_STUCK_HOURS ADDED', 'content ad.act.ADMIN_MARK_DONE ADDED', 'content ad.act.BANK_QR_REFRESH ADDED', 'content ad.act.REASSIGN_STUCK ADDED', 'content ad.act.TEMPLATE_DEDUPE ADDED', 'content ad.act.TEMPLATE_DEDUPE_TEXT ADDED',
+    'content ad.ev.REASSIGN_STUCK ADDED', 'content ad.ev.RELEASE_NOTES ADDED', 'content h.bank_note CHANGED', 'content h.bank_qr_alt ADDED', 'data BOOKINGS.admin_done_at ADDED', 'data RELEASE_LOG ADDED',
+    'notify REASSIGN_STUCK ADDED', 'notify RELEASE_NOTES ADDED', 'templates ADMIN_RELEASE_NOTES ADDED']);
+  assert.deepStrictEqual(relb.uncovered(d, notes), [], 'mọi thay đổi thật có ghi chú');
+  assert.deepStrictEqual(relb.invented(d, notes), [], 'ghi chú không bịa thay đổi');
+  // mỗi mục có chữ tiếng Việt và tiếng Anh; mặc định ghi trong ghi chú đúng bằng mặc định trong code
+  api.RELEASE_NOTES_.forEach(n => api.RELEASE_GROUPS_.forEach(g => (n[g[0]] || []).forEach(x => {
+    assert.ok(typeof x.vi === 'string' && x.vi.length > 10 && typeof x.en === 'string' && x.en.length > 10, n.version + ' ' + g[0] + ' thiếu vi hoặc en');
+    if (g[0] === 'config' && x.kind === 'ADDED') assert.strictEqual(x.value, String(api.DEFAULTS_[x.key]), 'mặc định ghi chú của ' + x.key);
+  })));
+  // chọn bản theo phiên bản trước
+  const CUR = api.APP.VERSION, between = (p) => api.releaseNotesBetween_(p, CUR).map(n => n.version).join(','), all = notes.map(n => n.version);
+  assert.strictEqual(between('8.1.4'), all.join(','));
+  assert.strictEqual(between('8.1.7'), all.slice(all.indexOf('8.1.8')).join(',')); assert.ok(/^8\.1\.8,/.test(between('8.1.7')) && between('8.1.7').split(',').length === all.length - 3);
+  assert.strictEqual(between(CUR), '');
+  assert.strictEqual(between(''), all.join(','), 'không rõ bản trước: tất cả');
+  assert.strictEqual(between('8.0.7'), all.join(','), 'bản trước cũ hơn 8.1.5: tất cả');
+  assert.strictEqual(api.releaseNotesBetween_('8.1.4', '8.1.7').map(n => n.version).join(','), '8.1.5,8.1.6,8.1.7', 'không vượt quá bản đang cài');
+  // ghi chú cho CONFIG
+  assert.ok(/^Mới ở 8\.1\.9: Ảnh mã QR chuyển khoản/.test(api.releaseConfigNote_('BANK_QR_IMAGE', CUR)));
+  assert.ok(/^Mới ở 8\.1\.7: Buổi kẹt/.test(api.releaseConfigNote_('REASSIGN_STUCK_HOURS', CUR)));
+  assert.ok(new RegExp('^Mới ở ' + CUR.replace(/\./g, '\\.') + ': ').test(api.releaseConfigNote_('KHOA_CHUA_CO_GHI_CHU', CUR)), 'khoá chưa có mô tả vẫn có ghi chú, không bao giờ trống');
+  assert.ok(!/^[=+\-@]/.test(api.releaseConfigNote_('BANK_QR_IMAGE', CUR)), 'không bắt đầu bằng = + - @');
+});
+
+t('I150', 'Tóm tắt cập nhật của menu 1: file mới tinh không có tóm tắt; lỗi gửi thư không làm hỏng menu 1; sao lưu lỗi thì giữ số đo cho lượt sau (không mất, không ghi hai lần); HTML thoát ký tự; RELEASE_LOG không bị lưu trữ, xoá test hay chép sang hệ thống mới', () => {
+  // (1) file mới tinh
+  const fr = freshEnv(); fr.api.setupFirstRun(); fr.api.clearDbCache_();
+  assert.strictEqual(fr.api.table_('RELEASE_LOG').all().length, 0, 'cài lần đầu: không có tóm tắt');
+  assert.ok(!fr.api.table_('NOTIFICATIONS').all().some(n => n.event === 'RELEASE_NOTES') && !fr.env.state.mails.some(m => /RELEASE_NOTES/.test(m.subject)));
+  assert.strictEqual(fr.env.state.props.APP_VERSION_LAST, fr.api.APP.VERSION, 'vẫn ghi nhận phiên bản');
+  assert.ok(fr.api.table_('CONFIG').all().every(r => !/^Mới ở/.test(r.note)), 'cài lần đầu: khoá CONFIG không có ghi chú "Mới ở"');
+  // (2) gửi thư hỏng hoàn toàn: menu 1 vẫn xong, RELEASE_LOG và thông báo vẫn đủ (luật 27, 39)
+  const f = fx814(); f.env.globals.GmailApp.sendEmail = () => { throw new Error('Gmail hỏng'); }; f.env.globals.MailApp.sendEmail = () => { throw new Error('MailApp hỏng'); };
+  const r = f.api.setupFirstRun(); assert.ok(r.ok, 'menu 1 vẫn thành công khi thư hỏng');
+  f.api.clearDbCache_();
+  assert.strictEqual(f.api.table_('RELEASE_LOG').all().length, UPG_LOG_ROWS(f.api));
+  assert.strictEqual(f.api.table_('NOTIFICATIONS').all().filter(n => n.event === 'RELEASE_NOTES').length, 1);
+  assert.strictEqual(f.env.state.props.APP_VERSION_LAST, f.api.APP.VERSION);
+  // (3) sao lưu trước cập nhật hỏng: chưa ghi nhận phiên bản, giữ số đo; lượt sau cộng vào, giao đúng một lần
+  const g = fx814(), DA = g.env.globals.DriveApp, orig = DA.getFileById;
+  DA.getFileById = (id) => Object.assign({}, orig(id), { makeCopy: () => { throw new Error('Drive đầy'); } });
+  const r1 = g.api.setupFirstRun();
+  assert.ok(r1.lines.some(l => /CẢNH BÁO: chưa sao lưu được/.test(l)) && !r1.lines.some(l => /CẬP NHẬT PHIÊN BẢN/.test(l)), r1.lines.join('|'));
+  assert.strictEqual(g.env.state.props.APP_VERSION_LAST, '8.1.4', 'chưa ghi nhận phiên bản');
+  assert.ok(g.env.state.props.RELEASE_PENDING && JSON.parse(g.env.state.props.RELEASE_PENDING).items.some(x => x.kind === 'CONFIG_ADDED' && x.item === 'BANK_QR_IMAGE'), 'số đo được giữ lại');
+  g.api.clearDbCache_(); assert.strictEqual(g.api.table_('RELEASE_LOG').all().length, 0); assert.strictEqual(g.env.state.mails.filter(m => /ADMIN_RELEASE_NOTES|cập nhật lên bản/.test(m.subject)).length, 0);
+  DA.getFileById = orig;
+  const r2 = g.api.setupFirstRun();
+  assert.ok(r2.lines.some(l => /Sao lưu trước cập nhật/.test(l)) && r2.lines.some(l => /thêm khoá CONFIG 2: .*BANK_QR_IMAGE/.test(l)), 'lượt 2 vẫn nói đúng việc lượt 1 đã làm: ' + r2.lines.join('|'));
+  g.api.clearDbCache_();
+  assert.strictEqual(g.api.table_('RELEASE_LOG').all().length, UPG_LOG_ROWS(g.api), 'đủ như một lượt liền');
+  assert.ok(!g.env.state.props.RELEASE_PENDING, 'xoá số đo tạm');
+  const r3 = g.api.setupFirstRun(); g.api.clearDbCache_();
+  assert.ok(!r3.lines.some(l => /CẬP NHẬT PHIÊN BẢN/.test(l)) && g.api.table_('RELEASE_LOG').all().length === UPG_LOG_ROWS(g.api), 'lượt 3 im lặng');
+  // (4) HTML email: chữ do admin nhập (tên khoá lạ) không chèn được thẻ
+  const sum = fr.api.releaseBuildSummary_('8.1.4', fr.api.APP.VERSION, fr.api.APP.VERSION_DATE, [{ kind: 'CONFIG_UNKNOWN', item: '<script>x</script>', vi: 'v', en: 'e' }]);
+  const html = fr.api.releaseSummaryHtml_(sum, 'vi') + fr.api.releaseSummaryHtml_(sum, 'en');
+  assert.ok(html.indexOf('<script>') === -1 && /&lt;script&gt;/.test(html), 'thoát HTML');
+  // (5) tab RELEASE_LOG: không lưu trữ, không xoá theo "xoá dữ liệu test", không chép sang hệ thống mới; sửa tay không ghi nhật ký
+  const a = fr.api;
+  assert.ok(a.ARCHIVE_TABS_.indexOf('RELEASE_LOG') === -1 && a.RESET_DATA_TABS_.indexOf('RELEASE_LOG') === -1 && !a.MOVE_TABS_.some(m => m.tab === 'RELEASE_LOG'), 'lưu trữ, xoá test, chuyển hệ thống');
+  assert.ok(a.SHEET_EDIT_SKIP_.indexOf('RELEASE_LOG') !== -1, 'bỏ qua ghi nhật ký sửa tay'); assert.ok(Object.keys(a.sheetSnapshot_(fr.env.globals.SpreadsheetApp.openById('NEW_DB'))).indexOf('RELEASE_LOG') !== -1 || Object.values(a.sheetSnapshot_(fr.env.globals.SpreadsheetApp.openById('NEW_DB'))).indexOf('RELEASE_LOG') !== -1, 'danh sách tab có RELEASE_LOG');
+  assert.deepStrictEqual(a.SCHEMA.RELEASE_LOG.cols, ['at', 'from_version', 'to_version', 'kind', 'item', 'detail']);
+  assert.ok(a.SCHEMA.RELEASE_LOG.text.indexOf('to_version') !== -1 && a.SCHEMA.RELEASE_LOG.text.indexOf('item') !== -1, 'cột chữ (luật 22)');
+  // (6) menu xem ghi chú: chỉ người vận hành
+  fr.env.state.uiScript = []; a.menuReleaseNotes();
+  const al = fr.env.state.uiLog.filter(x => x.kind === 'alert').map(x => x.title + x.msg).pop();   // alert_ chỉ truyền một chuỗi: mock ghi vào title
+  assert.ok(/THAY ĐỔI CỦA BẢN 8\.1\.9 \(14\/11\/2026\)/.test(al) && /BANK_QR_IMAGE/.test(al) && /600 x 600/.test(al) && /RELEASE_LOG/.test(al), al.substring(0, 200));
+  fr.env.state.activeUserEmail = 's003@student.test'; assert.throws(() => a.menuReleaseNotes(), /Không có quyền/);
+});
+
+t('I151', 'Nâng cấp 8.1.4 (a): code mới vừa dán, CHƯA chạy menu 1 (luật 38): trang, đăng nhập, học viên, tutor, đặt và huỷ buổi, job, sửa tay trong Sheets đều chạy không lỗi, thiếu cột hoặc tab hoặc khoá mới được bỏ qua, dữ liệu cũ nguyên vẹn', () => {
+  const f = fx814(), { api, env } = f, st = env.state;
+  assert.ok(api.cmpVersion_(api.APP.VERSION, '8.1.4') > 0); assert.strictEqual(st.props.APP_VERSION_LAST, '8.1.4');
+  const before = fxModel(f);
+  assert.ok(!before.RELEASE_LOG && before.BOOKINGS.head.indexOf('admin_done_at') === -1 && !before.CONFIG.rows.some(r => r[0] === 'BANK_QR_IMAGE'), 'đúng là DB 8.1.4');
+  // doGet, apiPublicInfo, apiBankQr (chưa có khoá BANK_QR_IMAGE: không hiện QR)
+  const page = api.doGet({ parameter: {} }); assert.ok(/<html/i.test(page.getContent()));
+  assert.strictEqual(api.healthStatus_(), 'OK');
+  const info = api.apiPublicInfo(); assert.ok(info.ok && info.data.bank.account === '0123456789' && info.data.bank.qr === '' && info.data.packages.length === 3, JSON.stringify(info.data.bank));
+  assert.deepStrictEqual(api.apiBankQr().data, { qr: '', src: '' });
+  // link đăng nhập (email dùng mẫu đã sửa của admin) và vào cổng
+  assert.ok(api.apiRequestLogin('an@example.com').ok);
+  const loginMail = st.mails.find(m => m.to === 'an@example.com'); assert.ok(loginMail && /^Link đăng nhập thaiput của bạn/.test(loginMail.subject), loginMail && loginMail.subject);
+  const tok = fxLogin(f, 'chi@example.com'), home = api.apiStudentHome(tok);
+  assert.ok(home.ok && home.data.upcoming.length >= 2, JSON.stringify(home).substring(0, 200));
+  const ttok = fxLogin(f, 'van@example.com'); assert.ok(api.apiTutorHome(ttok).ok); assert.ok(api.apiTutorAvailability(ttok, '2026-11-10', 7).ok);
+  assert.ok(api.apiAdminHome(fxLogin(f, 'admin@example.com')).ok, 'trang quản trị mở được khi chưa có cột admin_done_at');
+  assert.ok(api.apiStudentSlots(tok, '2026-11-11', 7).ok);
+  // đặt rồi huỷ
+  const b = api.apiStudentBook(tok, [{ date: '2026-11-16', slot: '19:00' }], 'rid-a1'); assert.ok(b.ok && b.data[0].ok, JSON.stringify(b));
+  const c = api.apiStudentCancel(tok, b.data[0].bookingId, 'rid-a2'); assert.ok(c.ok, JSON.stringify(c));
+  // job theo giờ, nhắc, Calendar, hằng ngày, sao lưu
+  ['reminderJob', 'calendarJob', 'hourlyJob', 'dailyJob', 'nightlyBackup'].forEach(j => assert.doesNotThrow(() => api[j]({ triggerUid: 'x' }), j));
+  // sửa tay trong Sheets: chọn "Đã xử lý (giữ nguyên)" ở BOOKINGS (cột admin_done_at chưa có), sửa ô CONFIG
+  const sh = env.globals.SpreadsheetApp.openById(FX_DB).getSheetByName('BOOKINGS'), ac = api.SCHEMA.BOOKINGS.cols.indexOf('admin_action') + 1;
+  const done = api.table_('BOOKINGS').all().find(x => x.status === 'COMPLETED');
+  sh.getRange(done._row, ac).setValue('Đã xử lý (giữ nguyên)');
+  const er = api.onEditInstallable({ range: sh.getRange(done._row, ac), value: 'Đã xử lý (giữ nguyên)', user: { getEmail: () => 'admin@example.com' } });
+  assert.ok(er && er.ok, JSON.stringify(er));
+  const cs = env.globals.SpreadsheetApp.openById(FX_DB).getSheetByName('CONFIG'), crow = api.table_('CONFIG').byId('BANK_NAME')._row;
+  cs.getRange(crow, 2).setValue('Techcombank'); assert.doesNotThrow(() => api.onEditInstallable({ range: cs.getRange(crow, 2), value: 'Techcombank', oldValue: 'Vietcombank', user: { getEmail: () => 'admin@example.com' } }));
+  api.clearDbCache_(); api.clearConfigCache_(); assert.strictEqual(api.cfg_('BANK_NAME'), 'Techcombank'); cs.getRange(crow, 2).setValue('Vietcombank'); api.clearDbCache_(); api.clearConfigCache_();
+  // menu 2 chạy được và chỉ than phiền về phần còn thiếu của bản mới (tab RELEASE_LOG, cột), không ném lỗi
+  const ts = api.testSystem(); assert.ok(ts.errors.length > 0 && ts.errors.every(e => /^Thiếu tab RELEASE_LOG trong file DB\./.test(e)), ts.errors.join(' | '));
+  // dữ liệu cũ nguyên vẹn: các tab cài đặt và dữ liệu gốc không đổi một ô nào; USERS chỉ đổi last_login_at; BOOKINGS chỉ thêm buổi vừa đặt
+  const after = fxModel(f), d = fxDiff(api, before, after);
+  ['CONFIG', 'PACKAGES', 'REGISTRATIONS', 'PAYMENTS', 'AVAILABILITY', 'CONTENT', 'EMAIL_TEMPLATES', 'NOTIFY_RULES', 'MARKETING_EMAILS', 'STUDENT_PACKAGES', 'META'].forEach(n => assert.ok(!d[n], n + ' bị đổi: ' + JSON.stringify(d[n])));
+  assert.ok(d.USERS && !d.USERS.added.length && !d.USERS.removed.length && d.USERS.cells.every(cl => /\|last_login_at\|/.test(cl)), 'USERS: ' + JSON.stringify(d.USERS));
+  const bd = d.BOOKINGS;
+  assert.deepStrictEqual([bd.added, bd.removed, bd.headAdded], [['BK000017#1'], [], []], 'BOOKINGS chỉ thêm đúng buổi vừa đặt');
+  assert.ok(bd.cells.every(cl => /\|(event_id|meet_link|cal_state|cal_attempts|cal_next_at|reminder_sent_at|day_reminder_at|admin_note|admin_action)\|/.test(cl)), 'buổi cũ chỉ đổi cột kỹ thuật (Calendar, nhắc, ghi chú admin): ' + JSON.stringify(bd.cells));
+  const kept = ['student_id', 'tutor_id', 'sp_id', 'date', 'slot', 'status'];
+  before.BOOKINGS.rows.forEach((row, i) => kept.forEach(c => assert.strictEqual(String(after.BOOKINGS.rows[i][after.BOOKINGS.head.indexOf(c)]), String(row[before.BOOKINGS.head.indexOf(c)]), 'buổi ' + row[0] + ' cột ' + c)));
+  assert.strictEqual(api.table_('BOOKINGS').byId('BK000017').status, 'CANCELLED_STUDENT');
+  ['ACTIVITY_LOG', 'MAIL_LOG', 'NOTIFICATIONS', 'AUTH'].forEach(n => { const x = d[n]; if (x) assert.ok(!x.removed.length && !x.cells.length, n + ' chỉ được thêm dòng: ' + JSON.stringify(x)); });
+  assert.ok(api.table_('ACTIVITY_LOG').all().some(l => l.action === 'ADMIN_MARK_DONE'), 'chọn "Đã xử lý" chạy được dù thiếu cột');
+});
+
+t('I152', 'Nâng cấp 8.1.4 (b): menu 1 chạy không lỗi; bản sao Releases làm TRƯỚC khi đổi cấu trúc; mọi dòng, mọi ô cũ còn nguyên TRỪ danh sách cho phép (khớp từng ô); BOOKINGS, PAYMENTS, USERS, STUDENT_PACKAGES, AVAILABILITY, AUTH, REGISTRATIONS không đổi; ACTIVITY_LOG chỉ thêm; trigger, tô màu, thuộc tính', () => {
+  const f = fx814(), { api, env } = f, st = env.state, sheets = () => st.spreadsheets[FX_DB].sheets;
+  const before = fxModel(f), props0 = Object.assign({}, st.props), fmt0 = {}, events0 = JSON.stringify(st.events);
+  Object.keys(sheets()).forEach(n => { fmt0[n] = Object.assign({}, sheets()[n].formats); });
+  const rec = fxMenu1(f);
+  assert.ok(rec.result.ok, 'menu 1 không lỗi');
+  // bản sao DB vào thư mục Releases lúc nào? Lúc đó BOOKINGS còn 28 cột, chưa có RELEASE_LOG, CONFIG còn 99 khoá (+ hàng tiêu đề)
+  assert.strictEqual(rec.copies.length, 1, 'một bản sao');
+  assert.deepStrictEqual([rec.copies[0].bookingsCols, rec.copies[0].hasReleaseLog, rec.copies[0].configRows], [28, false, 100], 'bản sao làm TRƯỚC khi đổi cấu trúc');
+  assert.ok(/^THAIPUT_DB_STAGING_TRUOC_8\.1\.9_\d{8}_\d{4}$/.test(rec.copies[0].name) && st.props.RELEASES_FOLDER_ID, rec.copies[0].name);
+  const copy = Object.values(st.drive.files).find(x => x.name === rec.copies[0].name); assert.strictEqual(copy.parent, st.props.RELEASES_FOLDER_ID, 'nằm trong thư mục Releases');
+  // DANH SÁCH CHO PHÉP, khớp từng ô (mọi khác biệt khác là lỗi)
+  const after = fxModel(f), d = fxDiff(api, before, after), D = api.DEFAULT_CONTENT_;
+  const pick = (n, k) => (d[n] ? d[n][k] : undefined);
+  assert.deepStrictEqual(Object.keys(d).sort(), ['ACTIVITY_LOG', 'BOOKINGS', 'CONFIG', 'CONTENT', 'EMAIL_TEMPLATES', 'MAIL_LOG', 'META', 'NOTIFICATIONS', 'NOTIFY_RULES', 'RELEASE_LOG'], 'chỉ 10 tab có khác biệt');
+  ['PACKAGES', 'USERS', 'REGISTRATIONS', 'STUDENT_PACKAGES', 'PAYMENTS', 'AVAILABILITY', 'AUTH', 'METRICS', 'MARKETING_EMAILS'].forEach(n => assert.ok(!d[n], n + ' không được đổi'));
+  // (1) tab mới
+  assert.ok(d.RELEASE_LOG.newTab && !before.RELEASE_LOG, 'RELEASE_LOG là tab thêm mới');
+  // (2) cột mới ở bên phải BOOKINGS, dòng cũ để trống; cột cũ nguyên vị trí
+  assert.deepStrictEqual([d.BOOKINGS.headAdded, d.BOOKINGS.added, d.BOOKINGS.removed, d.BOOKINGS.cells, d.BOOKINGS.newColFilled], [['admin_done_at'], [], [], [], 0]);
+  // (3) dòng thêm (hệ thống tự thêm khoá, chữ, luật, mẫu còn thiếu)
+  assert.deepStrictEqual(pick('CONFIG', 'added').sort(), ['BANK_QR_IMAGE#1', 'REASSIGN_STUCK_HOURS#1']);
+  assert.deepStrictEqual(pick('NOTIFY_RULES', 'added').sort(), ['REASSIGN_STUCK#1', 'RELEASE_NOTES#1']);
+  assert.deepStrictEqual(pick('CONTENT', 'added').sort(), ['ad.act.ADMIN_MARK_DONE#1', 'ad.act.BANK_QR_REFRESH#1', 'ad.act.REASSIGN_STUCK#1', 'ad.act.TEMPLATE_DEDUPE#1', 'ad.act.TEMPLATE_DEDUPE_TEXT#1', 'ad.ev.REASSIGN_STUCK#1', 'ad.ev.RELEASE_NOTES#1', 'h.bank_qr_alt#1']);
+  assert.deepStrictEqual(pick('EMAIL_TEMPLATES', 'added'), ['ADMIN_RELEASE_NOTES#1']);
+  assert.deepStrictEqual(pick('NOTIFICATIONS', 'added'), ['N0000027#1']);
+  assert.strictEqual(pick('MAIL_LOG', 'added').length, 1, 'đúng một email tóm tắt');
+  assert.deepStrictEqual(after.ACTIVITY_LOG.rows.slice(before.ACTIVITY_LOG.rows.length).map(r => r[2]).sort(), ['RELEASE', 'SETUP_RUN', 'TEMPLATE_DEDUPE'], 'ACTIVITY_LOG chỉ thêm 3 dòng');
+  assert.ok(d.ACTIVITY_LOG.cells.length === 0 && d.ACTIVITY_LOG.removed.length === 0, 'ACTIVITY_LOG không sửa, không mất dòng cũ');
+  // (4) dòng bị bỏ: CHỈ dòng trùng key (dòng cuối của REG_RECEIVED và LOGIN_LINK)
+  assert.deepStrictEqual(pick('EMAIL_TEMPLATES', 'removed').sort(), ['LOGIN_LINK#2', 'REG_RECEIVED#2']);
+  assert.deepStrictEqual(pick('CONTENT', 'removed'), []); assert.deepStrictEqual(pick('CONFIG', 'removed'), []);
+  // (5) ô đổi giá trị (cho phép, mỗi ô có lý do)
+  const cells = (n) => (pick(n, 'cells') || []).slice().sort();
+  assert.deepStrictEqual(cells('CONTENT'), [
+    'h.bank_note#1|default_en|' + 'Transfer note: your email and the package name. After sending the form, you get your own reference code by email.' + '|' + D['h.bank_note'][1],   // cột code quản lý: chữ gốc mới
+    'h.bank_note#1|default_vi|' + 'Nội dung chuyển khoản: email đăng ký và tên gói. Sau khi gửi form, bạn nhận mã nội dung riêng qua email để đối chiếu.' + '|' + D['h.bank_note'][0],
+    'h.bank_note#1|position|Dòng dưới thông tin ngân hàng|' + D['h.bank_note'][2]].sort(), 'CONTENT: chỉ 3 ô code quản lý của h.bank_note (page, position, shown_when, default_vi, default_en); chữ admin vi, en không đổi');
+  assert.deepStrictEqual(cells('EMAIL_TEMPLATES'), ['LOGIN_LINK#1|subject_vi|Link đăng nhập thaiput|Link đăng nhập thaiput của bạn'], 'gộp key trùng: ô tiêu đề chữ admin sửa ở dòng cuối được chuyển lên dòng giữ lại');
+  assert.deepStrictEqual(cells('META').map(x => x.split('|').slice(0, 2).join('|')), ['APP_VERSION#1|value', 'ID_FLOOR_AVAILABILITY#1|value', 'ID_FLOOR_BOOKINGS#1|value', 'ID_FLOOR_NOTIFICATIONS#1|value', 'ID_FLOOR_PAYMENTS#1|value',
+    'ID_FLOOR_REGISTRATIONS#1|value', 'ID_FLOOR_STUDENT_PACKAGES#1|value', 'META_AT#1|value'].sort(), 'META là tab code ghi mỗi lần menu 1 (phiên bản, giờ, mốc mã tự sinh)');
+  assert.ok(cells('META').indexOf('APP_VERSION#1|value|8.1.4|' + api.APP.VERSION) !== -1 && cells('META').indexOf('ID_FLOOR_BOOKINGS#1|value|0|16') !== -1);
+  assert.deepStrictEqual(Object.keys(d).map(n => [n, (d[n].cells || []).length]).filter(x => x[1]).map(x => x.join(':')).sort(), ['CONTENT:3', 'EMAIL_TEMPLATES:1', 'META:8'], 'tổng ô đổi: 12');
+  // dữ liệu nghiệp vụ nguyên vẹn đến từng ô (đối chiếu lại độc lập: toàn bộ giá trị thô trước và sau)
+  ['BOOKINGS', 'PAYMENTS', 'USERS', 'STUDENT_PACKAGES', 'AVAILABILITY', 'AUTH', 'REGISTRATIONS'].forEach(n => before[n].rows.forEach((row, i) => assert.deepStrictEqual(after[n].rows[i].slice(0, row.length), row, n + ' dòng ' + (i + 2))));
+  // Script Properties: chỉ 3 khoá đổi (ghi nhận phiên bản, thư mục Releases, danh sách tab)
+  const ch = Object.keys(Object.assign({}, props0, st.props)).filter(k => props0[k] !== st.props[k]).sort();
+  assert.deepStrictEqual(ch, ['APP_VERSION_LAST', 'RELEASES_FOLDER_ID', 'SHEET_SNAP'], 'thuộc tính đổi: ' + ch.join(','));
+  assert.strictEqual(st.props.APP_VERSION_LAST, api.APP.VERSION);
+  ['MIG_MORNING_OFF', 'MIG_1610', 'MIG_5M'].forEach(k => assert.strictEqual(st.props[k], props0[k], 'bước chuyển ' + k + ' không chạy lại'));
+  // trigger: vẫn đúng 8, không nhân đôi
+  assert.strictEqual(st.triggers.length, api.TRIGGER_COUNT_); assert.deepStrictEqual(st.triggers.map(x => x.fn).sort(), ['calendarJob', 'dailyJob', 'hourlyJob', 'nightlyBackup', 'onChangeInstallable', 'onEditInstallable', 'reminderJob', 'weeklyExport']);
+  // Calendar không bị chạm, định dạng ô không mất, tô màu mới có cột admin_done_at
+  assert.strictEqual(JSON.stringify(st.events), events0, 'sự kiện Calendar nguyên vẹn'); assert.strictEqual(st.calendarCalls.length, 0);
+  Object.keys(fmt0).forEach(n => Object.keys(fmt0[n]).forEach(k => assert.strictEqual(sheets()[n].formats[k], fmt0[n][k], 'định dạng ' + n + ' ' + k)));
+  const rules = (n) => sheets()[n].cfRules.map(r => r.formula);
+  assert.deepStrictEqual(['NOTIFICATIONS', 'REGISTRATIONS', 'AVAILABILITY', 'BOOKINGS', 'STUDENT_PACKAGES'].map(n => rules(n).length), [3, 1, 2, 6, 5]);
+  assert.ok(rules('BOOKINGS').some(x => /\$AC2/.test(x)) && /admin_done_at/.test(after.BOOKINGS.head[28]), 'luật tô màu mới đọc cột admin_done_at (cột AC)');
+  assert.ok(sheets().RELEASE_LOG.formats['2:5'] === '@' && sheets().RELEASE_LOG.formats['2:6'] === '@', 'cột chữ của RELEASE_LOG định dạng @');
+});
+
+t('I153', 'Nâng cấp 8.1.4 (c): mọi tuỳ chỉnh của admin còn nguyên và còn HIỆU LỰC: CONFIG (giá trị, ghi chú, khoá lạ), CONTENT (kể cả h.bank_note và ô "-"), EMAIL_TEMPLATES (sửa ô, mẫu tắt, dòng trùng gộp giữ chữ admin), PACKAGES, NOTIFY_RULES; email render trước và sau giống nhau', () => {
+  const A = fx814(), B = fx814();   // A: code mới dán, chưa menu 1. B: đã menu 1.
+  B.api.setupFirstRun(); [A, B].forEach(x => { x.api.clearDbCache_(); x.api.clearConfigCache_(); x.api.clearContentCache_(); });
+  // CONFIG
+  const cfgB = {}; B.api.table_('CONFIG').all().forEach(r => { cfgB[r.key] = r; });
+  const want = { ADMIN_EMAIL: 'admin@example.com', ADMIN_ZALO_URL: 'https://zalo.me/0900000000', ADMIN_PHONE: '+84900000000', SCHOOL_NAME: 'Thaiput Demo', BANK_NAME: 'Vietcombank', BANK_ACCOUNT: '0123456789', BANK_HOLDER: 'CONG TY THAIPUT',
+    BOOKING_CUTOFF_HOUR: 14, REMINDER_BEFORE_MINUTES: 45, SESSION_DAYS: 14, EXPIRY_NOTICE_DAYS: 5, BACKUP_KEEP: 10, DIGEST_HOUR: 20, TUTOR_DEADLINE_AT: 'SAT 20', LOG_KEEP_DAYS: 45, MY_CUSTOM_FLAG: 'abc' };
+  Object.keys(want).forEach(k => { assert.strictEqual(String(cfgB[k].value), String(want[k]), 'CONFIG ' + k); assert.strictEqual(B.api.cfg_(k) === want[k] || String(B.api.cfg_(k)) === String(want[k]), true, 'cfg_ ' + k); });
+  assert.strictEqual(cfgB.SCHOOL_NAME.note, 'Tên hiện trong email'); assert.strictEqual(cfgB.BANK_NAME.note, 'Tài khoản công ty'); assert.strictEqual(cfgB.TUTOR_DEADLINE_AT.note, 'Hạn mở lịch sớm hơn mặc định');
+  assert.strictEqual(cfgB.MY_CUSTOM_FLAG.note, 'Khoá admin tự thêm, code không dùng', 'khoá lạ giữ cả ghi chú');
+  assert.ok(B.api.table_('CONFIG').all().filter(r => r.key === 'MY_CUSTOM_FLAG').length === 1, 'khoá lạ còn đúng một dòng, không bị xoá hay nhân đôi');
+  A.api.table_('CONFIG').all().forEach(r => { assert.strictEqual(String(cfgB[r.key].value), String(r.value), 'mọi giá trị CONFIG cũ: ' + r.key); assert.strictEqual(cfgB[r.key].note, r.note, 'mọi ghi chú CONFIG cũ: ' + r.key); });
+  // CONTENT: ô admin sửa
+  const ctB = {}; B.api.table_('CONTENT').all().forEach(r => { ctB[r.key] = r; });
+  assert.deepStrictEqual([ctB['h.hero_title'].vi, ctB['h.hero_title'].en], ['Luyện nói tiếng Thái cùng thaiput', 'Practise Thai speaking with thaiput']);
+  assert.strictEqual(ctB['h.bank_title'].en, 'Pay by bank transfer');
+  assert.deepStrictEqual([ctB['h.bank_note'].vi, ctB['h.bank_note'].en], ['Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn.', 'Transfer reference: Please enter only your phone number.'], 'h.bank_note giữ chữ admin');
+  assert.strictEqual(ctB['h.hero_sub'].en, '-', 'ô "-" vẫn là "-"'); assert.strictEqual(ctB['a.pkg_none'].note, 'Admin ghi chú: chờ giá mới');
+  // ô code quản lý của h.bank_note cập nhật để admin thấy chữ gốc mới
+  assert.deepStrictEqual([ctB['h.bank_note'].default_vi, ctB['h.bank_note'].default_en], [B.api.DEFAULT_CONTENT_['h.bank_note'][0], B.api.DEFAULT_CONTENT_['h.bank_note'][1]]);
+  // chữ đang hiện ra web (contentMap_) cho MỌI khoá: y hệt trước menu 1 (khoá mới thì trước đó dùng chữ gốc trong code, nay chữ gốc trong ô: cùng chữ)
+  const mA = A.api.contentMap_(), mB = B.api.contentMap_(); let nKeys = 0;
+  Object.keys(A.api.contentDefaults_()).forEach(k => { assert.deepStrictEqual(mB[k], mA[k], 'chữ hiệu lực ' + k); nKeys++; });
+  assert.ok(nKeys > 600 && mB['h.hero_sub'][1] === '', 'ô "-" hiệu lực là trống (luật 34)');
+  // EMAIL_TEMPLATES
+  const etB = {}; B.api.table_('EMAIL_TEMPLATES').all().forEach(r => { assert.ok(!etB[r.key], 'không còn key trùng: ' + r.key); etB[r.key] = r; });
+  assert.strictEqual(etB.WELCOME.subject_vi, 'Chào mừng bạn đến thaiput!'); assert.ok(/Hẹn gặp bạn!/.test(etB.WELCOME.body_vi)); assert.strictEqual(etB.BOOKING_CONFIRM.title_en, 'Your lesson is booked'); assert.strictEqual(etB.REMINDER_STUDENT.note, 'Admin ghi chú: nhắc 45 phút trước');
+  assert.ok(/^Thaiput received your registration/.test(etB.REG_RECEIVED.body_en), 'chữ admin sửa ở dòng đầu REG_RECEIVED còn sau khi gộp');
+  assert.strictEqual(etB.LOGIN_LINK.subject_vi, 'Link đăng nhập thaiput của bạn', 'chữ admin ở dòng trùng cuối của LOGIN_LINK được giữ');
+  assert.strictEqual(String(etB.STAFF_NEW_LOGIN.active).toUpperCase(), 'FALSE', 'mẫu tắt vẫn tắt');
+  assert.strictEqual(B.api.table_('EMAIL_TEMPLATES').all().length, 30, '30 mẫu (29 cũ sau gộp + ADMIN_RELEASE_NOTES)');
+  // render email trước và sau: mọi mẫu, cùng dữ liệu mẫu
+  const render = (x) => { const out = {}; Object.keys(x.api.DEFAULT_EMAIL_TEMPLATES_).forEach(k => { x.env.state.mails = []; const ok = x.api.sendTpl_(k, 'khach@example.com', x.api.sampleTplVars_(k), { kind: 'T_' + k }); const m = x.env.state.mails[0]; out[k] = ok === false ? false : { subject: m.subject, html: m.htmlBody, to: m.to }; }); return out; };
+  const rA = render(A), rB = render(B);
+  assert.strictEqual(rB.STAFF_NEW_LOGIN, false); assert.strictEqual(rA.STAFF_NEW_LOGIN, false, 'mẫu tắt không gửi, trước và sau');
+  Object.keys(rA).filter(k => k !== 'REG_RECEIVED').forEach(k => assert.deepStrictEqual(rB[k], rA[k], 'email ' + k + ' render y hệt trước và sau menu 1'));
+  assert.ok(/^Link đăng nhập thaiput của bạn/.test(rB.LOGIN_LINK.subject), 'subject chữ admin còn hiệu lực');
+  assert.ok(!/Thaiput received your registration/.test(rA.REG_RECEIVED.html) && /Thaiput received your registration/.test(rB.REG_RECEIVED.html),
+    'REG_RECEIVED: trước menu 1 hệ thống gửi dòng CUỐI (chữ gốc) nên chữ admin sửa ở dòng đầu không có hiệu lực; sau khi gộp, chữ admin sửa có hiệu lực (đúng ý admin)');
+  assert.strictEqual(rB.REG_RECEIVED.subject, rA.REG_RECEIVED.subject);
+  assert.ok(/Chào mừng bạn đến thaiput!/.test(rB.WELCOME.subject), 'WELCOME chữ admin sửa còn hiệu lực');
+  // PACKAGES, NOTIFY_RULES
+  const pk = {}; B.api.table_('PACKAGES').all().forEach(r => { pk[r.code] = r; });
+  assert.deepStrictEqual([pk.TRIAL.price_vnd, pk.PASS_2W.price_vnd, pk.PASS_1M.price_vnd, pk.PASS_2W.name, pk.PASS_2W.name_en], [150000, 990000, 1790000, 'Gói 2 tuần (khuyến mãi)', 'Two-week pass (promo)']);
+  assert.deepStrictEqual(B.api.table_('PACKAGES').all().map(r => JSON.stringify(r)), A.api.table_('PACKAGES').all().map(r => JSON.stringify(r)));
+  const nr = (ev) => B.api.table_('NOTIFY_RULES').byId(ev);
+  assert.deepStrictEqual([nr('BOOKED').channel, nr('BOOKED').note, nr('STUDENT_CANCELLED').channel], ['DIGEST', 'Admin đổi: gom vào email tổng hợp', 'LOG']);
+  assert.strictEqual(B.api.notifyRule_('BOOKED').channel, 'DIGEST'); assert.strictEqual(B.api.notifyRule_('STUDENT_CANCELLED').channel, 'LOG');
+  assert.deepStrictEqual(B.api.table_('NOTIFY_RULES').all().filter(r => A.api.table_('NOTIFY_RULES').byId(r.event)).map(r => JSON.stringify(r)), A.api.table_('NOTIFY_RULES').all().map(r => JSON.stringify(r)), 'mọi luật thông báo cũ y nguyên');
+  // khoá lạ được BÁO (không xoá)
+  assert.ok(B.api.table_('RELEASE_LOG').all().some(r => r.kind === 'CONFIG_UNKNOWN' && r.item === 'MY_CUSTOM_FLAG'));
+});
+
+t('I154', 'Nâng cấp 8.1.4 (d): sau menu 1 có đủ phần mới: BANK_QR_IMAGE (trống, ghi chú Mới ở 8.1.9), REASSIGN_STUCK_HOURS (ghi chú Mới ở 8.1.7), RELEASE_LOG phủ 8.1.5 đến 8.1.9 và các việc đo thật, MỘT thông báo RELEASE_NOTES và MỘT email tới ADMIN_EMAIL, APP_VERSION_LAST, dòng RELEASE ở nhật ký, chữ ở kết quả menu 1', () => {
+  const f = fx814(), { api, env } = f, st = env.state;
+  const r = api.setupFirstRun(); api.clearDbCache_(); api.clearConfigCache_();
+  const cfg = (k) => api.table_('CONFIG').byId(k);
+  assert.strictEqual(String(cfg('BANK_QR_IMAGE').value), ''); assert.ok(/^Mới ở 8\.1\.9: Ảnh mã QR chuyển khoản.*600 x 600 px.*300 KB/.test(cfg('BANK_QR_IMAGE').note), cfg('BANK_QR_IMAGE').note);
+  assert.strictEqual(String(cfg('REASSIGN_STUCK_HOURS').value), '1'); assert.ok(/^Mới ở 8\.1\.7: Buổi kẹt/.test(cfg('REASSIGN_STUCK_HOURS').note));
+  assert.strictEqual(api.cfg_('REASSIGN_STUCK_HOURS'), 1);
+  const newKeys = api.table_('CONFIG').all().filter(x => /^Mới ở/.test(x.note)).map(x => x.key).sort(); assert.deepStrictEqual(newKeys, ['BANK_QR_IMAGE', 'REASSIGN_STUCK_HOURS'], 'chỉ khoá mới thêm có ghi chú "Mới ở"');
+  // RELEASE_LOG
+  const log = api.table_('RELEASE_LOG').all(); assert.strictEqual(log.length, UPG_LOG_ROWS(api));
+  assert.ok(log.every(x => x.from_version === '8.1.4' && x.to_version === api.APP.VERSION && x.at instanceof Date && x.at.getTime() === api.getNow_().getTime() && typeof x.detail === 'string' && x.detail.length > 5), 'cột bản và giờ');
+  ['8.1.5', '8.1.6', '8.1.7', '8.1.8', '8.1.9'].forEach(v => assert.ok(log.some(x => /^NOTE_/.test(x.kind) && x.item.indexOf(v) === 0), 'RELEASE_LOG có ghi chú bản ' + v));
+  const cnt = {}; log.filter(x => !/^NOTE_/.test(x.kind)).forEach(x => { cnt[x.kind] = (cnt[x.kind] || 0) + 1; });
+  assert.deepStrictEqual(cnt, { CONFIG_ADDED: 2, CONFIG_UNKNOWN: 1, TAB_ADDED: 1, COLUMN_ADDED: 1, CONTENT_ADDED: 8, TEMPLATE_ADDED: 1, NOTIFY_RULE_ADDED: 2, DUP_MERGED: 2 }, 'việc đo thật');
+  assert.deepStrictEqual(log.filter(x => x.kind === 'COLUMN_ADDED').map(x => x.item), ['BOOKINGS.admin_done_at']); assert.deepStrictEqual(log.filter(x => x.kind === 'TAB_ADDED').map(x => x.item), ['RELEASE_LOG']);
+  assert.deepStrictEqual(log.filter(x => x.kind === 'DUP_MERGED').map(x => x.item).sort(), ['EMAIL_TEMPLATES.LOGIN_LINK', 'EMAIL_TEMPLATES.REG_RECEIVED']);
+  assert.ok(!log.some(x => x.kind === 'MIGRATION' || x.kind === 'CONTENT_REFRESHED' || x.kind === 'CONTENT_KEPT'), 'không có bước chuyển, không có ô chữ đổi (admin đã dùng đúng chữ mới)');
+  assert.ok(log.some(x => x.kind === 'NOTE_CONFIG' && x.item === '8.1.9 · BANK_QR_IMAGE' && /\[mới, mặc định trống\]/.test(x.detail)) && log.some(x => x.kind === 'NOTE_CONTENT' && x.item === '8.1.9 · h.bank_note' && /\[chữ gốc đổi\]/.test(x.detail)));
+  // một thông báo và một email
+  const nt = api.table_('NOTIFICATIONS').all().filter(n => n.event === 'RELEASE_NOTES'); assert.strictEqual(nt.length, 1);
+  assert.deepStrictEqual([nt[0].level, nt[0].channel, nt[0].entity, nt[0].entity_id], ['INFO', 'EMAIL', 'RELEASE', api.APP.VERSION]);
+  assert.ok(/8\.1\.4 lên 8\.1\.9/.test(nt[0].message) && /8\.1\.4 to 8\.1\.9/.test(nt[0].message_en) && /RELEASE_LOG/.test(nt[0].message) && /RELEASE_LOG/.test(nt[0].message_en) && nt[0].emailed_at, 'thông báo song ngữ, đã đánh dấu gửi email');
+  assert.strictEqual(st.mails.length, 1, 'đúng một email'); const m = st.mails[0];
+  assert.strictEqual(m.to, 'admin@example.com'); assert.ok(/8\.1\.9/.test(m.subject) && / \| /.test(m.subject), 'tiêu đề hai thứ tiếng: ' + m.subject);
+  ['BANK_QR_IMAGE', '600 x 600', 'MY_CUSTOM_FLAG', 'REASSIGN_STUCK_HOURS', 'RELEASE_LOG', 'Update summary', 'Tóm tắt cập nhật', 'Bản 8.1.5', 'Version ' + api.APP.VERSION, 'admin_done_at', 'EMAIL_TEMPLATES.LOGIN_LINK'].forEach(x => assert.ok(m.htmlBody.indexOf(x) !== -1, 'email có "' + x + '"'));
+  assert.ok(api.table_('MAIL_LOG').all().some(x => x.kind === 'ADMIN_RELEASE_NOTES' && x.to === 'admin@example.com'));
+  // phiên bản và nhật ký
+  assert.strictEqual(st.props.APP_VERSION_LAST, api.APP.VERSION);
+  const rel = api.table_('ACTIVITY_LOG').all().filter(l => l.action === 'RELEASE'); assert.strictEqual(rel.length, 2, 'dòng RELEASE cũ (cài đặt 8.1.4) và dòng mới');
+  assert.deepStrictEqual(rel.map(l => l.entity_id), ['8.1.4', api.APP.VERSION]); assert.deepStrictEqual(JSON.parse(rel[1].detail), { from: '8.1.4' });
+  // chữ ở kết quả menu 1: gọn, có số lượng và việc cần làm, trỏ tab RELEASE_LOG
+  const txt = r.lines.join('\n'), i0 = r.lines.findIndex(l => /^CẬP NHẬT PHIÊN BẢN/.test(l));
+  assert.ok(i0 > 0 && r.lines.length - i0 <= 20, 'phần tóm tắt gọn (≤ 20 dòng): ' + (r.lines.length - i0));
+  assert.ok(new RegExp('CẬP NHẬT PHIÊN BẢN 8\\.1\\.4 → ' + api.APP.VERSION.replace(/\./g, '\\.') + ' \\(' + api.APP.VERSION_DATE + '\\).*RELEASE_LOG \\(' + UPG_LOG_ROWS(api) + ' dòng\\)').test(txt) && /thêm khoá CONFIG 2: .*BANK_QR_IMAGE/.test(txt) && /thêm tab 1: RELEASE_LOG/.test(txt) && /thêm cột 1: BOOKINGS\.admin_done_at/.test(txt) &&
+    /gộp key trùng 2/.test(txt) && /Khoá CONFIG lạ.*MY_CUSTOM_FLAG/.test(txt) && /VIỆC ADMIN CẦN LÀM/.test(txt) && txt.indexOf('Đã ghi ' + UPG_LOG_ROWS(api) + ' dòng vào tab RELEASE_LOG') !== -1 && /Đã tạo thông báo RELEASE_NOTES/.test(txt) && /Đã gửi email "Tóm tắt cập nhật" tới ADMIN_EMAIL/.test(txt), txt);   // soát X2: mỗi đường giao có một dòng riêng (thông báo, email)
+  assert.ok(/1\. Muốn hiện mã QR/.test(txt), 'việc của bản mới nhất lên đầu');
+  assert.ok(/phiên bản code 8\.1\.9 \(14\/11\/2026\)/.test(r.lines[0]), 'dòng đầu ghi phiên bản và ngày');
+});
+
+t('I155', 'Nâng cấp 8.1.4 (e): chạy lại menu 1 cùng phiên bản không đổi một ô nào ở mọi tab (trừ một dòng SETUP_RUN của nhật ký theo luật 11, và mốc mã thông báo ở META theo kịp lượt 1), không thêm dòng RELEASE_LOG, không gửi email thứ hai, không sao lưu thêm, không tạo thông báo; lần thứ ba cũng vậy', () => {
+  const f = fx814(), { api, env } = f, st = env.state;
+  const r1 = fxMenu1(f); assert.ok(r1.result.ok);
+  const snap = () => ({ model: fxModel(f), props: JSON.stringify(st.props), mails: st.mails.length, files: Object.keys(st.drive.files).length, folders: Object.keys(st.drive.folders).length,
+    cf: Object.keys(st.spreadsheets[FX_DB].sheets).map(n => n + ':' + (st.spreadsheets[FX_DB].sheets[n].cfRules || []).map(x => x.formula + '|' + x.bg).join(',')).join(';'), triggers: st.triggers.length,
+    fmt: JSON.stringify(Object.keys(st.spreadsheets[FX_DB].sheets).map(n => [n, Object.keys(st.spreadsheets[FX_DB].sheets[n].formats).length])), events: JSON.stringify(st.events) });
+  let prev = snap();
+  [2, 3].forEach(run => {
+    const r = fxMenu1(f); assert.ok(r.result.ok); assert.strictEqual(r.copies.length, 0, 'lượt ' + run + ': không sao lưu thêm');
+    assert.ok(!r.result.lines.some(l => /CẬP NHẬT PHIÊN BẢN|RELEASE_LOG|Sao lưu trước cập nhật|Ghi nhận phiên bản/.test(l)), 'lượt ' + run + ' im lặng: ' + r.result.lines.join(' | '));
+    const cur = snap(), d = fxDiff(api, prev.model, cur.model);
+    // Lượt 2: mốc mã tự sinh ID_FLOOR_NOTIFICATIONS của META theo kịp thông báo RELEASE_NOTES (N0000027) mà lượt 1 vừa tạo (26 thành 27); từ lượt 3 hết đổi.
+    assert.deepStrictEqual(Object.keys(d).sort(), run === 2 ? ['ACTIVITY_LOG', 'META'] : ['ACTIVITY_LOG'], 'lượt ' + run + ': khác biệt: ' + JSON.stringify(Object.keys(d)));
+    if (run === 2) assert.deepStrictEqual([d.META.cells, d.META.added, d.META.removed], [['ID_FLOOR_NOTIFICATIONS#1|value|26|27'], [], []]);
+    assert.deepStrictEqual([d.ACTIVITY_LOG.added.length, d.ACTIVITY_LOG.cells.length, d.ACTIVITY_LOG.removed.length], [1, 0, 0]);
+    assert.strictEqual(cur.model.ACTIVITY_LOG.rows[cur.model.ACTIVITY_LOG.rows.length - 1][2], 'SETUP_RUN');
+    ['props', 'mails', 'files', 'folders', 'cf', 'triggers', 'fmt', 'events'].forEach(k => assert.strictEqual(cur[k], prev[k], 'lượt ' + run + ' đổi ' + k));
+    prev = cur;
+  });
+  api.clearDbCache_(); assert.strictEqual(api.table_('RELEASE_LOG').all().length, UPG_LOG_ROWS(api));
+  assert.strictEqual(api.table_('NOTIFICATIONS').all().filter(n => n.event === 'RELEASE_NOTES').length, 1);
+  assert.strictEqual(st.mails.filter(m => /8\.1\.9/.test(m.subject)).length, 1, 'một email duy nhất');
+});
+
+t('I156', 'Nâng cấp 8.1.4 (f): sau nâng cấp hệ thống chạy đủ vòng đời: đăng ký, duyệt, kích hoạt khi đặt, đặt, huỷ, nhắc (không trùng), tutor chọn kết quả, "Đã xử lý" ghi cột mới, buổi kẹt Chờ đổi tutor báo một lần, job lưu trữ, menu 2 không lỗi; chữ admin sửa dùng đúng trong email', () => {
+  const f = fx814(), { api, env } = f, st = env.state;
+  api.setupFirstRun(); st.mails = [];
+  const SHOT = { name: 'ck.jpg', mimeType: 'image/jpeg', base64: Buffer.from('anh').toString('base64') };
+  const nBk0 = api.table_('BOOKINGS').all().length, nPay0 = api.table_('PAYMENTS').all().length;
+  // buổi kẹt Chờ đổi tutor (tính năng mới 8.1.7, khoá REASSIGN_STUCK_HOURS vừa được menu 1 thêm): báo đúng một lần
+  const fut = api.table_('BOOKINGS').all().find(b => b.status === 'CONFIRMED' && api.dateKey_(b.date) === '2026-11-12');
+  api.withLock_(() => api.table_('BOOKINGS').update(api.table_('BOOKINGS').byId(fut.booking_id), { status: 'PENDING_REASSIGN' }));
+  api.setSimNow_('2026-11-10 10:30'); assert.strictEqual(api.hourlyJob({ triggerUid: 'x' }).stuck, 0, 'vừa thấy: chưa báo');
+  api.setSimNow_('2026-11-10 11:40'); assert.strictEqual(api.hourlyJob({ triggerUid: 'x' }).stuck, 1, 'quá 1 giờ: báo');
+  api.setSimNow_('2026-11-10 12:50'); assert.strictEqual(api.hourlyJob({ triggerUid: 'x' }).stuck, 0, 'không báo lặp');
+  api.clearDbCache_(); assert.strictEqual(api.table_('NOTIFICATIONS').all().filter(n => n.event === 'REASSIGN_STUCK').length, 1);
+  assert.ok(st.mails.some(m => m.to === 'admin@example.com' && /\[Khẩn\]/.test(m.subject) && new RegExp(fut.booking_id).test(m.htmlBody)), 'email Khẩn tới ADMIN_EMAIL');
+  const adm = fxLogin(f, 'admin@example.com');   // admin xử lý bằng "Huỷ bởi admin" (buổi kẹt luôn được bù, 5N)
+  const ac = api.apiAdminCancel(adm, fut.booking_id, 'Tutor nghỉ', 'rid-ad1'); assert.ok(ac.ok, JSON.stringify(ac));
+  api.clearDbCache_(); assert.strictEqual(api.table_('BOOKINGS').byId(fut.booking_id).status, 'CANCELLED_ADMIN');
+  // đăng ký → email nhận đăng ký dùng chữ admin đã sửa (dòng trùng đã gộp) → admin duyệt trong Sheets → email chào mừng chữ admin
+  api.setSimNow_('2026-11-10 13:00'); st.mails = [];
+  const rg = api.submitRegistration_({ email: 'moi@example.com', name: 'Mới', phone: '0912 345 678', level_self: 'A1', package_code: 'PASS_1M', consent: true, screenshot: SHOT }); assert.ok(rg.ok, JSON.stringify(rg));
+  const recv = st.mails.find(m => m.to === 'moi@example.com'); assert.ok(/Thaiput received your registration/.test(recv.htmlBody), 'REG_RECEIVED dùng chữ admin sau khi gộp');
+  api.clearDbCache_();
+  const sh = env.globals.SpreadsheetApp.openById(FX_DB).getSheetByName('REGISTRATIONS'), reg = api.table_('REGISTRATIONS').byId(rg.regId), col = api.SCHEMA.REGISTRATIONS.cols.indexOf('admin_action') + 1;
+  sh.getRange(reg._row, col).setValue('Duyệt');
+  const er = api.onEditInstallable({ range: sh.getRange(reg._row, col), value: 'Duyệt', user: { getEmail: () => 'admin@example.com' } }); assert.ok(er.ok, JSON.stringify(er));
+  assert.ok(st.mails.some(m => m.to === 'moi@example.com' && /^Chào mừng bạn đến thaiput!/.test(m.subject)), 'WELCOME chữ admin');
+  api.clearDbCache_(); const u = api.userByEmail_('moi@example.com');
+  assert.strictEqual(api.table_('PAYMENTS').all().length, nPay0 + 1); const sp = api.table_('STUDENT_PACKAGES').all().find(x => x.student_id === u.user_id); assert.strictEqual(sp.status, 'INACTIVE', 'chờ kích hoạt khi đặt buổi đầu');
+  // đặt 2 buổi (kích hoạt gói), huỷ 1
+  const tok = fxLogin(f, 'moi@example.com'), b = api.apiStudentBook(tok, [{ date: '2026-11-17', slot: '19:00' }, { date: '2026-11-18', slot: '19:00' }], 'rid-f1');
+  assert.ok(b.ok && b.data.every(x => x.ok), JSON.stringify(b));
+  api.clearDbCache_(); const sp2 = api.table_('STUDENT_PACKAGES').byId(sp.sp_id); assert.strictEqual(sp2.status, 'ACTIVE'); assert.ok(sp2.start_date instanceof Date && sp2.end_date instanceof Date, 'gói có ngày bắt đầu và hết hạn');
+  assert.ok(api.apiStudentCancel(tok, b.data[1].bookingId, 'rid-f2').ok);
+  api.clearDbCache_(); assert.deepStrictEqual([api.table_('BOOKINGS').byId(b.data[0].bookingId).status, api.table_('BOOKINGS').byId(b.data[1].bookingId).status], ['CONFIRMED', 'CANCELLED_STUDENT']);
+  // Calendar và nhắc: nhắc đúng một lần cho học viên và tutor (REMINDER_BEFORE_MINUTES = 45 của admin), job lặp lại không gửi trùng
+  api.setSimNow_('2026-11-17 18:10'); api.calendarJob({ triggerUid: 'x' }); st.mails = []; api.reminderJob({ triggerUid: 'x' });
+  const rm = st.mails.map(m => m.to).sort(); assert.deepStrictEqual(rm, ['moi@example.com', api.userById_(api.table_('BOOKINGS').byId(b.data[0].bookingId).tutor_id).email].sort());
+  st.mails = []; api.reminderJob({ triggerUid: 'x' }); assert.strictEqual(st.mails.length, 0, 'không nhắc trùng');
+  assert.ok(Object.values(st.events).some(e => e.status === 'confirmed'), 'Calendar có sự kiện');
+  // tutor chọn kết quả; admin chọn "Đã xử lý (giữ nguyên)" thì cột admin_done_at (mới) được ghi
+  api.setSimNow_('2026-11-17 20:00'); const bk = api.table_('BOOKINGS').byId(b.data[0].bookingId), ttok = fxLogin(f, api.userById_(bk.tutor_id).email);
+  assert.ok(api.apiTutorSubmitResult(ttok, bk.booking_id, 'TECH_ISSUE', 'rid-f3').ok); api.clearDbCache_(); assert.strictEqual(api.table_('BOOKINGS').byId(bk.booking_id).status, 'TECH_ISSUE');
+  const old = api.table_('BOOKINGS').all().find(x => x.status === 'STUDENT_ABSENT');   // buổi Vắng học viên cũ của 8.1.4
+  const bsh = env.globals.SpreadsheetApp.openById(FX_DB).getSheetByName('BOOKINGS'), aac = api.SCHEMA.BOOKINGS.cols.indexOf('admin_action') + 1;
+  bsh.getRange(old._row, aac).setValue('Đã xử lý (giữ nguyên)');
+  assert.ok(api.onEditInstallable({ range: bsh.getRange(old._row, aac), value: 'Đã xử lý (giữ nguyên)', user: { getEmail: () => 'admin@example.com' } }).ok);
+  api.clearDbCache_(); const done = api.table_('BOOKINGS').byId(old.booking_id); assert.ok(done.admin_done_at instanceof Date && done.status === 'STUDENT_ABSENT' && done.admin_action === '', 'admin_done_at ghi, trạng thái giữ nguyên');
+  // job hằng ngày, đêm, lưu trữ: không làm mất dòng nào (mọi dữ liệu còn trong hạn lưu trữ)
+  const counts = () => ['BOOKINGS', 'AVAILABILITY', 'ACTIVITY_LOG', 'MAIL_LOG', 'NOTIFICATIONS'].map(n => api.table_(n).all().length);
+  api.clearDbCache_(); const c0 = counts();
+  api.setSimNow_('2026-11-18 02:00'); api.nightlyBackup({ triggerUid: 'x' }); api.setSimNow_('2026-11-18 03:30'); const hj = api.hourlyJob({ triggerUid: 'x' }); api.dailyJob({ triggerUid: 'x' });
+  assert.ok(st.props['DONE_ARCHIVE_2026-11-18'], 'job lưu trữ đã chạy'); assert.ok(hj.archive.every(x => x.archived === 0), JSON.stringify(hj.archive));
+  api.clearDbCache_(); const c1 = counts(); assert.ok(c1.every((n, i) => n >= c0[i]), 'không mất dòng: ' + c0 + ' -> ' + c1);
+  assert.strictEqual(api.table_('BOOKINGS').all().length, nBk0 + 2, 'BOOKINGS: 8.1.4 cũ + 2 buổi mới');
+  // dữ liệu nhất quán: đối soát mỗi giờ không thấy sai luật, không có email lỗi, menu 2 sạch lỗi
+  assert.strictEqual(hj.issues, 0); assert.ok(!api.table_('NOTIFICATIONS').all().some(n => /DATA_INVARIANT|SYSTEM_ERROR|MAIL_FAILED|PACKAGE_ROW_MISSING/.test(n.event)), 'không có thông báo lỗi');
+  assert.deepStrictEqual(api.testSystem().errors, [], 'menu 2 không có lỗi sau nâng cấp');
+});
+
+t('I157', 'Nâng cấp (g): ô chữ web chưa sửa thì nâng lên chữ gốc mới, ô admin sửa thì giữ và được báo; khoá CONFIG admin đã tự thêm trước không bị ghi đè hay nhân đôi; mẫu email còn chữ gốc cũ được nâng; mọi việc ấy vào tóm tắt đo thật', () => {
+  const f = fx814(), { api, env } = f, st = env.state, sh = (n) => st.spreadsheets[FX_DB].sheets[n];
+  const cell = (tab, key, col) => { const v = sh(tab).values, h = v[0], r = v.findIndex((x, i) => i > 0 && String(x[0]).trim() === key); return { r, c: h.indexOf(col), v }; };
+  const setCell = (tab, key, col, val) => { const x = cell(tab, key, col); x.v[x.r][x.c] = val; };
+  const oldVi = cell('CONTENT', 'h.bank_note', 'default_vi'), oldEn = cell('CONTENT', 'h.bank_note', 'default_en');
+  const defVi = oldVi.v[oldVi.r][oldVi.c], defEn = oldEn.v[oldEn.r][oldEn.c];
+  setCell('CONTENT', 'h.bank_note', 'vi', 'Chữ riêng của admin về chuyển khoản');   // admin sửa: GIỮ
+  setCell('CONTENT', 'h.bank_note', 'en', defEn);                                    // còn đúng chữ gốc cũ: NÂNG
+  // admin đã tự thêm khoá mới trước khi dán code (đúng tên khoá của bản mới), có giá trị và ghi chú riêng
+  const cfg = sh('CONFIG').values;
+  cfg.push(['BANK_QR_IMAGE', 'https://drive.google.com/file/d/ABCDEFGHIJKL/view', 'Ghi chú của admin về QR']); cfg.push(['REASSIGN_STUCK_HOURS', '-1', 'Admin tắt báo buổi kẹt']);
+  // mẫu email còn đúng chữ gốc cũ của bản trước: được nâng
+  const trOld = api.TEMPLATE_UPGRADES_.TUTOR_REMIND.body_vi, tr = cell('EMAIL_TEMPLATES', 'TUTOR_REMIND', 'body_vi'); tr.v[tr.r][tr.c] = trOld;
+  const r = api.setupFirstRun(); api.clearDbCache_(); api.clearConfigCache_();
+  const ct = api.table_('CONTENT').byId('h.bank_note');
+  assert.strictEqual(ct.vi, 'Chữ riêng của admin về chuyển khoản', 'ô admin sửa được giữ'); assert.strictEqual(ct.en, api.DEFAULT_CONTENT_['h.bank_note'][1], 'ô chưa sửa nâng lên chữ gốc mới');
+  assert.deepStrictEqual([ct.default_vi, ct.default_en], [api.DEFAULT_CONTENT_['h.bank_note'][0], api.DEFAULT_CONTENT_['h.bank_note'][1]], 'chữ gốc mới ghi ở cột default');
+  assert.strictEqual(defVi === ct.default_vi, false);
+  const k = api.table_('CONFIG').all(); assert.strictEqual(k.filter(x => x.key === 'BANK_QR_IMAGE').length, 1); assert.strictEqual(k.filter(x => x.key === 'REASSIGN_STUCK_HOURS').length, 1);
+  assert.deepStrictEqual([api.table_('CONFIG').byId('BANK_QR_IMAGE').value, api.table_('CONFIG').byId('BANK_QR_IMAGE').note, api.table_('CONFIG').byId('REASSIGN_STUCK_HOURS').value, api.table_('CONFIG').byId('REASSIGN_STUCK_HOURS').note],
+    ['https://drive.google.com/file/d/ABCDEFGHIJKL/view', 'Ghi chú của admin về QR', '-1', 'Admin tắt báo buổi kẹt'], 'không ghi đè giá trị, không ghi đè ghi chú');
+  assert.strictEqual(api.cfg_('REASSIGN_STUCK_HOURS'), -1);
+  assert.notStrictEqual(api.table_('EMAIL_TEMPLATES').byId('TUTOR_REMIND').body_vi, trOld, 'mẫu còn chữ gốc cũ được nâng lên chữ gốc mới');
+  const log = api.table_('RELEASE_LOG').all().filter(x => !/^NOTE_/.test(x.kind)), by = (kind) => log.filter(x => x.kind === kind).map(x => x.item).sort();
+  assert.deepStrictEqual(by('CONTENT_KEPT'), ['h.bank_note (vi)']); assert.deepStrictEqual(by('CONTENT_REFRESHED'), ['h.bank_note (en)']); assert.deepStrictEqual(by('TEMPLATE_UPGRADED'), ['TUTOR_REMIND']);
+  assert.deepStrictEqual(by('CONFIG_ADDED'), [], 'khoá đã có thì không "thêm"');
+  const txt = r.lines.join('\n'); assert.ok(/GIỮ chữ bạn đã sửa dù chữ gốc đã đổi \(1 ô\): h\.bank_note \(vi\)/.test(txt) && /làm mới ô chữ web chưa sửa 1: h\.bank_note \(en\)/.test(txt) && /nâng mẫu email 1: TUTOR_REMIND/.test(txt), txt);
+  assert.ok(/default_vi/.test(txt), 'chỉ cho admin chỗ xem chữ gốc mới');
+  // chạy lại: không báo lại ô đã giữ
+  const r2 = api.setupFirstRun(); assert.ok(!r2.lines.some(l => /GIỮ chữ|CẬP NHẬT PHIÊN BẢN/.test(l)));
+});
+
+t('I158', 'Soát 5R (hồi quy I151): fixture 8.1.4 lưu mốc ĐỒNG HỒ THẬT (nhịp tim job, BACKUP_OK_AT, MET_LAST); nạp fixture dời chúng về bây giờ, giữ khoảng cách, MET_LAST vẫn tròn giờ, giờ mô phỏng không đổi, nên fixture cũ bao nhiêu thì trang health vẫn OK', () => {
+  const H10 = 10 * 3600000, props = (f) => f.st.props;
+  // Đối chứng: fixture "cũ 10 giờ" mà KHÔNG dời thì health báo STALE (chứng minh test này nhạy, và đúng là lỗi I151 đã gặp).
+  assert.strictEqual(fx814({ ageMs: H10, noRebase: true }).api.healthStatus_(), 'STALE');
+  // Có dời: OK, dù fixture cũ 10 giờ hay 3 ngày.
+  [0, H10, 72 * 3600000].forEach(age => {
+    const f = fx814({ ageMs: age }), p = props(f), now = Date.now();
+    assert.strictEqual(f.api.healthStatus_(), 'OK', 'fixture cũ ' + age + ' ms');
+    ['HB_reminderJob', 'HB_calendarJob', 'HB_hourlyJob', 'HB_dailyJob', 'HB_nightlyBackup', 'BACKUP_OK_AT'].forEach(k => assert.ok(Math.abs(now - Number(p[k])) < 60000, k + ' vừa dời về bây giờ'));
+    assert.strictEqual(Number(p.MET_LAST) % 3600000, 0, 'MET_LAST vẫn tròn giờ');
+    assert.strictEqual(Number(p.MET_LAST), Math.floor(Number(p.BACKUP_OK_AT) / 3600000) * 3600000 - 3600000, 'MET_LAST là giờ tròn liền trước giờ của mốc sao lưu, như lúc dựng fixture');
+    assert.strictEqual(p.SIM_NOW, '2026-11-10T03:00:00.000Z', 'giờ mô phỏng không bị dời');
+  });
+  // Khoảng cách giữa các mốc giữ nguyên (so với file gốc).
+  const raw = fxio.parse(FX814_TEXT).props, moved = fxio.parse(FX814_TEXT), r = fxio.rebaseRealClock(moved, Date.now() + 5 * 3600000);
+  assert.ok(r && r.delta > 0);
+  ['HB_reminderJob', 'HB_calendarJob', 'HB_hourlyJob', 'HB_dailyJob', 'HB_nightlyBackup', 'BACKUP_OK_AT'].forEach(k => assert.strictEqual(Number(moved.props[k]) - Number(raw[k]), r.delta, k + ' dời đúng một khoảng'));
+  // Mốc ở TƯƠNG LAI (hạn tạm dừng Calendar, hạn cổng thử tải) và dạng "mili giây:chuỗi" cũng dời cùng, không làm lệch mốc gốc.
+  const d2 = fxio.parse(FX814_TEXT), anchor0 = Math.max.apply(null, ['HB_reminderJob', 'HB_calendarJob', 'HB_hourlyJob', 'HB_dailyJob', 'HB_nightlyBackup', 'BACKUP_OK_AT'].map(k => Number(d2.props[k]))); d2.props.CAL_PAUSED_UNTIL = String(anchor0 + 600000); d2.props.MKT_RUN_X = (anchor0 - 1000) + ':abc12';
+  const r2 = fxio.rebaseRealClock(d2, anchor0 + 7000);
+  assert.strictEqual(r2.anchor, anchor0); assert.strictEqual(Number(d2.props.CAL_PAUSED_UNTIL), anchor0 + 7000 + 600000); assert.strictEqual(d2.props.MKT_RUN_X, (anchor0 + 6000) + ':abc12');
+  assert.strictEqual(fxio.rebaseRealClock({ props: { SIM_NOW: '2026-11-10T03:00:00.000Z', X: '12345' } }, Date.now()), null, 'không có mốc đồng hồ thật thì không làm gì');
+  // Không còn mốc đồng hồ thật nào nằm ngoài Script Properties (Sheets, Drive, Calendar): quét văn bản fixture theo dải của mốc dựng.
+  const near = (FX814_TEXT.match(/\d{13}/g) || []).filter(x => Math.abs(Number(x) - Number(raw.HB_hourlyJob)) < 3600000);
+  assert.deepStrictEqual(near.filter(x => !Object.keys(raw).some(k => raw[k] === x)), [], 'không có mốc thật ngoài Script Properties');
+  // Soát vòng 3 (D4): chọn theo TÊN. Thuộc tính giữ GIỜ MÔ PHỎNG (code 8.1.4 ghi bằng getNow_) KHÔNG bị dời; mốc dạng số chưa phân loại thì NÉM LỖI.
+  const d3 = fxio.parse(FX814_TEXT), simVal = String(Date.UTC(2026, 10, 10, 3, 0, 0));
+  const SIMS = { ARCH_CUTOFF_MAIN: simVal, ARCH_CUTOFF_MAIL: simVal, TA_CONFIRM_BK000001: simVal, STUCK_BK000002: simVal, PKGMISS_SP1: simVal, COMPBLK_BK1_2: simVal, PKGOUT_SP1__2026: simVal, TRIALOVER_SP1: simVal, TRIALLEFT_SP1_2026: simVal };
+  Object.assign(d3.props, SIMS); const r3 = fxio.rebaseRealClock(d3, Date.now() + 9 * 3600000);
+  assert.ok(r3 && r3.delta > 0); Object.keys(SIMS).forEach(k => assert.strictEqual(d3.props[k], simVal, k + ' là giờ mô phỏng: KHÔNG được dời'));
+  assert.ok(Number(d3.props.HB_hourlyJob) > Number(raw.HB_hourlyJob), 'mốc đồng hồ thật vẫn dời');
+  const d4 = fxio.parse(FX814_TEXT); d4.props.MOT_MOC_MOI = String(Date.UTC(2026, 10, 10, 3, 0, 0));
+  assert.throws(() => fxio.rebaseRealClock(d4, Date.now()), /chưa phân loại.*MOT_MOC_MOI/, 'mốc thời gian chưa phân loại: ném lỗi');
+  // danh sách phân loại: hai nhóm không giao nhau; mỗi tên cố định nhắc trong src/ (đổi tên ở src/ mà quên danh sách thì đỏ)
+  const probe = ['HB_x', 'BACKUP_OK_AT', 'MET_LAST', 'CAL_PAUSED_UNTIL', 'LOADTEST_UNTIL', 'MKT_RUN_X', 'TA_CONFIRM_1', 'ARCH_CUTOFF_MAIN', 'ARCH_CUTOFF_MAIL', 'STUCK_1', 'PKGMISS_1', 'COMPBLK_1', 'PKGOUT_1', 'TRIALOVER_1', 'TRIALLEFT_1'];
+  probe.forEach(k => assert.strictEqual(fxio.REAL_CLOCK_PROPS.filter(r => r.test(k)).length + fxio.SIM_CLOCK_PROPS.filter(r => r.test(k)).length, 1, k + ' thuộc đúng một nhóm'));
+  const srcAll = fs.readdirSync(path.join(__dirname, '..', 'src')).filter(f => f.endsWith('.gs')).map(f => fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8')).join('\n');
+  ['HB_', 'BACKUP_OK_AT', 'MET_LAST', 'CAL_PAUSED_UNTIL', 'LOADTEST_UNTIL', 'MKT_RUN_', 'TA_CONFIRM_', 'ARCH_CUTOFF_MAIN', 'ARCH_CUTOFF_MAIL', 'STUCK_', 'PKGMISS_', 'COMPBLK_', 'PKGOUT_', 'TRIALOVER_', 'TRIALLEFT_'].forEach(n => assert.ok(srcAll.indexOf("'" + n) !== -1, n + ' còn trong src/'));
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+// Soát X2 (5R): giao tóm tắt cập nhật BỀN (FIX A), số đo BỀN từng bước (FIX B), khoá CONFIG có dấu cách thừa (FIX C), mốc bỏ dòng sót (FIX D),
+// mock CacheService nghiêm như Google (FIX E), và 15 test đột biến từ đợt soát (X201 đến X215 nay là I175 đến I189).
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+const X2h = (() => {
+  const sh = (f, n) => f.env.state.spreadsheets[FX_DB].sheets[n];
+  const ci = (f, n, c) => sh(f, n).values[0].indexOf(c);
+  const lastRow = (f, n) => { const v = sh(f, n).values; let l = v.length; while (l > 1 && v[l - 1].every(x => x === '' || x === null || x === undefined)) l--; return l; };
+  const find = (f, n, key) => { const v = sh(f, n).values, k = ci(f, n, 'key'); for (let r = 1; r < v.length; r++) if (String(v[r][k]).trim() === key) return r; return -1; };
+  const put = (f, n, r, c, val) => { sh(f, n).values[r][ci(f, n, c)] = val; };
+  const addCopy = (f, n, src, over) => { const s = sh(f, n), line = s.values[src].slice(); Object.keys(over || {}).forEach(c => { line[ci(f, n, c)] = over[c]; }); s.values[lastRow(f, n)] = line; };
+  const addRow = (f, n, o) => { const s = sh(f, n), line = new Array(s.values[0].length).fill(''); Object.keys(o).forEach(c => { line[ci(f, n, c)] = o[c]; }); s.values[lastRow(f, n)] = line; };
+  const rows = (f, n) => { f.api.clearDbCache_(); return f.api.table_(n).all(); };
+  const qrFile = (f, id, o) => { f.env.state.drive.files[id] = Object.assign({ id, name: id, mime: 'image/png', bytes: Buffer.alloc(900, 1), trashed: false }, o || {}); };
+  const setCfg = (f, key, val) => { put(f, 'CONFIG', find(f, 'CONFIG', key), 'value', val); f.api.clearDbCache_(); f.api.clearConfigCache_(); f.env.state.cache = {}; };
+  return { sh, ci, lastRow, find, put, addCopy, addRow, rows, qrFile, setCfg };
+})();
+
+/** Một LƯỢT CHẠY MỚI của Apps Script trên cùng dữ liệu Google (biến toàn cục về ban đầu, không còn bộ nhớ lượt trước). */
+const xRun = (f) => attach(f.env);
+/**
+ * Cắt lượt chạy như Google ngắt: pred(tên cuộc gọi, tham số, st) đúng ở lần gọi dịch vụ Google đầu tiên thì cuộc gọi đó ném KILLED và MỌI cuộc gọi sau cũng ném (lượt đã chết).
+ * Tên cuộc gọi dạng "SpreadsheetApp.openById().getSheetByName().getRange().setValues". Trả { st, restore }; restore trả mọi dịch vụ về nguyên trạng.
+ */
+function xKill(f, pred) {
+  const st = { dead: false, n: 0, at: null }, undo = [];
+  const guard = (p, args) => { if (st.dead) throw new Error('KILLED(dead)'); st.n++; if (!st.at && pred(p, args, st)) { st.at = p; st.dead = true; throw new Error('KILLED at ' + p); } };
+  const wrapRes = (r, p) => {
+    if (r === null || typeof r !== 'object' || Array.isArray(r) || r instanceof Date) return r;
+    if (!Object.keys(r).some(k => typeof r[k] === 'function')) return r;
+    return new Proxy(r, { get(t, k) { const v = t[k]; if (typeof v !== 'function') return v; const q = p + '.' + String(k); return (...a) => { guard(q, a); return wrapRes(v.apply(t, a), q + '()'); }; } });
+  };
+  ['SpreadsheetApp', 'PropertiesService', 'LockService', 'CacheService', 'MailApp', 'GmailApp', 'DriveApp', 'ScriptApp'].forEach(g => {
+    const obj = f.env.globals[g];
+    Object.keys(obj).forEach(k => {
+      const v = obj[k]; if (typeof v !== 'function') return;
+      const q = g + '.' + k;
+      obj[k] = (...a) => { guard(q, a); return wrapRes(v.apply(obj, a), q + '()'); };
+      undo.push(() => { obj[k] = v; });
+    });
+  });
+  return { st, restore: () => undo.forEach(u => u()) };
+}
+/** Chạy fn(api) với lượt chạy bị cắt tại pred. Trả { err, st }. Kiểm chắc là đã cắt thật (không cắt thì test vô nghĩa). */
+function xKilled(f, pred, fn) {
+  const k = xKill(f, pred); let err = null;
+  try { fn(f.api); } catch (e) { err = e; } finally { k.restore(); }
+  // Code có thể bắt lỗi KILLED ở chỗ nào đó (khác Google thật, không bắt được); nhưng từ lúc cắt MỌI cuộc gọi dịch vụ đều ném nên lượt chạy không ghi thêm gì: tương đương bị cắt.
+  assert.ok(k.st.at && k.st.dead, 'lượt chạy phải bị cắt thật: ' + (err ? err.message : 'không lỗi') + ' | ' + k.st.at);
+  return { err, st: k.st };
+}
+const xPending = (f) => Object.keys(f.env.state.props).filter(k => /^RELEASE_PENDING/.test(k));
+const xHdr = (f) => JSON.parse(f.env.state.props.RELEASE_PENDING);
+const xSet = (f, tab) => fxRows(fxModel(f), tab);
+/** Trạng thái giao tóm tắt: tập dòng RELEASE_LOG (kind, item, detail), số thông báo, số email, số dòng nhật ký RELEASE của bản này, còn bản ghi bền không. */
+function xState(f) {
+  const m = fxModel(f), st = f.env.state;
+  return {
+    log: fxRows(m, 'RELEASE_LOG').map(r => [r.from_version, r.to_version, r.kind, r.item, r.detail].join('¦')).sort(),
+    notif: fxRows(m, 'NOTIFICATIONS').filter(n => n.event === 'RELEASE_NOTES').length,
+    mails: st.mails.filter(x => / \| /.test(x.subject) && /8\.1\.9/.test(x.subject) && x.to === 'admin@example.com').length,
+    activity: fxRows(m, 'ACTIVITY_LOG').filter(a => a.action === 'RELEASE' && a.entity_id === '8.1.9').length,
+    pending: xPending(f).length, version: st.props.APP_VERSION_LAST
+  };
+}
+let X2_REF = null;
+/** Lần nâng cấp 8.1.4 lên 8.1.9 KHÔNG bị cắt (chuẩn để so). */
+function xRef() { if (!X2_REF) { const f = fx814(); f.api.setupFirstRun(); X2_REF = xState(f); } return X2_REF; }
+/** Đếm lệnh ghi Script Properties trong fn: tổng và riêng của bản ghi giao (RELEASE_PENDING*, APP_VERSION_LAST). */
+function xPropWrites(f, fn) {
+  const s = f.env.globals.PropertiesService.getScriptProperties(), c = { total: 0, release: 0 }, o = {};
+  ['setProperty', 'setProperties', 'deleteProperty'].forEach(m => { o[m] = s[m]; s[m] = function (k) { c.total++; const keys = m === 'setProperties' ? Object.keys(k) : [k]; if (keys.some(x => /^(RELEASE_PENDING|APP_VERSION_LAST)/.test(x))) c.release++; return o[m].apply(this, arguments); }; });
+  try { fn(); } finally { Object.keys(o).forEach(m => { s[m] = o[m]; }); }
+  return c;
+}
+/** Làm mọi email có "8.1.9" trong tiêu đề hỏng (Gmail ném lỗi) cho tới khi ctl.fail về 0. ctl.attempts đếm số lần thử gửi. */
+function xMailFail(f, n) {
+  const G = f.env.globals.GmailApp, orig = G.sendEmail, ctl = { fail: n, attempts: 0 };
+  G.sendEmail = function (to, subject) { if (/8\.1\.9/.test(subject)) { ctl.attempts++; if (ctl.fail-- > 0) throw new Error('Gmail hỏng (giả lập)'); } return orig.apply(this, arguments); };
+  return ctl;
+}
+/** Sau khi ghi nhận phiên bản (setProperties có APP_VERSION_LAST) thì đặt khoá bận: khoá bận NGAY SAU KHI ghi nhận. */
+function xBusyAfterRecord(f) {
+  const s = f.env.globals.PropertiesService.getScriptProperties(), o = s.setProperties;
+  s.setProperties = function (x) { const r = o.apply(this, arguments); if (x && 'APP_VERSION_LAST' in x) f.env.state.lockBusy = true; return r; };
+  return () => { s.setProperties = o; };
+}
+const xAfterRecord = (n, a, st) => { if (st.rec) return true; if (/getScriptProperties\(\)\.setProperties$/.test(n) && a[0] && 'APP_VERSION_LAST' in a[0]) st.rec = true; return false; };
+const xRecordLegs = (a) => { try { return JSON.parse(a[0].RELEASE_PENDING).legs; } catch (e) { return null; } };
+
+t('I166', 'Soát X2 (FIX E, luật 14): mock CacheService nghiêm như Google: mục hết hạn thì get trả null (hạn theo đồng hồ thật), giá trị phải là chữ, khoá không trống, hạn 1 đến 21600 giây; code thật dùng bộ đệm CONFIG 60 giây nên sửa tay sau 61 giây phải được đọc lại', () => {
+  const { api, env } = load({ props: {} }), C = env.globals.CacheService.getScriptCache(), st = env.state;
+  C.put('a', 'x', 5); assert.strictEqual(C.get('a'), 'x');
+  st.cacheClockMs = 4999; assert.strictEqual(C.get('a'), 'x', 'chưa hết hạn');
+  st.cacheClockMs = 5000; assert.strictEqual(C.get('a'), null, 'hết hạn đúng lúc: get trả null'); assert.ok(!('a' in st.cache), 'mục hết hạn bị bỏ');
+  st.cacheClockMs = 0; C.put('d', 'y'); st.cacheClockMs = 599e3; assert.strictEqual(C.get('d'), 'y'); st.cacheClockMs = 600e3; assert.strictEqual(C.get('d'), null, 'mặc định 600 giây');
+  st.cacheClockMs = 0; C.put('m', 'z', 21600); C.putAll({ p: '1', q: '2' }, 10); st.cacheClockMs = 11e3; assert.deepStrictEqual(C.getAll(['m', 'p', 'q']), { m: 'z' }, 'getAll bỏ mục hết hạn');
+  st.cacheClockMs = 0; C.put('a', 'old', 1); st.cacheClockMs = 1500; C.put('a', 'new', 100); assert.strictEqual(C.get('a'), 'new', 'ghi đè đặt lại hạn');
+  const throws = (fn, re, why) => assert.throws(fn, re, why);
+  throws(() => C.put('k', 5), /Invalid argument: value/, 'số không phải chữ'); throws(() => C.put('k', { a: 1 }), /Invalid argument: value/); throws(() => C.put('k', null), /Invalid argument: value/); throws(() => C.put('k', undefined), /Invalid argument: value/);
+  throws(() => C.put('', 'x'), /Invalid argument: key/, 'khoá trống'); throws(() => C.get(''), /Invalid argument: key/); throws(() => C.put(null, 'x'), /Invalid argument: key/); throws(() => C.get(undefined), /Invalid argument: key/);
+  throws(() => C.put('k', 'x', 0), /expirationInSeconds/, 'hạn 0'); throws(() => C.put('k', 'x', -3), /expirationInSeconds/); throws(() => C.put('k', 'x', 0.5), /expirationInSeconds/); throws(() => C.put('k', 'x', NaN), /expirationInSeconds/); throws(() => C.put('k', 'x', '60'), /expirationInSeconds/); throws(() => C.put('k', 'x', 21601), /expirationInSeconds/);
+  throws(() => C.putAll({ ok: 'x', bad: 7 }), /Invalid argument: value/); assert.strictEqual(C.get('ok'), null, 'putAll hỏng thì không ghi gì');
+  throws(() => C.put('k'.repeat(251), 'x'), /key/); throws(() => C.put('k', 'x'.repeat(102401)), /value/);
+  // Mục test ghi tay không có hạn (test vẫn đọc ghi st.cache trực tiếp được)
+  st.cache.tay = 'v'; st.cacheClockMs = 1e9; assert.strictEqual(C.get('tay'), 'v');
+  // Tác động thật: bộ đệm CONFIG sống 60 giây (CFG_CACHE_SECONDS_). Sửa ô CONFIG bằng tay (không qua onEdit) chỉ thấy sau 60 giây.
+  const f = fx814(), key = 'BANK_NAME'; f.api.clearConfigCache_(); f.env.state.cacheClockMs = 0;
+  const before = f.api.cfg_(key); assert.ok(before, 'có giá trị mẫu');
+  X2h.put(f, 'CONFIG', X2h.find(f, 'CONFIG', key), 'value', 'NGAN HANG MOI'); f.api.clearConfigMemory_();
+  assert.strictEqual(f.api.cfg_(key), before, 'còn trong bộ đệm 60 giây: chưa thấy giá trị mới (đúng như Google)');
+  f.env.state.cacheClockMs = 61e3; f.api.clearConfigMemory_();
+  assert.strictEqual(f.api.cfg_(key), 'NGAN HANG MOI', 'sau 61 giây bộ đệm hết hạn: đọc lại từ Sheets');
+});
+
+t('I167', 'Soát X2 (FIX A): khoá bận NGAY SAU KHI ghi nhận phiên bản: menu 1 vẫn ok nhưng chữ nói thật (chưa ghi RELEASE_LOG, còn dở), bản tóm tắt được giữ bền; menu 1 lần sau (hoặc job mỗi giờ) làm nốt đúng phần thiếu, trạng thái cuối y hệt lượt không bị cắt; lần sau nữa im lặng', () => {
+  const ref = xRef();
+  const N = ref.log.length; assert.ok(N >= 60, 'RELEASE_LOG của lượt chuẩn: ' + N); assert.strictEqual(ref.notif, 1); assert.strictEqual(ref.mails, 1); assert.strictEqual(ref.activity, 1); assert.strictEqual(ref.pending, 0);
+  const full = ['act', 'log', 'notif', 'mail'];
+  [['menu 1 lần sau', (f) => xRun(f).setupFirstRun()], ['job mỗi giờ', (f) => xRun(f).hourlyJob()]].forEach(([who, again]) => {
+    const f = fx814(), st = f.env.state, undo = xBusyAfterRecord(f);
+    const r1 = f.api.setupFirstRun(); undo();
+    assert.ok(r1.ok, 'menu 1 không hỏng vì lỗi giao (luật 39)'); const txt = r1.lines.join('\n');
+    assert.strictEqual(st.props.APP_VERSION_LAST, '8.1.9', 'phiên bản đã ghi nhận');
+    assert.strictEqual(xState(f).log.length, 0, 'RELEASE_LOG chưa có dòng nào'); assert.strictEqual(xState(f).notif, 0); assert.strictEqual(xState(f).mails, 0);
+    assert.ok(/CÒN DỞ \(.*tab RELEASE_LOG.*thông báo RELEASE_NOTES.*email ADMIN_RELEASE_NOTES\)/.test(txt), 'nói rõ phần còn dở: ' + txt);
+    assert.ok(/CHƯA ghi xong vào tab RELEASE_LOG/.test(txt) && /email CHƯA gửi/.test(txt), 'dòng đầu của tóm tắt không còn nói "đầy đủ ở RELEASE_LOG": ' + txt);
+    assert.ok(!/đầy đủ ở tab RELEASE_LOG/.test(txt) && !/Đã ghi \d+ dòng/.test(txt) && !/Đã tạo thông báo/.test(txt) && !/Đã gửi email/.test(txt) && !/Tab RELEASE_LOG vẫn đủ/.test(txt), 'không khẳng định điều chưa làm: ' + txt);
+    const h = xHdr(f); assert.strictEqual(h.sealed, true); assert.strictEqual(h.target, '8.1.9'); assert.strictEqual(h.from, '8.1.4'); assert.deepStrictEqual(full.map(k => h.legs[k]), [0, 0, 0, 0], 'chưa đường nào xong');
+    assert.ok(h.items.length >= 15 || xPending(f).length > 1, 'số đo nằm trong bản ghi: ' + h.items.length);
+    // khoá hết bận: làm nốt
+    st.lockBusy = false; const r2 = again(f);
+    if (who === 'menu 1 lần sau') {
+      const t2 = r2.lines.join('\n');
+      assert.ok(/TIẾP TỤC giao tóm tắt cập nhật bản 8\.1\.9/.test(t2) && new RegExp('Đã ghi ' + N + ' dòng vào tab RELEASE_LOG').test(t2) && /Đã tạo thông báo RELEASE_NOTES/.test(t2) && /Đã gửi email "Tóm tắt cập nhật" tới ADMIN_EMAIL/.test(t2) && new RegExp('đầy đủ ở tab RELEASE_LOG \\(' + N + ' dòng\\) và trong email').test(t2), t2);
+      assert.ok(!/CÒN DỞ/.test(t2), 'xong thì không còn dòng còn dở');
+    }
+    assert.deepStrictEqual(xState(f), ref, who + ': trạng thái cuối y hệt lượt không bị cắt (cùng tập dòng RELEASE_LOG, đúng MỘT thông báo, đúng MỘT email, một dòng RELEASE, hết bản ghi bền)');
+    assert.ok(fxRows(fxModel(f), 'NOTIFICATIONS').find(n => n.event === 'RELEASE_NOTES').emailed_at !== '', 'thông báo đã đánh dấu gửi email');
+    // lần sau nữa: im lặng, không đổi gì
+    const mails0 = st.mails.length, r3 = xRun(f).setupFirstRun();
+    assert.ok(!r3.lines.some(l => /TIẾP TỤC|CẬP NHẬT PHIÊN BẢN|Đã ghi \d+ dòng/.test(l)), 'lần sau im lặng'); assert.strictEqual(st.mails.length, mails0); assert.deepStrictEqual(xState(f), ref);
+  });
+});
+
+t('I168', 'Soát X2 (FIX A): lượt chạy bị cắt (Google ngắt) giữa lúc ghi nhận phiên bản và giao, hoặc giữa các đường giao: bản ghi bền cho lượt sau (menu 1 hoặc job mỗi giờ) làm đúng phần thiếu; RELEASE_LOG chưa kịp đánh dấu mà đã ghi thì nhận ra, không ghi trùng; kết quả cuối y hệt lượt không bị cắt', () => {
+  const ref = xRef();
+  const kills = [
+    ['ngay sau khi ghi nhận phiên bản, trước mọi đường giao', xAfterRecord],
+    ['sau khi RELEASE_LOG đã ghi và đã đánh dấu xong', (n, a, st) => { if (st.mark) return true; if (/getScriptProperties\(\)\.setProperties$/.test(n)) { const l = xRecordLegs(a); if (l && l.log === 1) st.mark = true; } return false; }],
+    ['sau khi RELEASE_LOG đã GHI nhưng TRƯỚC khi đánh dấu (không biết đã ghi hay chưa)', (n, a) => { if (/getScriptProperties\(\)\.setProperties$/.test(n)) { const l = xRecordLegs(a); return !!(l && l.log === 1); } return false; }],
+    ['sau khi thông báo đã ghi nhưng TRƯỚC khi đánh dấu', (n, a) => { if (/getScriptProperties\(\)\.setProperties$/.test(n)) { const l = xRecordLegs(a); return !!(l && l.notif === 1); } return false; }]
+  ];
+  [['menu 1', (f) => xRun(f).setupFirstRun()], ['job mỗi giờ', (f) => xRun(f).hourlyJob()]].forEach(([who, again]) => kills.forEach(([where, pred]) => {
+    const f = fx814(), k = xKilled(f, pred, (api) => api.setupFirstRun());
+    const pend = xPending(f); assert.ok(pend.length >= 1, where + ': còn bản ghi bền');
+    again(f);
+    assert.deepStrictEqual(xState(f), ref, who + ' sau khi bị cắt ' + where + ': trạng thái cuối y hệt lượt không bị cắt');
+    // chạy thêm một lượt nữa: không thêm gì
+    const s1 = xState(f), mails = f.env.state.mails.length; xRun(f).hourlyJob(); xRun(f).setupFirstRun();
+    assert.deepStrictEqual(xState(f), s1); assert.strictEqual(f.env.state.mails.length, mails, 'không gửi email lần hai');
+  }));
+});
+
+t('I169', 'Soát X2 (FIX A): email tóm tắt gửi hỏng: thông báo và RELEASE_LOG đã đủ, bản ghi giữ phần email; menu 1 và job mỗi giờ thử lại, TỐI ĐA 5 lần rồi dừng với MỘT thông báo MAIL_FAILED chỉ chỗ đọc tóm tắt (không email admin mỗi giờ); gửi được ở lần thử sau thì đúng một email; chữ menu 1 nói thật từng đường', () => {
+  const ref = xRef();
+  // (a) hỏng hoàn toàn: đúng 5 lần thử rồi bỏ cuộc
+  let f = fx814(); const ctl = xMailFail(f, 99);
+  const r1 = f.api.setupFirstRun(), t1 = r1.lines.join('\n');
+  assert.ok(r1.ok && ctl.attempts === 1, 'menu 1 vẫn ok, thử gửi 1 lần: ' + ctl.attempts);
+  assert.ok(new RegExp('Đã ghi ' + ref.log.length + ' dòng vào tab RELEASE_LOG').test(t1) && /Đã tạo thông báo RELEASE_NOTES/.test(t1) && /CHƯA gửi được email tóm tắt cập nhật \(lần thử 1\/5/.test(t1) && /email CHƯA gửi/.test(t1), t1);
+  assert.ok(!/Đã gửi email/.test(t1) && !/Đã gửi thông báo RELEASE_NOTES/.test(t1) && /CÒN DỞ \(email ADMIN_RELEASE_NOTES\)/.test(t1) && /đã nằm ở tab RELEASE_LOG/.test(t1), 'RELEASE_LOG đã đủ nên được nói là đã đủ, email nói là chưa: ' + t1);
+  assert.strictEqual(xState(f).log.length, ref.log.length); assert.strictEqual(xState(f).notif, 1); assert.strictEqual(xHdr(f).legs.mail, 0); assert.strictEqual(xHdr(f).tries.mail, 1);
+  const rel = () => fxRows(fxModel(f), 'NOTIFICATIONS').filter(n => n.event === 'MAIL_FAILED' && n.entity === 'RELEASE');
+  assert.strictEqual(rel().length, 0, 'chưa bỏ cuộc: chưa có thông báo riêng');
+  for (let i = 2; i <= 4; i++) { xRun(f).hourlyJob(); assert.strictEqual(ctl.attempts, i); assert.strictEqual(xHdr(f).tries.mail, i); }
+  assert.strictEqual(xState(f).log.length, ref.log.length, 'không ghi trùng RELEASE_LOG'); assert.strictEqual(xState(f).notif, 1, 'không tạo thông báo thứ hai');
+  xRun(f).hourlyJob(); assert.strictEqual(ctl.attempts, 5, 'lần thử thứ 5');
+  assert.strictEqual(xPending(f).length, 0, 'bỏ cuộc: bản ghi bền được xoá'); assert.strictEqual(rel().length, 1, 'đúng MỘT thông báo MAIL_FAILED riêng');
+  assert.ok(/RELEASE_LOG/.test(rel()[0].message) && /8\.1\.9/.test(rel()[0].message) && /RELEASE_LOG/.test(rel()[0].message_en), rel()[0].message);
+  for (let i = 0; i < 3; i++) xRun(f).hourlyJob(); xRun(f).setupFirstRun();
+  assert.strictEqual(ctl.attempts, 5, 'không thử nữa, không email admin mỗi giờ'); assert.strictEqual(rel().length, 1); assert.strictEqual(xState(f).mails, 0); assert.strictEqual(xState(f).log.length, ref.log.length);
+  // (b) hỏng 2 lần rồi gửi được: đúng một email, thông báo đã đánh dấu gửi
+  f = fx814(); const c2 = xMailFail(f, 2);
+  f.api.setupFirstRun(); xRun(f).hourlyJob(); assert.strictEqual(xState(f).mails, 0); xRun(f).hourlyJob();
+  assert.strictEqual(c2.attempts, 3); assert.deepStrictEqual(xState(f), ref, 'cuối cùng y hệt lượt không lỗi');
+  assert.ok(fxRows(fxModel(f), 'NOTIFICATIONS').find(n => n.event === 'RELEASE_NOTES').emailed_at !== '');
+  // (c) luật RELEASE_NOTES không dùng kênh EMAIL: không gửi, nói rõ; mẫu email tắt: cũng vậy
+  f = fx814(); f.api.withLock_(() => { const t = f.api.table_('NOTIFY_RULES'); t.insert({ event: 'RELEASE_NOTES', level: 'INFO', channel: 'DIGEST', note: '' }); }); f.api.clearDbCache_();
+  const r3 = f.api.setupFirstRun(), t3 = r3.lines.join('\n');
+  assert.ok(/Không gửi email: luật RELEASE_NOTES.*DIGEST/.test(t3) && !/Đã gửi email/.test(t3) && !/CÒN DỞ/.test(t3), t3); assert.strictEqual(xState(f).mails, 0); assert.strictEqual(xState(f).pending, 0);
+});
+
+t('I170', 'Soát X2 (FIX B): bị cắt sau khi gộp key, sau khi đổi cấu trúc, lúc tạo tab RELEASE_LOG, sau khi gieo chữ, lúc tạo trigger, hoặc khoá bận suốt lượt đầu: sau lượt chạy lại, RELEASE_LOG có ĐÚNG tập dòng của lượt không bị cắt (cùng kind, item, chi tiết), chữ menu 1 nói thật; dữ liệu y hệt', () => {
+  const ref = xRef(), refF = fx814(); refF.api.setupFirstRun(); const refModel = fxModel(refF);
+  const kills = [
+    ['sau khi sửa dòng đầu của key trùng (trước khi bỏ dòng thừa)', (n, a) => /getScriptProperties\(\)\.setProperty$/.test(n) && /^PURGE_OPEN_/.test(String(a[0]))],
+    ['sau khi đổi cấu trúc (bước 1 xong, đang đặt dropdown)', (n) => /\.setDataValidation$/.test(n)],
+    ['ngay sau khi tạo tab RELEASE_LOG', (n, a, st) => { if (st.tab) return true; if (/insertSheet$/.test(n) && a[0] === 'RELEASE_LOG') st.tab = true; return false; }],
+    ['sau khi gieo chữ web và mẫu email (đang đặt màu)', (n) => /setConditionalFormatRules$/.test(n)],
+    ['lúc tạo trigger', (n) => /ScriptApp\.newTrigger$/.test(n)]
+  ];
+  kills.forEach(([where, pred]) => {
+    const f = fx814(); xKilled(f, pred, (api) => api.setupFirstRun());
+    assert.ok(f.env.state.props.APP_VERSION_LAST !== '8.1.9', where + ': chưa ghi nhận phiên bản'); assert.ok(f.env.state.props.RELEASE_PENDING, where + ': số đo đã được giữ');
+    const r = xRun(f).setupFirstRun(), txt = r.lines.join('\n');
+    assert.deepStrictEqual(xState(f), xRef(), where + ': RELEASE_LOG, thông báo, email, nhật ký y hệt lượt không bị cắt');
+    assert.ok(/Cả đợt cập nhật này \(kể cả \d+ mục của lượt menu 1 bị ngắt trước đó\) đã \(đo thật\): .*thêm khoá CONFIG 2/.test(txt) && !/không phải thêm/.test(txt), where + ': ' + txt);
+    // dữ liệu y hệt: so các tab chính với lượt không bị cắt
+    const m = fxModel(f);
+    ['CONFIG', 'CONTENT', 'NOTIFY_RULES', 'PACKAGES'].forEach(tab => assert.deepStrictEqual(m[tab].rows.map(r => r.join('¦')).sort().map(s => s.replace(/D:\d+/g, 'D')), refModel[tab].rows.map(r => r.join('¦')).sort().map(s => s.replace(/D:\d+/g, 'D')), where + ' · tab ' + tab));
+    assert.deepStrictEqual(m.EMAIL_TEMPLATES.rows.map(r => String(r[0]).trim()).sort(), refModel.EMAIL_TEMPLATES.rows.map(r => String(r[0]).trim()).sort(), where + ': mẫu email không trùng key');
+  });
+  // khoá bận suốt lượt đầu
+  const f = fx814(); f.env.state.lockBusy = true; let err = null; try { f.api.setupFirstRun(); } catch (e) { err = e; }
+  assert.ok(f.env.state.props.APP_VERSION_LAST !== '8.1.9'); assert.ok(f.env.state.props.RELEASE_PENDING, 'khoá bận suốt: số đo cấu trúc đã đo được vẫn được giữ');
+  f.env.state.lockBusy = false; const r = xRun(f).setupFirstRun(), txt = r.lines.join('\n');
+  assert.deepStrictEqual(xState(f), xRef(), 'khoá bận suốt lượt đầu'); assert.ok(!/không phải thêm/.test(txt) && /thêm tab 1: RELEASE_LOG/.test(txt), txt);
+  // số lệnh ghi Script Properties của bản ghi giao trong MỘT lượt menu 1 liền: có giới hạn
+  const g = fx814(), c = xPropWrites(g, () => g.api.setupFirstRun());
+  assert.ok(c.release <= 14, 'lệnh ghi Script Properties của bản ghi giao: ' + c.release + ' (tổng ' + c.total + ')'); assert.ok(c.total <= 24, 'tổng lệnh ghi Script Properties một lượt menu 1: ' + c.total);
+});
+
+t('I171', 'Soát X2 (FIX B): câu "không phải thêm khoá, cột, tab hay dòng chữ nào" chỉ khi đúng cho CẢ đợt (kể cả lượt bị cắt); số đo của bản đích khác không lẫn vào; quá nhiều mục thì giữ việc đã làm, bỏ bớt khoá lạ và BÁO số mục không lưu hết (không im lặng); bản ghi quá 8 KB chia nhiều giá trị', () => {
+  // (a) thật sự không có gì để thêm (dữ liệu đã đủ, chỉ phiên bản ghi nhận lùi): câu đó đúng
+  let f = fx814(); f.api.setupFirstRun(); f.env.state.props.APP_VERSION_LAST = '8.1.8';
+  let r = xRun(f).setupFirstRun(), txt = r.lines.join('\n'); assert.ok(/Lượt chạy này không phải thêm khoá, cột, tab hay dòng chữ nào\./.test(txt), txt);
+  // (b) bị cắt khi đã làm xong mọi thứ trừ trigger: lượt chạy lại không có gì mới để thêm, nhưng lượt trước đã làm: câu đó KHÔNG được nói
+  f = fx814(); xKilled(f, (n) => /ScriptApp\.newTrigger$/.test(n), (api) => api.setupFirstRun());
+  r = xRun(f).setupFirstRun(); txt = r.lines.join('\n'); assert.ok(!/không phải thêm/.test(txt) && /thêm khoá CONFIG 2/.test(txt) && /thêm tab 1: RELEASE_LOG/.test(txt), txt);
+  // (c) bản ghi của phiên bản đích khác: bỏ (không lẫn); bản ghi hỏng: bỏ
+  f = fx814(); f.env.state.props.RELEASE_PENDING = JSON.stringify({ target: '8.1.7', items: [{ kind: 'CONFIG_ADDED', item: 'KHOA_CU_X2', vi: 'x', en: 'x' }] }); f.env.state.props.RELEASE_PENDING_1 = '[]';
+  f.api.setupFirstRun(); assert.ok(!xSet(f, 'RELEASE_LOG').some(x => x.item === 'KHOA_CU_X2') && xPending(f).length === 0, 'bản ghi bản khác và phần phụ bị bỏ sạch');
+  f = fx814(); f.env.state.props.RELEASE_PENDING = '{không phải JSON'; f.api.setupFirstRun(); assert.deepStrictEqual(xState(f), xRef(), 'bản ghi hỏng không làm hỏng menu 1');
+  // (d) nhiều mục: 150 dòng chữ web bị xoá nên menu 1 thêm lại 150 mục; bản ghi chia nhiều giá trị, mỗi giá trị dưới 9 KB, đọc lại đủ
+  f = fx814(); const sh = X2h.sh(f, 'CONTENT'), kc = X2h.ci(f, 'CONTENT', 'key'), defKeys = Object.keys(f.api.DEFAULT_CONTENT_).filter(k => X2h.find(f, 'CONTENT', k) !== -1).slice(0, 150);
+  defKeys.forEach(k => { sh.values[X2h.find(f, 'CONTENT', k)] = new Array(sh.values[0].length).fill(''); });
+  xKilled(f, (n) => /ScriptApp\.newTrigger$/.test(n), (api) => api.setupFirstRun());
+  const props = f.env.state.props, hdr = JSON.parse(props.RELEASE_PENDING), parts = Object.keys(props).filter(k => /^RELEASE_PENDING_\d+$/.test(k));
+  assert.ok(parts.length >= 2 && hdr.parts === parts.length + 1, 'chia nhiều giá trị: ' + parts.length);
+  ['RELEASE_PENDING'].concat(parts).forEach(k => assert.ok(Buffer.byteLength(k + props[k], 'utf8') <= 9 * 1024, k + ' dưới 9 KB'));
+  const back = xRun(f).releasePendingRead_(); const nAdd = back.items.filter(x => x.kind === 'CONTENT_ADDED').length; assert.ok(nAdd >= 150, 'đọc lại đủ từng dòng chữ web đã thêm: ' + nAdd);
+  xRun(f).setupFirstRun(); assert.strictEqual(xPending(f).length, 0, 'xong thì xoá sạch mọi phần');
+  assert.strictEqual(xSet(f, 'RELEASE_LOG').filter(x => x.kind === 'CONTENT_ADDED').length, nAdd, 'RELEASE_LOG đủ từng dòng (không bỏ im lặng)');
+  // (e) ép quá hạn: 450 khoá lạ + nhiều việc: mục không lưu hết được thì có dòng cảnh báo trong chữ menu 1, RELEASE_LOG và email
+  f = fx814(); for (let i = 0; i < 450; i++) X2h.addRow(f, 'CONFIG', { key: 'X2_KHOA_LA_' + i, value: '1' });
+  const r3 = f.api.setupFirstRun(), t3 = r3.lines.join('\n');
+  assert.ok(/CẢNH BÁO: \d+ mục đo KHÔNG lưu hết được/.test(t3) && !/không phải thêm/.test(t3), t3);
+  const log = xSet(f, 'RELEASE_LOG'); assert.ok(log.some(x => x.kind === 'MEASURED_TRUNCATED' && /KHÔNG lưu hết được/.test(x.detail)), 'RELEASE_LOG có dòng cảnh báo'); assert.ok(log.some(x => x.kind === 'TRUNCATED'));
+  assert.ok(f.env.state.mails.some(m => /KHÔNG lưu hết được|NOT be stored/.test(m.htmlBody)), 'email có cảnh báo');
+  assert.ok(log.some(x => x.kind === 'CONFIG_ADDED'), 'việc đã làm (khoá CONFIG thêm) được giữ trước khoá lạ');
+});
+
+t('I172', 'Soát X2 (FIX C): khoá CONFIG có dấu cách thừa ("BANK_NAME "): giá trị admin đúng là giá trị đang có hiệu lực TRƯỚC và SAU menu 1; menu 1 cắt ô khoá qua DbTable.update (không thêm dòng mặc định trống), báo ở chữ menu 1 và RELEASE_LOG; khoá lạ chỉ báo khoá còn lạ sau khi cắt', () => {
+  [['dấu cách cuối', 'BANK_NAME '], ['dấu cách đầu', '  BANK_NAME'], ['tab và xuống dòng', '\tBANK_NAME\n'], ['dấu cách không ngắt (U+00A0)', 'BANK_NAME\u00a0']].forEach(([why, stray]) => {
+    const f = fx814(), h = X2h, r0 = h.find(f, 'CONFIG', 'BANK_NAME'), mine = 'Techcombank của admin';
+    h.put(f, 'CONFIG', r0, 'key', stray); h.put(f, 'CONFIG', r0, 'value', mine); f.api.clearDbCache_(); f.api.clearConfigCache_(); f.env.state.cache = {};
+    assert.strictEqual(f.api.cfg_('BANK_NAME'), mine, why + ': trước menu 1 giá trị admin có hiệu lực');
+    const n0 = h.lastRow(f, 'CONFIG'), res = f.api.setupFirstRun(), txt = res.lines.join('\n'); f.api.clearDbCache_(); f.api.clearConfigCache_();
+    assert.strictEqual(f.api.cfg_('BANK_NAME'), mine, why + ': SAU menu 1 giá trị admin vẫn có hiệu lực (không bị dòng mặc định trống thắng)');
+    const rows = h.rows(f, 'CONFIG').filter(x => String(x.key).trim() === 'BANK_NAME');
+    assert.strictEqual(rows.length, 1, why + ': không thêm dòng mặc định trùng'); assert.strictEqual(rows[0].key, 'BANK_NAME', 'ô khoá đã cắt gọn'); assert.strictEqual(rows[0].value, mine, 'giá trị giữ nguyên');
+    assert.strictEqual(h.lastRow(f, 'CONFIG') - n0, 2, why + ': chỉ thêm đúng 2 khoá mới của bản (không thêm BANK_NAME)');
+    assert.ok(new RegExp('Sửa khoá CONFIG có dấu cách thừa \\(hoặc ký tự vô hình\\): ' + JSON.stringify(stray).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' thành "BANK_NAME" \\(hàng ' + (r0 + 1) + ', giá trị giữ nguyên\\)').test(txt), why + ': ' + txt);
+    assert.ok(/cắt dấu cách thừa ở khoá CONFIG 1: BANK_NAME/.test(txt), 'tóm tắt cập nhật nêu việc cắt: ' + txt);
+    const log = h.rows(f, 'RELEASE_LOG').filter(x => x.kind === 'CONFIG_KEY_TRIMMED'); assert.deepStrictEqual(log.map(x => x.item), ['BANK_NAME']); assert.ok(/có dấu cách thừa/.test(log[0].detail));
+    assert.ok(!h.rows(f, 'RELEASE_LOG').some(x => x.kind === 'CONFIG_UNKNOWN' && /BANK_NAME/.test(x.item)), 'báo khoá lạ không liệt kê khoá đã biết sau khi cắt');
+    assert.ok(h.rows(f, 'RELEASE_LOG').some(x => x.kind === 'CONFIG_UNKNOWN' && x.item === 'MY_CUSTOM_FLAG'), 'khoá lạ thật vẫn được báo');
+    const again = xRun(f).setupFirstRun(); assert.ok(!again.lines.some(l => /Sửa khoá CONFIG có dấu cách thừa/.test(l)), 'lần sau im lặng');
+  });
+  // khoá lạ thật có dấu cách thừa: vẫn là khoá lạ, được cắt và báo
+  const f = fx814(), h = X2h; h.addRow(f, 'CONFIG', { key: 'X2_KHOA_LA ', value: '9' }); const r = f.api.setupFirstRun();
+  assert.ok(h.rows(f, 'CONFIG').some(x => x.key === 'X2_KHOA_LA' && String(x.value) === '9') && !h.rows(f, 'CONFIG').some(x => x.key === 'X2_KHOA_LA '), 'khoá lạ cũng được cắt, không mất');
+  assert.ok(h.rows(f, 'RELEASE_LOG').some(x => x.kind === 'CONFIG_UNKNOWN' && x.item === 'X2_KHOA_LA'), r.lines.join('|'));
+  // khoá đổi tên (chép từ khoá cũ có dấu cách thừa): khoá cũ "LOGIN_LINK_MINUTES " vẫn được nhận ra
+  const g = fx814(), r1 = h.find(g, 'CONFIG', 'LOGIN_LINK_MINUTES');
+  if (r1 !== -1) { h.put(g, 'CONFIG', r1, 'key', 'LOGIN_LINK_MINUTES '); h.put(g, 'CONFIG', r1, 'value', '45'); }
+});
+
+t('I173', 'Soát X2 (FIX C): hai dòng "BANK_NAME " và "BANK_NAME": menu 1 KHÔNG xoá, KHÔNG đoán, giữ cả hai, báo rõ dòng nào đang có hiệu lực (dòng cuối, như trước đây); menu 2 có cảnh báo; không thêm dòng mặc định; CONFIG không nằm trong phép gộp tự động', () => {
+  const f = fx814(), h = X2h, r0 = h.find(f, 'CONFIG', 'BANK_NAME');
+  h.put(f, 'CONFIG', r0, 'key', 'BANK_NAME '); h.put(f, 'CONFIG', r0, 'value', 'Dòng đầu (có dấu cách)'); h.addRow(f, 'CONFIG', { key: 'BANK_NAME', value: 'Dòng cuối (đúng khoá)' });
+  f.api.clearDbCache_(); f.api.clearConfigCache_(); f.env.state.cache = {};
+  assert.strictEqual(f.api.cfg_('BANK_NAME'), 'Dòng cuối (đúng khoá)', 'trước menu 1: dòng cuối thắng');
+  const snap = () => h.rows(f, 'CONFIG').filter(x => String(x.key).trim() === 'BANK_NAME').map(x => JSON.stringify(x.key) + '=' + x.value);
+  const before = snap(), res = f.api.setupFirstRun(), txt = res.lines.join('\n'); f.api.clearDbCache_(); f.api.clearConfigCache_();
+  assert.deepStrictEqual(snap(), before, 'giữ nguyên cả hai dòng, không xoá, không sửa khoá');
+  assert.strictEqual(f.api.cfg_('BANK_NAME'), 'Dòng cuối (đúng khoá)', 'hiệu lực y như trước');
+  const last = h.lastRow(f, 'CONFIG') - 2;   // hàng (số từ 0) của dòng cuối BANK_NAME không cố định; chỉ cần có số hàng trong chữ
+  assert.ok(/CẢNH BÁO: khoá CONFIG "BANK_NAME" có 2 dòng chỉ khác nhau ở dấu cách hoặc ký tự vô hình \(hàng \d+ "BANK_NAME ", hàng \d+ "BANK_NAME"\)\. KHÔNG xoá, KHÔNG đoán\. Đang có hiệu lực: dòng CUỐI \(hàng \d+\)/.test(txt), txt);
+  assert.ok(!/Dòng cuối \(đúng khoá\)|Dòng đầu/.test(txt + JSON.stringify(h.rows(f, 'RELEASE_LOG'))), 'không in giá trị CONFIG ra chữ báo hay RELEASE_LOG (có thể là khoá bí mật)');
+  assert.ok(/Khoá CONFIG có hai dòng|CẢNH BÁO: 1 khoá CONFIG có hai dòng chỉ khác nhau ở dấu cách.*BANK_NAME/.test(txt) && h.rows(f, 'RELEASE_LOG').some(x => x.kind === 'CONFIG_KEY_TWIN' && x.item === 'BANK_NAME'), 'có trong tóm tắt và RELEASE_LOG');
+  assert.ok(f.env.state.mails.some(m => /CONFIG_KEY_TWIN|BANK_NAME/.test(m.htmlBody) && /Cần bạn xem|Needs your attention/.test(m.htmlBody)), 'email nêu thành khối cần xem');
+  const ts = f.api.testSystem(); assert.ok(ts.warnings.some(w => /^CONFIG: khoá CONFIG "BANK_NAME" có 2 dòng chỉ khác nhau ở dấu cách.*Đang có hiệu lực: dòng CUỐI \(hàng \d+\)/.test(w)), 'menu 2: ' + JSON.stringify(ts.warnings));
+  // không đoán: chạy lại nhiều lần vẫn y nguyên
+  xRun(f).setupFirstRun(); f.api.clearDbCache_(); assert.deepStrictEqual(snap(), before);
+  // sạch thì menu 2 không cảnh báo
+  const g = fx814(); g.api.setupFirstRun(); assert.ok(!g.api.testSystem().warnings.some(w => /^CONFIG: khoá CONFIG/.test(w)));
+});
+
+t('I174', 'Soát X2 (FIX D): mốc PURGE_OPEN_<tab> còn sót sau lần bỏ dòng bị cắt (đã xoá đuôi xong, chưa kịp xoá mốc): menu 1 và job mỗi giờ dọn mốc khi tab nhất quán, KHÔNG báo nhầm "tab bị sửa tay"; tab thật sự bị sửa sau khi cắt thì vẫn KHÔNG xoá gì và báo Khẩn', () => {
+  // bị cắt đúng lúc xoá mốc, trong lúc menu 1 gộp key trùng
+  const kill = (n, a) => /getScriptProperties\(\)\.deleteProperty$/.test(n) && a[0] === 'PURGE_OPEN_EMAIL_TEMPLATES';
+  ['menu 1', 'job mỗi giờ'].forEach(who => {
+    const f = fx814(); xKilled(f, kill, (api) => api.setupFirstRun());
+    assert.ok(f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES, 'mốc còn sót sau khi bị cắt');
+    f.api.clearDbCache_(); assert.strictEqual(f.api.table_('EMAIL_TEMPLATES').all().filter(x => String(x.key).trim() === 'LOGIN_LINK').length, 1, 'đuôi đã xoá: tab nhất quán');
+    if (who === 'menu 1') xRun(f).setupFirstRun(); else xRun(f).hourlyJob();
+    assert.ok(!f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES, who + ': mốc đã dọn');
+    const nf = fxRows(fxModel(f), 'NOTIFICATIONS').filter(x => x.event === 'PURGE_CHECK'); assert.strictEqual(nf.length, 0, who + ': không báo nhầm PURGE_CHECK');
+    const rec = fxRows(fxModel(f), 'ACTIVITY_LOG').filter(a => a.action === 'PURGE_RECOVERED' && a.entity_id === 'EMAIL_TEMPLATES'); assert.ok(rec.length >= 1 && /completed/.test(rec[rec.length - 1].detail), 'ghi nhật ký: ' + JSON.stringify(rec.map(r => r.detail)));
+    assert.ok(!f.api.testSystem().warnings.some(w => /lần bỏ dòng dở/.test(w)), 'menu 2 hết cảnh báo mốc');
+  });
+  // không làm yếu phục hồi: bị cắt giữa chừng (phần giữ đã ghi, đuôi còn nguyên) thì đuôi VẪN bị xoá
+  let f = fx814(); xKilled(f, (n, a, st) => { if (st.go) return true; if (/getScriptProperties\(\)\.setProperty$/.test(n) && /^PURGE_OPEN_/.test(String(a[0]))) st.seen = 1; if (st.seen && /setValues$/.test(n)) st.go = true; return false; }, (api) => api.setupFirstRun());
+  const mark = f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES; assert.ok(mark, 'mốc còn');
+  const tabRows = () => X2h.rows(f, 'EMAIL_TEMPLATES').length;
+  xRun(f).setupFirstRun(); assert.ok(!f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES); assert.strictEqual(X2h.rows(f, 'EMAIL_TEMPLATES').filter(x => String(x.key).trim() === 'LOGIN_LINK').length, 1, 'đuôi thừa đã xoá, không còn key trùng');
+  // tab bị sửa tay sau khi cắt: không xoá gì, báo Khẩn
+  f = fx814(); xKilled(f, (n, a, st) => { if (st.go) return true; if (/getScriptProperties\(\)\.setProperty$/.test(n) && /^PURGE_OPEN_/.test(String(a[0]))) st.seen = 1; if (st.seen && /setValues$/.test(n)) st.go = true; return false; }, (api) => api.setupFirstRun());
+  const sh = X2h.sh(f, 'EMAIL_TEMPLATES'), kc = X2h.ci(f, 'EMAIL_TEMPLATES', 'key'), o = JSON.parse(f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES);
+  const lastTail = o.last - 1; sh.values[lastTail][X2h.ci(f, 'EMAIL_TEMPLATES', 'subject_vi')] = 'admin vừa sửa tay đuôi';   // đuôi không còn như lúc hỏng
+  const rowsBefore = JSON.stringify(sh.values);
+  f.api.withLock_(() => f.api.purgeRecoverAll_());
+  assert.strictEqual(JSON.stringify(sh.values), rowsBefore, 'tab bị sửa tay thì KHÔNG xoá gì'); assert.ok(!f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES);
+  assert.strictEqual(fxRows(fxModel(f), 'NOTIFICATIONS').filter(x => x.event === 'PURGE_CHECK').length, 1, 'báo Khẩn PURGE_CHECK');
+});
+
+t('I175', 'X2 (M07, ex X201): dòng trùng CONTENT, dòng đầu admin để "-" (cố ý trống), dòng cuối là chữ gốc: sau menu 1 còn một dòng và ô vẫn là "-"', () => {
+  const f = fx814(), h = X2h, key = 'h.hero_sub', r = h.find(f, 'CONTENT', key);
+  h.put(f, 'CONTENT', r, 'en', '-'); h.addCopy(f, 'CONTENT', r, { en: f.api.DEFAULT_CONTENT_[key][1] });
+  f.api.setupFirstRun();
+  const got = h.rows(f, 'CONTENT').filter(x => String(x.key).trim() === key);
+  assert.strictEqual(got.length, 1, 'một dòng'); assert.strictEqual(got[0].en, '-', 'chữ "-" của admin phải giữ, không bị chữ gốc đè');
+});
+
+t('I176', 'X2 (M09, ex X202): menu 1 chỉ gộp key trùng ở EMAIL_TEMPLATES và CONTENT; CONFIG trùng key không bị đụng', () => {
+  const f = fx814(), h = X2h, r = h.find(f, 'CONFIG', 'BANK_NAME');
+  h.addCopy(f, 'CONFIG', r, { value: 'Dup bank' });
+  f.api.setupFirstRun();
+  const got = h.rows(f, 'CONFIG').filter(x => String(x.key).trim() === 'BANK_NAME');
+  assert.strictEqual(got.length, 2, 'CONFIG không thuộc phạm vi gộp'); assert.ok(got.some(x => x.value === 'Dup bank'));
+});
+
+t('I177', 'X2 (M12, M13, ex X203): rowsByTrimmedKey_ lấy dòng CUỐI và bỏ key trống; dupMergeRows_ lấy audience, variables từ dòng sau khi dòng đầu trống', () => {
+  const { api } = load();
+  const m = api.rowsByTrimmedKey_({ all: () => [{ key: 'A', n: 1 }, { key: ' A ', n: 2 }, { key: '', n: 3 }] });
+  assert.strictEqual(m.A.n, 2, 'key trùng: dòng cuối thắng'); assert.ok(!('' in m), 'key trống bị bỏ');
+  const mk = (o, row) => Object.assign({ key: 'K', active: true, subject_vi: '', title_vi: '', body_vi: '', subject_en: '', title_en: '', body_en: '', note: '', audience: '', variables: '', _row: row }, o);
+  const res = api.dupMergeRows_([mk({}, 2), mk({ audience: 'ADMIN', variables: 'a, b' }, 5)], api.dupSpec_('EMAIL_TEMPLATES'));
+  assert.strictEqual(res.patch.audience, 'ADMIN'); assert.strictEqual(res.patch.variables, 'a, b'); assert.strictEqual(res.removed, 1);
+});
+
+t('I178', 'X2 (M16, ex X204): ô key có dấu cách thừa ở dòng đầu của nhóm trùng được cắt gọn sau khi gộp (mọi key trong EMAIL_TEMPLATES bằng key đã cắt)', () => {
+  const f = fx814(), h = X2h, r = h.find(f, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  h.put(f, 'EMAIL_TEMPLATES', r, 'key', 'LOGIN_LINK  ');
+  f.api.setupFirstRun();
+  const ks = h.rows(f, 'EMAIL_TEMPLATES').map(x => x.key);
+  assert.ok(ks.every(k => k === String(k).trim()), 'còn key có dấu cách thừa: ' + JSON.stringify(ks.filter(k => k !== String(k).trim())));
+  assert.strictEqual(ks.filter(k => k === 'LOGIN_LINK').length, 1);
+});
+
+t('I179', 'X2 (M21, ex X205): dòng cuối là chữ gốc có thêm xuống dòng cuối vẫn là chữ gốc: chữ admin sửa ở dòng đầu không bị coi là bản thua và bỏ', () => {
+  const f = fx814(), h = X2h, r = h.find(f, 'EMAIL_TEMPLATES', 'WELCOME'), def = f.api.DEFAULT_EMAIL_TEMPLATES_.WELCOME[3];
+  h.put(f, 'EMAIL_TEMPLATES', r, 'body_vi', 'ADMIN X body'); h.addCopy(f, 'EMAIL_TEMPLATES', r, { body_vi: def + '\n' });
+  const res = f.api.setupFirstRun();
+  assert.strictEqual(h.rows(f, 'EMAIL_TEMPLATES').find(x => x.key === 'WELCOME').body_vi, 'ADMIN X body');
+  assert.ok(!res.lines.some(l => /key WELCOME/.test(l) && /BỎ bản/.test(l)), res.lines.filter(l => /WELCOME/.test(l)).join('|'));
+});
+
+t('I180', 'X2 (M31, ex X206): apiPublicInfo khi có QR chỉ mang dấu 10 ký tự (không mã file Drive, không ảnh); bank chỉ có name, account, holder, qr', () => {
+  const f = fx814(), h = X2h; f.api.setupFirstRun(); h.qrFile(f, 'QRX2FILE0001'); h.setCfg(f, 'BANK_QR_IMAGE', 'QRX2FILE0001');
+  const info = f.api.apiPublicInfo(), js = JSON.stringify(info);
+  assert.ok(info.ok && !/data:image|base64/.test(js), 'ảnh không nằm trong apiPublicInfo');
+  assert.deepStrictEqual(Object.keys(info.data.bank).sort(), ['account', 'holder', 'name', 'qr']);
+  assert.ok(/^[a-f0-9]{10}$/.test(info.data.bank.qr) && js.indexOf('QRX2FILE0001') === -1, 'dấu là băm, không lộ mã file');
+});
+
+t('I181', 'X2 (M35, M37, ex X207): file quá cỡ không bị tải nội dung (getBlob 0 lần); lỗi nhớ ngắn (tối đa 600 giây), ảnh tốt nhớ tối đa 21600 giây', () => {
+  const f = fx814(), h = X2h; f.api.setupFirstRun();
+  h.qrFile(f, 'QRBIGX2FILE01', { bytes: Buffer.alloc(301 * 1024, 1) }); h.setCfg(f, 'BANK_QR_IMAGE', 'QRBIGX2FILE01');
+  const cache = f.env.globals.CacheService.getScriptCache(), op = cache.put, opa = cache.putAll, puts = [];
+  cache.put = (k, v, ttl) => { puts.push([k, ttl]); return op(k, v, ttl); }; cache.putAll = (o, ttl) => { Object.keys(o).forEach(k => puts.push([k, ttl])); return opa(o, ttl); };
+  let blobs = 0; const DA = f.env.globals.DriveApp, og = DA.getFileById;
+  DA.getFileById = (id) => { const x = og(id); return Object.assign({}, x, { getBlob: () => { blobs++; return x.getBlob(); } }); };
+  const r = f.api.apiBankQr();
+  assert.strictEqual(r.data.src, ''); assert.strictEqual(blobs, 0, 'quá cỡ thì không tải nội dung');
+  const bad = puts.find(p => /^bq_[0-9a-f]{10}$/.test(p[0])); assert.ok(bad && bad[1] <= 600, 'lỗi nhớ ngắn: ' + JSON.stringify(puts));
+  h.qrFile(f, 'QRGOODX2FILE1'); h.setCfg(f, 'BANK_QR_IMAGE', 'QRGOODX2FILE1'); puts.length = 0;
+  assert.ok(f.api.apiBankQr().data.src.length > 100); assert.ok(puts.length >= 2 && puts.every(p => p[1] > 0 && p[1] <= 21600), JSON.stringify(puts));
+});
+
+t('I182', 'X2 (M39, ex X208): menu 2 báo file QR hỏng ở danh sách LỖI (không phải cảnh báo)', () => {
+  const f = fx814(), h = X2h; f.api.setupFirstRun(); h.qrFile(f, 'QRSVGX2FILE01', { mime: 'image/svg+xml' }); h.setCfg(f, 'BANK_QR_IMAGE', 'QRSVGX2FILE01');
+  const ts = f.api.testSystem();
+  assert.ok(ts.errors.some(e => /BANK_QR_IMAGE hỏng \(BAD_TYPE\)/.test(e)), JSON.stringify(ts.errors)); assert.ok(!ts.warnings.some(w => /BANK_QR_IMAGE/.test(w)));
+});
+
+t('I183', 'X2 (M66, ex X209): cột optional chưa có trong tab (admin chưa chạy menu 1) đọc ra chuỗi rỗng ở cả cột thô, không phải undefined', () => {
+  const f = fx814(), h = X2h, hd = h.sh(f, 'USERS').values[0], j = hd.indexOf('marketing_opt_out');
+  assert.ok(j !== -1 && f.api.SCHEMA.USERS.optional.indexOf('marketing_opt_out') !== -1);
+  hd[j] = 'cot_la_cua_admin';   // tab "chưa có" cột optional này
+  f.api.clearDbCache_(); const us = f.api.table_('USERS').all();
+  assert.ok(us.length > 3 && us.every(u => u.marketing_opt_out === ''), JSON.stringify(us.map(u => u.marketing_opt_out)));
+});
+
+t('I184', 'X2 (M71, ex X210): khoá CONFIG đã có mà admin để trống thì menu 1 không điền giá trị mặc định vào', () => {
+  const f = fx814(), h = X2h, key = Object.keys(f.api.DEFAULTS_).find(k => String(f.api.DEFAULTS_[k]) !== '' && h.find(f, 'CONFIG', k) !== -1 && String(f.api.table_('CONFIG').byId(k).value) !== '');
+  assert.ok(key, 'có khoá mẫu'); h.put(f, 'CONFIG', h.find(f, 'CONFIG', key), 'value', '');
+  f.api.setupFirstRun();
+  assert.strictEqual(String(h.rows(f, 'CONFIG').find(x => x.key === key).value), '', key + ' vẫn trống');
+});
+
+t('I185', 'X2 (M74, ex X211): lỗi bất ngờ khi dựng tóm tắt không làm hỏng menu 1; có dòng LƯU Ý và phiên bản vẫn được ghi nhận; bản ghi bỏ cuộc sau 5 lần dựng lỗi (không thử mãi mỗi giờ)', () => {
+  const f = fx814(); f.api.RELEASE_NOTES_[f.api.RELEASE_NOTES_.length - 1].users = [null];
+  const r = f.api.setupFirstRun();
+  assert.ok(r.ok && r.lines.some(l => /LƯU Ý: chưa lập được tóm tắt/.test(l)), r.lines.join('|')); assert.strictEqual(f.env.state.props.APP_VERSION_LAST, f.api.APP.VERSION);
+  // (thêm cho thiết kế bền) job mỗi giờ thử lại có giới hạn: lần dựng lỗi thứ 5 thì xoá bản ghi và báo admin một lần
+  assert.strictEqual(xHdr(f).tries.build, 1);
+  for (let i = 0; i < 3; i++) f.api.hourlyJob(); assert.strictEqual(xHdr(f).tries.build, 4);
+  f.api.hourlyJob(); assert.strictEqual(xPending(f).length, 0, 'bỏ cuộc: xoá bản ghi'); const n = f.env.state.mails.length; f.api.hourlyJob(); assert.strictEqual(f.env.state.mails.length, n);
+});
+
+t('I186', 'X2 (M79, ex X212): quá 400 mục thì RELEASE_LOG ghi 400 dòng cộng một dòng TRUNCATED nói còn bao nhiêu mục', () => {
+  const f = fx814(), h = X2h; for (let i = 0; i < 450; i++) h.addRow(f, 'CONFIG', { key: 'X2_KHOA_LA_' + i, value: '1' });
+  f.api.setupFirstRun();
+  const rl = h.rows(f, 'RELEASE_LOG'); assert.strictEqual(rl.length, 401, 'số dòng ' + rl.length);
+  const tr = rl.filter(x => x.kind === 'TRUNCATED'); assert.strictEqual(tr.length, 1); assert.ok(Number(tr[0].item) > 0);
+});
+
+t('I187', 'X2 (M83, ex X213, ĐỔI theo thiết kế mới): sao lưu hỏng và số đo quá lớn: bản ghi bền KHÔNG còn cắt bớt im lặng mà chia nhiều giá trị Script Properties (mỗi giá trị dưới 9 KB), đọc lại đủ; lượt sau giao đủ một lần', () => {
+  // Bản gốc của test dùng 450 khoá CONFIG lạ và kiểm MỘT giá trị dưới 8.200 ký tự. Khoá lạ nay là trạng thái (đo lại mỗi lượt, không lưu bền) và bản ghi chia phần, nên dùng 300 dòng chữ web bị xoá (việc đã làm) làm số đo lớn.
+  const g = fx814(), h = X2h, sh = h.sh(g, 'CONTENT'), defKeys = Object.keys(g.api.DEFAULT_CONTENT_);
+  for (let i = 1; i < sh.values.length; i++) if (defKeys.indexOf(String(sh.values[i][h.ci(g, 'CONTENT', 'key')]).trim()) !== -1) sh.values[i] = new Array(sh.values[0].length).fill('');
+  const DA = g.env.globals.DriveApp, orig = DA.getFileById; DA.getFileById = (id) => Object.assign({}, orig(id), { makeCopy: () => { throw new Error('Drive đầy'); } });
+  g.api.setupFirstRun();
+  const props = g.env.state.props, p = props.RELEASE_PENDING; assert.ok(p, 'số đo giữ lại'); assert.ok(p.length <= 8000 + 200 && JSON.parse(p).items.length > 0, 'độ dài ' + p.length);
+  const keys = xPending(g); assert.ok(keys.length >= 5, 'chia nhiều giá trị: ' + keys.length); keys.forEach(k => assert.ok(Buffer.byteLength(k + props[k], 'utf8') <= 9 * 1024, k));
+  assert.strictEqual(xRun(g).releasePendingRead_().items.filter(x => x.kind === 'CONTENT_ADDED').length, defKeys.length, 'bản ghi chưa niêm phong không mất mục nào');
+  DA.getFileById = orig; xRun(g).setupFirstRun(); assert.strictEqual(xPending(g).length, 0);
+  // RELEASE_LOG ghi tối đa 400 dòng (RELEASE_LOG_MAX_ROWS_): quá thì có dòng TRUNCATED, và việc đo bị bỏ bớt được báo bằng MEASURED_TRUNCATED (không im lặng)
+  const lg = xSet(g, 'RELEASE_LOG'); assert.strictEqual(lg.length, 401); assert.ok(lg.some(x => x.kind === 'TRUNCATED') && lg.some(x => x.kind === 'MEASURED_TRUNCATED'), 'có cảnh báo cắt bớt'); assert.ok(lg.filter(x => x.kind === 'CONTENT_ADDED').length >= 300);
+});
+
+t('I188', 'X2 (M88, ex X214): số đo giữ lại cho một phiên bản đích khác (8.1.7) không bị cộng vào lượt nâng lên 8.1.9', () => {
+  const f = fx814(); f.env.state.props.RELEASE_PENDING = JSON.stringify({ target: '8.1.7', items: [{ kind: 'CONFIG_ADDED', item: 'KHOA_CU_X2', vi: 'x', en: 'x' }] });
+  f.api.setupFirstRun();
+  assert.ok(!X2h.rows(f, 'RELEASE_LOG').some(x => x.item === 'KHOA_CU_X2'), 'số đo của bản khác không được vào'); assert.ok(!f.env.state.props.RELEASE_PENDING);
+});
+
+t('I189', 'X2 (M90, ex X215): khoá CONFIG lạ: khoá có ghi chú "Không dùng từ" được nói là đã bỏ, khoá khác nói là admin tự thêm; cả hai giữ nguyên', () => {
+  const f = fx814(), h = X2h; h.addRow(f, 'CONFIG', { key: 'X2_KHOA_CU', value: '1', note: 'Không dùng từ 8.1.1 (x)' }); h.addRow(f, 'CONFIG', { key: 'X2_KHOA_MOI', value: '2', note: '' });
+  f.api.setupFirstRun();
+  const rl = h.rows(f, 'RELEASE_LOG').filter(x => x.kind === 'CONFIG_UNKNOWN');
+  assert.ok(/đã ghi không dùng nữa/.test(rl.find(x => x.item === 'X2_KHOA_CU').detail) && /tự thêm/.test(rl.find(x => x.item === 'X2_KHOA_MOI').detail));
+  const cfg = h.rows(f, 'CONFIG'); assert.ok(cfg.some(x => x.key === 'X2_KHOA_CU' && String(x.value) === '1') && cfg.some(x => x.key === 'X2_KHOA_MOI' && String(x.value) === '2'), 'khoá lạ còn nguyên');
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+// Soát X2 vòng 3 (supervisor, bản 84a0b96 sửa tiếp): email giao đúng một lần (D1, D4), dòng ghi xuống Sheets trước khi đánh dấu đường giao (D2), khoá CONFIG cập nhật hai lần
+// trong một lượt (D3), khoá CONFIG nghi giá trị admin bị bỏ qua (E1), ký tự vô hình (L1), hạn mức Script Properties (L2), đường giao không bền (L3, L4) và các test đột biến còn sót.
+// ════════════════════════════════════════════════════════════════════════════════════════════════════
+/**
+ * Ma trận cắt: với MỌI cuộc gọi dịch vụ Google thứ N của một lượt chạy (hoặc khoá bận từ cuộc gọi N), chạy tiếp các lượt sau (job mỗi giờ, menu 1) tới khi yên, rồi kiểm bất biến giao đúng một lần.
+ * o: { make() → f, run(f) (lượt bị cắt), arm(tên, tham số) (chỉ đếm từ cuộc gọi này; mặc định từ đầu), busy (khoá bận thay vì cắt), stride }.
+ * Trả { calls, tally: { ok, zeroMailNotice, dupMail, dupNotif, dupAct, other }, zero: [N], bad: [{ N, probs }] }.
+ */
+function xMatrix(o) {
+  const pred = (N, f) => (n, a, st) => {
+    if (st.k === undefined) st.k = 0;
+    if (o.arm && !st.armed) { if (o.arm(n, a)) st.armed = true; else return false; }
+    st.k++;
+    if (st.k !== N) return false;
+    if (o.busy) { f.env.state.lockBusy = true; return false; }
+    return true;
+  };
+  const refF = o.make(), kc = xKill(refF, pred(-1, refF)); try { o.run(refF); } finally { kc.restore(); }
+  const calls = kc.st.k || 0, ref = xState(refF);
+  const out = { calls, ref, tally: { ok: 0, zeroMailNotice: 0, mailNoticeNoLog: 0, extraMailLog: 0, dupMail: 0, dupNotif: 0, dupAct: 0, other: 0 }, zero: [], nl: [], xl: [], bad: [] };
+  const steps = ['hourly', 'hourly', 'hourly', 'hourly', 'hourly', 'hourly', 'menu', 'hourly'];
+  for (let N = 1; N <= calls; N += (o.stride || 1)) {
+    const f = o.make(), k = xKill(f, pred(N, f));
+    try { o.run(f); } catch (e) { } finally { k.restore(); }
+    f.env.state.lockBusy = false;
+    const seq = [xState(f)];
+    steps.forEach(s => { const api = xRun(f); try { if (s === 'menu') api.setupFirstRun(); else api.hourlyJob(); } catch (e) { } seq.push(xState(f)); });
+    const fin = seq[seq.length - 1], probs = [], notice = fxRows(fxModel(f), 'NOTIFICATIONS').filter(n => n.event === 'MAIL_FAILED' && n.entity === 'RELEASE').length;
+    const dm = seq.some(s => s.mails > 1), dn = seq.some(s => s.notif > 1), da = seq.some(s => s.activity > 1);
+    if (dm) probs.push('mails>1'); if (dn) probs.push('notif>1'); if (da) probs.push('activity>1');
+    if (JSON.stringify(fin.log) !== JSON.stringify(ref.log)) probs.push('LOG ' + fin.log.length + ' vs ' + ref.log.length);
+    if (fin.notif !== 1) probs.push('final notif ' + fin.notif); if (fin.activity !== 1) probs.push('final activity ' + fin.activity); if (fin.pending) probs.push('final pending ' + fin.pending); if (fin.version !== '8.1.9') probs.push('version ' + fin.version);
+    const zero = fin.mails === 0, mlogRows = fxRows(fxModel(f), 'MAIL_LOG').filter(m => m.kind === 'ADMIN_RELEASE_NOTES').length;
+    // Phân lớp (soát X2 vòng 4): email=1 mà có thông báo "có thể đã hoặc chưa gửi" và không có dòng MAIL_LOG (cắt đúng lúc Google vừa nhận thư) là cửa sổ 4; email=1, không thông báo, 2 dòng MAIL_LOG là cửa sổ 2.
+    if (zero && !probs.length && notice === 1) { out.tally.zeroMailNotice++; out.zero.push(N); }
+    else if (zero) probs.push('final mails 0 và ' + notice + ' thông báo');
+    else if (fin.mails !== 1) probs.push('final mails ' + fin.mails);
+    else if (!probs.length) {
+      if (notice === 0 && mlogRows === 1) { out.tally.ok++; continue; }
+      if (notice === 1 && mlogRows === 0) { out.tally.mailNoticeNoLog++; out.nl.push(N); continue; }
+      if (notice === 0 && mlogRows === 2) { out.tally.extraMailLog++; out.xl.push(N); continue; }
+      probs.push('email 1 với ' + notice + ' thông báo và ' + mlogRows + ' dòng MAIL_LOG');
+    }
+    if (!probs.length) continue;
+    if (dm) out.tally.dupMail++; else if (dn) out.tally.dupNotif++; else if (da) out.tally.dupAct++; else out.tally.other++;
+    out.bad.push({ N, probs });
+  }
+  return out;
+}
+/** Số điểm cắt của từng cửa sổ còn lại, đúng bằng số đã đo (đổi mã làm số này đổi thì phải xem lại và cập nhật comment đầu đường giao trong Release.gs). Mỗi cửa sổ là MỘT khúc liền. */
+function xWindows(r, label) {
+  const run = (a) => a.length === 0 || a.every((n, i) => i === 0 || n === a[i - 1] + 1);
+  assert.deepStrictEqual([r.tally.zeroMailNotice, r.tally.mailNoticeNoLog, r.tally.extraMailLog], [9, 4, 3], label + ': số điểm cắt của cửa sổ 1 (không email + thông báo), 4 (email đã đi + thông báo, không dòng MAIL_LOG), 2 (thừa một dòng MAIL_LOG): ' + JSON.stringify(r.tally));
+  assert.ok(run(r.zero) && run(r.nl) && run(r.xl), label + ': mỗi cửa sổ liền một khúc: ' + JSON.stringify([r.zero, r.nl, r.xl]));
+}
+/** Cuộc gọi ghi nhận phiên bản (setProperties có APP_VERSION_LAST): ma trận "giao" chỉ đếm từ đây. */
+const xIsRecord = (n, a) => /getScriptProperties\(\)\.setProperties$/.test(n) && a[0] && 'APP_VERSION_LAST' in a[0];
+/** Hệ thống đã niêm phong bản ghi nhưng chưa đường giao nào xong (khoá bận ngay sau khi ghi nhận), khoá đã nhả. */
+function xPendingFixture() { const f = fx814(), undo = xBusyAfterRecord(f); f.api.setupFirstRun(); undo(); f.env.state.lockBusy = false; return f; }
+
+/** Số điểm cắt của từng cửa sổ còn lại, đúng bằng số đo được (đổi mã làm số này đổi thì xem lại và cập nhật comment đầu đường giao trong Release.gs). Mỗi cửa sổ là MỘT khúc liền. */
+function xWindows(r, label) {
+  const run = (a) => a.length === 0 || a.every((n, i) => i === 0 || n === a[i - 1] + 1);
+  assert.deepStrictEqual([r.tally.zeroMailNotice, r.tally.mailNoticeNoLog, r.tally.extraMailLog], [9, 4, 3], label + ': số điểm cắt cửa sổ 1 (không email + thông báo), 4 (email đã đi + thông báo, không dòng MAIL_LOG), 2 (thừa một dòng MAIL_LOG): ' + JSON.stringify(r.tally));
+  assert.ok(run(r.zero) && run(r.nl) && run(r.xl), label + ': mỗi cửa sổ liền một khúc: ' + JSON.stringify([r.zero, r.nl, r.xl]));
+}
+
+/** Số lần lấy khoá (tryLock) trong fn. */
+function xLockCount(f, fn) { const L = f.env.globals.LockService, og = L.getScriptLock; let n = 0; L.getScriptLock = function () { const l = og.apply(this, arguments), t = l.tryLock; l.tryLock = function () { n++; return t.apply(l, arguments); }; return l; }; try { fn(); } finally { L.getScriptLock = og; } return n; }
+/**
+ * Xen kẽ (soát X2 vòng 4): ngay TRƯỚC lần lấy khoá thứ k của lượt A (A đang không giữ khoá), cho lượt B chạy HẾT. make() dựng hệ thống, runA/runB(api) chạy một lượt.
+ * Trả { total, bad: [{ k, ... }] } với mọi k vi phạm: email > 1 hoặc cuối cùng khác 1, thông báo RELEASE_NOTES khác 1, dòng RELEASE khác 1, RELEASE_LOG khác lượt không bị cắt,
+ * còn bản ghi, hoặc có thông báo trung thực (cả hai lượt đều chạy xong bình thường nên không được có).
+ */
+function xInterleave(make, runA, runB) {
+  const f0 = make(); const total = xLockCount(f0, () => { try { runA(xRun(f0)); } catch (e) { } });
+  const ref = xRef(), bad = [];
+  for (let k = 1; k <= total; k++) {
+    const f = make(), L = f.env.globals.LockService, og = L.getScriptLock; let n = 0, fired = false, wrap = null;
+    const hooked = function () {
+      const l = og.apply(this, arguments), t = l.tryLock;
+      l.tryLock = function () { n++; if (n === k && !fired) { fired = true; L.getScriptLock = og; try { runB(xRun(f)); } catch (e) { } L.getScriptLock = wrap; } return t.apply(l, arguments); };
+      return l;
+    };
+    wrap = hooked; L.getScriptLock = hooked;
+    try { runA(xRun(f)); } catch (e) { } finally { L.getScriptLock = og; }
+    const mid = xState(f);
+    for (let i = 0; i < 3; i++) { try { xRun(f).hourlyJob(); } catch (e) { } }
+    const s = xState(f), notice = fxRows(fxModel(f), 'NOTIFICATIONS').filter(x => x.event === 'MAIL_FAILED' && x.entity === 'RELEASE').length, probs = [];
+    if (mid.mails > 1 || s.mails > 1) probs.push('mails ' + mid.mails + '/' + s.mails); if (s.mails !== 1) probs.push('final mails ' + s.mails);
+    if (s.notif !== 1) probs.push('notif ' + s.notif); if (s.activity !== 1) probs.push('RELEASE activity ' + s.activity);
+    if (JSON.stringify(s.log) !== JSON.stringify(ref.log)) probs.push('RELEASE_LOG ' + s.log.length + ' vs ' + ref.log.length); if (s.pending) probs.push('pending ' + s.pending); if (notice) probs.push('notice ' + notice);
+    if (probs.length) bad.push({ k, probs });
+  }
+  return { total, bad };
+}
+
+t('I210', 'Soát X2 vòng 4 (DEFECT 1): lượt B chạy HẾT ngay trước MỖI lần lấy khoá của lượt A (A = menu 1 nâng cấp mới, menu 1 làm nốt, job mỗi giờ làm nốt; B = menu 1, job mỗi giờ): đúng một email, một thông báo RELEASE_NOTES, một dòng RELEASE, RELEASE_LOG đủ một bộ, hết bản ghi, không thông báo trung thực', () => {
+  const combos = [
+    ['menu 1 nâng cấp mới + menu 1', () => fx814(), (a) => a.setupFirstRun(), (a) => a.setupFirstRun()],
+    ['menu 1 nâng cấp mới + job mỗi giờ', () => fx814(), (a) => a.setupFirstRun(), (a) => a.hourlyJob()],
+    ['menu 1 làm nốt + menu 1', xPendingFixture, (a) => a.setupFirstRun(), (a) => a.setupFirstRun()],
+    ['menu 1 làm nốt + job mỗi giờ', xPendingFixture, (a) => a.setupFirstRun(), (a) => a.hourlyJob()],
+    ['job mỗi giờ làm nốt + menu 1', xPendingFixture, (a) => a.hourlyJob(), (a) => a.setupFirstRun()],
+    ['job mỗi giờ làm nốt + job mỗi giờ', xPendingFixture, (a) => a.hourlyJob(), (a) => a.hourlyJob()]
+  ], rows = [];
+  combos.forEach(([name, make, runA, runB]) => {
+    const r = xInterleave(make, runA, runB); rows.push(name + ': ' + r.total + ' điểm khoá, vi phạm ' + r.bad.length);
+    if (process.env.IL_LOG) console.log('      [I210 chi tiết] ' + name + ': ' + r.bad.map(b => 'k=' + b.k + ' ' + b.probs.join(',')).join(' ; ')); else assert.deepStrictEqual(r.bad, [], name + ': ' + JSON.stringify(r.bad.slice(0, 6)));
+  });
+  console.log('      [I210] xen kẽ: ' + rows.join(' | '));
+});
+
+t('I196', 'Soát X2 D1: khoá bận đúng lúc ghi MAIL_LOG sau khi Google ĐÃ nhận email tóm tắt: không còn "CHƯA gửi được" sai, không gửi lần hai, không tính là lần thử lỗi; dòng MAIL_LOG được ghi nốt ở lượt sau', () => {
+  const f = fx814(), G = f.env.globals.GmailApp, og = G.sendEmail; let once = 1;
+  G.sendEmail = function (to, s) { const r = og.apply(this, arguments); if (/8\.1\.9/.test(s) && once-- > 0) f.env.state.lockBusy = true; return r; };
+  const r1 = f.api.setupFirstRun(), txt = r1.lines.join('\n'); f.env.state.lockBusy = false;
+  assert.ok(r1.ok && !/CHƯA gửi/.test(txt) && /Đã gửi email "Tóm tắt cập nhật" tới ADMIN_EMAIL/.test(txt), 'menu 1 không nói sai: ' + txt);
+  assert.strictEqual(xState(f).mails, 1, 'đúng một email'); const h = xHdr(f); assert.strictEqual(h.legs.mail, 1); assert.ok(!h.tries.mail, 'không tính là lần thử lỗi: ' + JSON.stringify(h.tries)); assert.strictEqual(h.legs.mlog, 0, 'dòng MAIL_LOG còn chờ ghi');
+  xRun(f).hourlyJob(); xRun(f).setupFirstRun();
+  assert.strictEqual(xState(f).mails, 1, 'không gửi lại'); assert.strictEqual(xState(f).pending, 0);
+  assert.strictEqual(fxRows(fxModel(f), 'MAIL_LOG').filter(m => m.kind === 'ADMIN_RELEASE_NOTES').length, 1, 'dòng MAIL_LOG đã được ghi nốt (đúng một)');
+  assert.ok(fxRows(fxModel(f), 'NOTIFICATIONS').find(n => n.event === 'RELEASE_NOTES'), 'thông báo còn đủ');
+});
+
+t('I197', 'Soát X2 D2: job mỗi giờ làm nốt bản ghi giao: bị cắt TẠI MỖI cuộc gọi dịch vụ của lượt resume rồi chạy tiếp: đúng 1 thông báo, đúng 1 dòng RELEASE ở nhật ký, không email thứ hai ở mọi bước; chỉ còn cửa sổ "không email + một thông báo trung thực" quanh lúc nhận gửi', () => {
+  const r = xMatrix({ make: xPendingFixture, run: (f) => xRun(f).hourlyJob() });
+  assert.ok(r.calls > 200, 'số cuộc gọi trong lượt resume: ' + r.calls);
+  assert.deepStrictEqual(r.bad, [], 'vi phạm: ' + JSON.stringify(r.bad.slice(0, 5)));
+  assert.strictEqual(r.tally.dupMail + r.tally.dupNotif + r.tally.dupAct, 0, JSON.stringify(r.tally));
+  xWindows(r, 'job mỗi giờ');
+  console.log('      [I197] ma trận job mỗi giờ (cắt): ' + r.calls + ' điểm, ' + JSON.stringify(r.tally) + ' N không email+thông báo=' + JSON.stringify(r.zero));
+});
+
+t('I198', 'Soát X2 D4 (menu 1): bị cắt hoặc khoá bận tại MỖI cuộc gọi dịch vụ sau khi ghi nhận phiên bản, rồi chạy tiếp menu 1 và job mỗi giờ: không bao giờ hai email, đúng một thông báo và một dòng RELEASE; RELEASE_LOG như lượt không bị cắt', () => {
+  const make = () => fx814(), run = (f) => f.api.setupFirstRun();
+  const a = xMatrix({ make, run, arm: xIsRecord }), b = xMatrix({ make, run, arm: xIsRecord, busy: true, stride: 2 });
+  [a, b].forEach((r, i) => { assert.ok(r.calls > 100, 'số cuộc gọi: ' + r.calls); assert.deepStrictEqual(r.bad, [], (i ? 'khoá bận' : 'cắt') + ': ' + JSON.stringify(r.bad.slice(0, 5))); assert.strictEqual(r.tally.dupMail + r.tally.dupNotif + r.tally.dupAct, 0); });
+  assert.strictEqual(b.tally.zeroMailNotice + b.tally.mailNoticeNoLog + b.tally.extraMailLog, 0, 'khoá bận không bao giờ làm mất email, sinh thông báo hay thừa dòng MAIL_LOG'); xWindows(a, 'menu 1');
+  console.log('      [I198] ma trận menu 1 (giao): cắt ' + a.calls + ' điểm ' + JSON.stringify(a.tally) + ' N=' + JSON.stringify(a.zero) + '; khoá bận ' + b.calls + ' điểm (bước 2) ' + JSON.stringify(b.tally));
+});
+
+t('I199', 'Soát X2 D4: hai lượt chạy CÙNG LÚC (một lượt đang gửi email, lượt kia chạy trong lúc đó): ở cả bốn kiểu ghép (job+menu, job+job, menu+job, menu+menu) tối đa một email; thông báo trung thực tối đa một lần', () => {
+  [['hourly', 'menu'], ['hourly', 'hourly'], ['menu', 'hourly'], ['menu', 'menu']].forEach(([a, b]) => {
+    const f = fx814(), G = f.env.globals.GmailApp, og = G.sendEmail; let n = 1;
+    G.sendEmail = function (to, s) { if (/8\.1\.9/.test(s) && n-- > 0) throw new Error('gmail down'); return og.apply(this, arguments); };
+    f.api.setupFirstRun(); G.sendEmail = og;   // email đang chờ thử lại
+    let fired = false;
+    G.sendEmail = function (to, s) { const r = og.apply(this, arguments); if (!fired && /8\.1\.9/.test(s)) { fired = true; const B = xRun(f); if (b === 'menu') B.setupFirstRun(); else B.hourlyJob(); } return r; };
+    const A = xRun(f); if (a === 'menu') A.setupFirstRun(); else A.hourlyJob(); G.sendEmail = og;
+    assert.strictEqual(xPending(f).length, 0, a + '+' + b + ': ngay sau hai lượt, bản ghi đã xoá KHÔNG được sống lại (lượt gửi ghi trạng thái sau khi lượt kia đã giao xong)');
+    for (let i = 0; i < 3; i++) xRun(f).hourlyJob();
+    const s = xState(f), notice = fxRows(fxModel(f), 'NOTIFICATIONS').filter(x => x.event === 'MAIL_FAILED' && x.entity === 'RELEASE').length;
+    assert.strictEqual(s.mails, 1, a + '+' + b + ': đúng một email'); assert.ok(notice <= 1, a + '+' + b + ': thông báo ' + notice); assert.strictEqual(s.notif, 1); assert.strictEqual(s.activity, 1); assert.strictEqual(s.pending, 0);
+  });
+});
+
+t('I200', 'Soát X2 D3: khoá CONFIG cũ có dấu cách thừa được cập nhật HAI lần trong một lượt menu 1 (cắt khoá rồi ghi chú "Không dùng từ"): menu 1 không ném lỗi "không thấy dòng"; khoá đổi tên được chép trong cùng lượt', () => {
+  let f = fx814(), h = X2h, i = h.find(f, 'CONFIG', 'LOG_KEEP_DAYS');
+  h.addRow(f, 'CONFIG', { key: 'ACTIVITY_LOG_KEEP_DAYS ', value: '30', note: '' });
+  let r = f.api.setupFirstRun(); f.api.clearDbCache_(); f.api.clearConfigCache_();
+  let rows = h.rows(f, 'CONFIG').filter(x => /ACTIVITY_LOG_KEEP_DAYS/.test(x.key)); assert.deepStrictEqual(rows.map(x => x.key), ['ACTIVITY_LOG_KEEP_DAYS'], 'khoá cắt gọn, một dòng'); assert.ok(/^Không dùng từ 8\.1\.2/.test(rows[0].note), 'ghi chú đã ghi trong cùng lượt: ' + rows[0].note);
+  assert.strictEqual(rows[0].value, '30');
+  // khoá đổi tên chưa có: chép trong cùng lượt từ khoá cũ có dấu cách
+  f = fx814(); h.put(f, 'CONFIG', h.find(f, 'CONFIG', 'LOG_KEEP_DAYS'), 'key', 'KHOA_TAM_X2'); h.addRow(f, 'CONFIG', { key: 'ACTIVITY_LOG_KEEP_DAYS ', value: '33', note: '' });
+  r = f.api.setupFirstRun(); f.api.clearDbCache_(); f.api.clearConfigCache_();
+  assert.strictEqual(String(h.rows(f, 'CONFIG').find(x => x.key === 'LOG_KEEP_DAYS').value), '33', 'khoá mới được chép từ khoá cũ trong cùng lượt'); assert.strictEqual(f.api.cfg_('LOG_KEEP_DAYS'), 33);
+  // DbTable: ô khoá đổi rồi cập nhật lần hai trên cùng dòng không ném lỗi
+  const g = fx814(), r0 = g.api.withLock_(() => { const t = g.api.table_('CONFIG'), row = t.byId('BANK_NAME'); t.update(row, { key: 'BANK_NAME_X' }); t.update(row, { note: 'lần hai' }); return row; });
+  assert.strictEqual(r0.key, 'BANK_NAME_X'); assert.strictEqual(r0.note, 'lần hai');
+});
+
+t('I201', 'Soát X2 E1: giá trị admin nằm ở dòng "BANK_NAME " còn dòng "BANK_NAME" sau đó là mặc định trống (kiểu hỏng của menu 1 bản 8.1.4): menu 1 giữ cả hai, KHÔNG tự đổi giá trị, nhưng báo thêm câu nêu hai số hàng và cách sửa tay (menu 1, menu 2, RELEASE_LOG, email); đảo thứ tự hai dòng thì không có câu đó; dòng CUỐI luôn là dòng có hiệu lực', () => {
+  const run = (adminFirst) => {
+    const f = fx814(), h = X2h, r0 = h.find(f, 'CONFIG', 'BANK_NAME');
+    if (adminFirst) { h.put(f, 'CONFIG', r0, 'key', 'BANK_NAME '); h.put(f, 'CONFIG', r0, 'value', 'Ngân hàng của admin'); h.addRow(f, 'CONFIG', { key: 'BANK_NAME', value: '' }); }
+    else { h.put(f, 'CONFIG', r0, 'key', 'BANK_NAME'); h.put(f, 'CONFIG', r0, 'value', ''); h.addRow(f, 'CONFIG', { key: 'BANK_NAME ', value: 'Ngân hàng của admin' }); }
+    f.api.clearDbCache_(); f.api.clearConfigCache_(); f.env.state.cache = {};
+    const plan = f.api.cfgKeyPlan_(f.api.table_('CONFIG').all()), tw = plan.twins.find(w => w.key === 'BANK_NAME');
+    assert.strictEqual(tw.effective, tw.rows[tw.rows.length - 1], 'dòng CUỐI là dòng có hiệu lực'); assert.strictEqual(plan.have.BANK_NAME._row, tw.effective);
+    const before = f.api.cfg_('BANK_NAME'), res = f.api.setupFirstRun(), txt = res.lines.join('\n'); f.api.clearDbCache_(); f.api.clearConfigCache_();
+    assert.strictEqual(f.api.cfg_('BANK_NAME'), before, 'không tự đổi giá trị đang chạy'); assert.strictEqual(h.rows(f, 'CONFIG').filter(x => String(x.key).trim() === 'BANK_NAME').length, 2, 'giữ cả hai dòng');
+    return { f, txt, tw, ts: f.api.testSystem(), log: h.rows(f, 'RELEASE_LOG').find(x => x.kind === 'CONFIG_KEY_TWIN') };
+  };
+  const a = run(true), nums = a.tw.rows;
+  assert.ok(a.tw.suspect && a.tw.suspect.effective === nums[1] && a.tw.suspect.others[0] === nums[0], 'nghi: ' + JSON.stringify(a.tw));
+  const sentence = new RegExp('CHÚ Ý: dòng đang có hiệu lực \\(hàng ' + nums[1] + '\\) đang mang giá trị MẶC ĐỊNH hoặc TRỐNG.*hàng ' + nums[0] + ' \\(cùng khoá\\).*Sửa tay: chép giá trị muốn dùng vào hàng ' + nums[1] + ', rồi xoá hàng ' + nums[0]);
+  assert.ok(sentence.test(a.txt), 'menu 1: ' + a.txt); assert.ok(a.ts.warnings.some(w => sentence.test(w)), 'menu 2: ' + JSON.stringify(a.ts.warnings)); assert.ok(sentence.test(a.log.detail), 'RELEASE_LOG');
+  assert.ok(a.f.env.state.mails.some(m => /MẶC ĐỊNH hoặc TRỐNG|DEFAULT or an EMPTY/.test(m.htmlBody)), 'email'); assert.ok(/KHÔNG được dùng/.test(a.txt), 'dòng tóm tắt nhắc');
+  assert.ok(!/Ngân hàng của admin/.test(a.txt + JSON.stringify(a.f.env.state.mails.map(m => m.htmlBody)) + JSON.stringify(X2h.rows(a.f, 'RELEASE_LOG'))), 'không in giá trị');
+  const b = run(false); assert.strictEqual(b.tw.suspect, null, 'đảo thứ tự: dòng có hiệu lực mang giá trị admin, không nghi'); assert.ok(!/CHÚ Ý: dòng đang có hiệu lực/.test(b.txt) && !b.ts.warnings.some(w => /CHÚ Ý: dòng đang có hiệu lực/.test(w)));
+  assert.ok(/Đang có hiệu lực: dòng CUỐI/.test(b.txt));
+});
+
+t('I202', 'Soát X2 L1: khoá CONFIG có ký tự vô hình (U+200B, U+200C, U+200D, U+2060, U+FEFF) hoặc dấu cách không ngắt (U+00A0) ở trong hay quanh khoá: không thêm dòng mặc định trống đè giá trị admin; ô khoá được viết lại thành khoá sạch khi không có dòng song sinh; khoá sạch hôm nay không đổi dòng nào có hiệu lực', () => {
+  ['​', '‌', '‍', '⁠', '﻿'].forEach(ch => ['BANK_' + ch + 'NAME', 'BANK_NAME' + ch, ch + 'BANK_NAME'].forEach(dirty => {
+    const f = fx814(), h = X2h, r0 = h.find(f, 'CONFIG', 'BANK_NAME'); h.put(f, 'CONFIG', r0, 'key', dirty); h.put(f, 'CONFIG', r0, 'value', 'Của admin'); f.api.clearDbCache_(); f.api.clearConfigCache_(); f.env.state.cache = {};
+    const code = 'U+' + ch.charCodeAt(0).toString(16).toUpperCase(), n0 = h.lastRow(f, 'CONFIG');
+    assert.strictEqual(f.api.cfg_('BANK_NAME'), 'Của admin', code + ' ' + JSON.stringify(dirty) + ': trước menu 1 giá trị admin có hiệu lực (đọc chuẩn hoá khoá)');
+    const res = f.api.setupFirstRun(); f.api.clearDbCache_(); f.api.clearConfigCache_();
+    assert.strictEqual(f.api.cfg_('BANK_NAME'), 'Của admin', code + ': sau menu 1'); assert.strictEqual(h.lastRow(f, 'CONFIG') - n0, 2, code + ': chỉ thêm 2 khoá mới của bản, không thêm BANK_NAME');
+    const rows = h.rows(f, 'CONFIG').filter(x => /BANK.?NAME/.test(x.key)); assert.deepStrictEqual(rows.map(x => x.key), ['BANK_NAME'], code + ': khoá viết lại sạch'); assert.ok(res.lines.some(l => /Sửa khoá CONFIG có dấu cách thừa/.test(l)), code);
+    assert.ok(!h.rows(f, 'RELEASE_LOG').some(x => x.kind === 'CONFIG_UNKNOWN' && /BANK/.test(x.item)), code + ': không báo khoá lạ');
+  }));
+  // dấu cách không ngắt ở hai đầu
+  const f = fx814(), h = X2h, r0 = h.find(f, 'CONFIG', 'BANK_NAME'); h.put(f, 'CONFIG', r0, 'key', ' BANK_NAME '); h.put(f, 'CONFIG', r0, 'value', 'Của admin'); f.api.setupFirstRun(); f.api.clearDbCache_(); f.api.clearConfigCache_(); assert.strictEqual(f.api.cfg_('BANK_NAME'), 'Của admin'); assert.deepStrictEqual(h.rows(f, 'CONFIG').filter(x => /BANK.?NAME/.test(x.key)).map(x => x.key), ['BANK_NAME']);
+  // song sinh: khoá sạch và khoá có ký tự vô hình: giữ cả hai, báo, dòng khoá sạch có hiệu lực dù nằm TRƯỚC (đúng như hôm nay)
+  const g = fx814(), r1 = h.find(g, 'CONFIG', 'BANK_NAME'); h.put(g, 'CONFIG', r1, 'value', 'Sạch'); h.addRow(g, 'CONFIG', { key: 'BANK_NAME​', value: 'Vô hình' }); g.api.clearDbCache_(); g.api.clearConfigCache_(); g.env.state.cache = {};
+  assert.strictEqual(g.api.cfg_('BANK_NAME'), 'Sạch', 'khoá sạch vẫn thắng khoá có ký tự vô hình nằm sau (không đổi dòng có hiệu lực của khoá sạch)');
+  const rs = g.api.setupFirstRun(); g.api.clearDbCache_(); g.api.clearConfigCache_(); assert.strictEqual(h.rows(g, 'CONFIG').filter(x => /BANK.?NAME/.test(x.key)).length, 2, 'giữ cả hai'); assert.strictEqual(g.api.cfg_('BANK_NAME'), 'Sạch'); assert.ok(rs.lines.some(l => /CẢNH BÁO: khoá CONFIG "BANK_NAME" có 2 dòng/.test(l)));
+});
+
+t('I203', 'Soát X2 L2: bản ghi giao tối đa 12 phần (phần quá hạn đếm vào trunc và báo MEASURED_TRUNCATED); mock Script Properties giữ hạn mức TỔNG 500 KB thật (setProperty và setProperties); kho gần đầy thì menu 1 vẫn xong, không mất dữ liệu', () => {
+  const { api, env } = load({ props: {} }), P = env.globals.PropertiesService.getScriptProperties();
+  assert.strictEqual(api.RELEASE_PENDING_MAX_PARTS_, 12);
+  const items = []; for (let i = 0; i < 400; i++) items.push({ kind: 'DUP_MERGED', item: 'EMAIL_TEMPLATES.KEY_' + i, vi: 'Gộp dòng trùng '.repeat(40), en: 'Merged duplicate '.repeat(40) });
+  const rec = api.releaseEmptyRecord_(); rec.items = items; rec.sealed = true; const pk = api.releasePack_(rec);
+  assert.ok(Object.keys(pk).length <= 12, 'số phần: ' + Object.keys(pk).length); const hd = JSON.parse(pk.RELEASE_PENDING); assert.ok(hd.trunc > 0 && hd.parts <= 12, 'phần quá hạn đếm vào trunc: ' + hd.trunc);
+  const bytes = Object.keys(pk).reduce((n, k) => n + Buffer.byteLength(k + pk[k]), 0); assert.ok(bytes <= 12 * 9 * 1024, 'tổng byte: ' + bytes);
+  rec.trunc = hd.trunc; const sum = api.releaseSummaryOfRec_(rec); assert.ok(sum.measured.some(x => x.kind === 'MEASURED_TRUNCATED') && /KHÔNG lưu hết được/.test(sum.menuLines.join('\n')), 'báo cho admin');
+  // hạn mức tổng của mock
+  const usedP = () => Object.keys(env.state.props).reduce((n, k) => n + Buffer.byteLength(k + env.state.props[k]), 0); let fi = 0; while (usedP() < 495 * 1024) P.setProperty('FILL_' + (fi++), 'x'.repeat(8 * 1024)); assert.ok(usedP() >= 495 * 1024 && usedP() <= 500 * 1024);
+  assert.throws(() => P.setProperty('MOT_MUC_NUA', 'y'.repeat(8 * 1024)), /quota/, 'setProperty vượt 500 KB tổng');
+  assert.throws(() => P.setProperties({ A1: 'y'.repeat(8 * 1024), A2: 'y'.repeat(8 * 1024) }), /quota/, 'setProperties vượt 500 KB tổng'); assert.ok(!('A1' in env.state.props), 'hỏng thì không ghi gì');
+  // kho gần đầy: menu 1 vẫn xong, dữ liệu đủ
+  const f = fx814(); const Pf = f.env.globals.PropertiesService.getScriptProperties(); const used = () => Object.keys(f.env.state.props).reduce((n, k) => n + Buffer.byteLength(k + f.env.state.props[k]), 0);
+  let i = 0; while (used() < 497 * 1024) { Pf.setProperty('FILL_' + (i++), 'x'.repeat(Math.min(8 * 1024, 499 * 1024 - used()))); }
+  const r = f.api.setupFirstRun(); assert.ok(r.ok && r.lines.some(l => /Trigger: 8 cái/.test(l)), 'menu 1 vẫn xong'); f.api.clearDbCache_(); assert.ok(f.api.table_('CONFIG').byId('BANK_QR_IMAGE'), 'dữ liệu cấu trúc đủ');
+});
+
+t('I204', 'Soát X2 L3, L4: giao nốt bản trước bị bỏ phần nào thì báo MỘT thông báo trung thực (không biến mất im lặng); đường giao không bền (không lưu được bản ghi) không để bản ghi chưa niêm phong mồ côi khi cùng phiên bản đã xong', () => {
+  // L3: bản ghi đã niêm phong của bản 8.1.8 còn dở (email lỗi, khoá bận...), lên 8.1.9: không giao hết được thì có thông báo
+  const f = fx814(); f.api.setupFirstRun();
+  const rec = f.api.releaseEmptyRecord_(); rec.target = '8.1.8'; rec.from = '8.1.7'; rec.date = '12/11/2026'; rec.sealed = true; rec.at = Date.now(); rec.legs = { act: 1, log: 1, notif: 1, mail: 0, mlog: 1 }; rec.items = [];
+  f.env.state.props.APP_VERSION_LAST = '8.1.8'; f.api.releasePendingWrite_(rec);
+  f.env.globals.GmailApp.sendEmail = () => { throw new Error('Gmail hỏng'); };
+  xRun(f).setupFirstRun();
+  const n = fxRows(fxModel(f), 'NOTIFICATIONS').filter(x => x.event === 'MAIL_FAILED' && x.entity === 'RELEASE' && x.entity_id === '8.1.8'); assert.strictEqual(n.length, 1, 'đúng một thông báo cho bản 8.1.8'); assert.ok(/chưa giao đủ trước khi nâng lên bản 8\.1\.9/.test(n[0].message) && /email ADMIN_RELEASE_NOTES/.test(n[0].message) && /RELEASE_LOG/.test(n[0].message), n[0].message);
+  // L4: không lưu bền được (setProperties hỏng) nhưng phiên bản được ghi nhận: bản ghi chưa niêm phong được dọn, và lượt menu 1 sau không còn bản ghi
+  const g = fx814(), P = g.env.globals.PropertiesService.getScriptProperties(), o = P.setProperties; let fails = 0;
+  P.setProperties = function (x) { if (x && 'APP_VERSION_LAST' in x) { fails++; throw new Error('Exception: quota (giả lập)'); } return o.apply(this, arguments); };
+  const r1 = g.api.setupFirstRun(); P.setProperties = o;
+  assert.ok(fails === 1 && r1.ok && r1.lines.some(l => /không lưu bền được bản ghi giao tóm tắt/.test(l)), r1.lines.join('|')); assert.strictEqual(g.env.state.props.APP_VERSION_LAST, '8.1.9'); assert.strictEqual(xPending(g).length, 0, 'không còn bản ghi mồ côi');
+  g.env.state.props.RELEASE_PENDING = JSON.stringify({ target: '8.1.9', items: [{ kind: 'CONFIG_ADDED', item: 'MO_COI_X2', vi: 'x', en: 'x' }] });   // bản ghi chưa niêm phong sót lại
+  xRun(g).setupFirstRun(); assert.strictEqual(xPending(g).length, 0, 'cùng phiên bản đã xong: dọn bản ghi chưa niêm phong');
+});
+
+t('I205', 'Soát X2 M19: job mỗi giờ KHÔNG đụng bản ghi chưa niêm phong (menu 1 bị cắt ở bước 3): RELEASE_LOG vẫn trống, bản ghi vẫn chưa niêm phong; menu 1 lần sau giao đủ cả bộ', () => {
+  const f = fx814(); xKilled(f, (n) => /setConditionalFormatRules$/.test(n), (api) => api.setupFirstRun());
+  assert.strictEqual(xHdr(f).sealed, false); assert.ok(f.env.state.props.APP_VERSION_LAST !== '8.1.9');
+  xRun(f).hourlyJob(); xRun(f).hourlyJob();
+  assert.strictEqual(xState(f).log.length, 0, 'RELEASE_LOG vẫn trống'); assert.strictEqual(xState(f).notif, 0); assert.strictEqual(xState(f).mails, 0); assert.strictEqual(xHdr(f).sealed, false, 'vẫn chưa niêm phong');
+  xRun(f).setupFirstRun(); assert.deepStrictEqual(xState(f), xRef(), 'menu 1 giao đủ cả bộ');
+});
+
+t('I206', 'Soát X2 M20: chạy khô seedContent_({dry:true}) KHÔNG ghi gì: không ghi Sheets (setValue, setValues, định dạng, thêm hàng), không ghi Script Properties, không gửi thư (bộ đệm đo thời gian khoá của withLock_ không tính), không dòng nhật ký; kết quả đếm đúng như lượt thật', () => {
+  const f = fx814(), h = X2h, sh = h.sh(f, 'CONTENT'), kc = h.ci(f, 'CONTENT', 'key'), keys = Object.keys(f.api.DEFAULT_CONTENT_).filter(k => h.find(f, 'CONTENT', k) !== -1).slice(0, 5);
+  keys.forEach(k => { sh.values[h.find(f, 'CONTENT', k)] = new Array(sh.values[0].length).fill(''); });
+  const mk = h.sh(f, 'MARKETING_EMAILS'); if (mk) mk.values = mk.values.slice(0, 1);
+  f.api.clearDbCache_(); f.api.clearContentCache_();
+  const snap = () => JSON.stringify({ s: f.env.state.spreadsheets, p: f.env.state.props, m: f.env.state.mails.length, calls: f.env.state.calendarCalls.length });
+  const W = /^(Spreadsheet|Properties|Cache|Mail|Gmail|Drive|Script|Calendar)/, writes = [];
+  const kk = xKill(f, (n) => { if (/\.(setValue|setValues|setNumberFormat|setDataValidation|insertSheet|insertRows|insertRowsAfter|insertColumnsAfter|clearContent|setFormula|setConditionalFormatRules|setProperty|setProperties|deleteProperty|sendEmail|setName|setFrozenRows)$/.test(n)) writes.push(n); return false; });
+  const before = snap(); let dry; try { dry = f.api.seedContent_({ dry: true }); } finally { kk.restore(); }
+  assert.deepStrictEqual(writes, [], 'chạy khô không có lời gọi ghi: ' + writes.join(',')); assert.strictEqual(snap(), before, 'trạng thái Google không đổi một byte');
+  assert.ok(dry.content >= 5 && dry.contentKeys.length === dry.content, 'chạy khô có việc để đếm: ' + dry.content);
+  const real = f.api.seedContent_(); assert.deepStrictEqual(real.contentKeys, dry.contentKeys, 'kết quả chạy khô khớp lượt thật'); assert.strictEqual(real.templates, dry.templates); assert.strictEqual(real.marketing, dry.marketing);
+});
+
+t('I207', 'Soát X2 M28: dọn mốc PURGE_OPEN: "completed" đòi dấu vân tay của phần GIỮ khớp; admin sắp xếp lại phần giữ rồi đuôi trống thì vẫn là "changed" (báo Khẩn PURGE_CHECK, không xoá gì)', () => {
+  const f = fx814(); xKilled(f, (n, a) => /getScriptProperties\(\)\.deleteProperty$/.test(n) && a[0] === 'PURGE_OPEN_EMAIL_TEMPLATES', (api) => api.setupFirstRun());
+  const sh = X2h.sh(f, 'EMAIL_TEMPLATES'), o = JSON.parse(f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES); assert.ok(o.keep >= 3);
+  // admin đảo hai dòng ở phần giữ (đuôi vẫn trống)
+  const r1 = sh.values[1], r2 = sh.values[2]; sh.values[1] = r2; sh.values[2] = r1;
+  const snapshot = JSON.stringify(sh.values); f.api.withLock_(() => f.api.purgeRecoverAll_());
+  assert.ok(!f.env.state.props.PURGE_OPEN_EMAIL_TEMPLATES, 'mốc được bỏ'); assert.strictEqual(JSON.stringify(sh.values), snapshot, 'không xoá, không sửa gì');
+  assert.strictEqual(fxRows(fxModel(f), 'NOTIFICATIONS').filter(x => x.event === 'PURGE_CHECK').length, 1, 'báo Khẩn: phần giữ đã đổi, không phải "completed"');
+  assert.ok(/changed/.test(fxRows(fxModel(f), 'ACTIVITY_LOG').filter(a => a.action === 'PURGE_RECOVERED' && a.entity_id === 'EMAIL_TEMPLATES').pop().detail));
+});
+
+t('I208', 'Soát X2 M35, M36: quay về 8.1.4 và nâng cấp LẦN HAI (đường thử lại): lần hai ghi RELEASE_LOG riêng, thông báo riêng và dòng RELEASE riêng, không bị nhận nhầm là "đã giao" từ lần một (nhận diện theo mốc ghi nhận và bản đích)', () => {
+  const f = fx814(), st = f.env.state; f.api.setupFirstRun(); assert.deepStrictEqual(xState(f), xRef());
+  const logs1 = xState(f).log.length;
+  // lần hai, một giờ sau: quay phiên bản ghi nhận về 8.1.4, đường giao bị khoá bận rồi làm nốt ở lượt sau
+  st.props.SIM_NOW = new Date(new Date(st.props.SIM_NOW).getTime() + 3600e3).toISOString(); st.props.APP_VERSION_LAST = '8.1.4';
+  const undo = xBusyAfterRecord(f); const r1 = xRun(f).setupFirstRun(); undo(); st.lockBusy = false; assert.ok(r1.ok);
+  assert.strictEqual(xHdr(f).sealed, true); assert.strictEqual(xState(f).log.length, logs1, 'chưa ghi dòng nào của lần hai');
+  xRun(f).hourlyJob();
+  const s = xState(f), rows = xSet(f, 'RELEASE_LOG'), ats = new Set(rows.map(r => r.at));
+  assert.strictEqual(ats.size, 2, 'hai mốc ghi nhận khác nhau trong RELEASE_LOG'); const at2 = Array.from(ats).sort().pop(), second = rows.filter(r => r.at === at2); assert.strictEqual(second.length, f.api.releaseNoteItems_(f.api.releaseNotesBetween_('8.1.4', '8.1.9')).length + 1, 'lần hai ghi bộ dòng của riêng nó (ghi chú tĩnh + khoá lạ), không bị coi là đã có: ' + second.length);
+  assert.strictEqual(s.notif, 2, 'thông báo riêng của lần hai'); assert.strictEqual(s.activity, 2, 'dòng RELEASE riêng của lần hai'); assert.strictEqual(s.pending, 0);
+  assert.strictEqual(st.mails.filter(x => / \| /.test(x.subject) && /8\.1\.9/.test(x.subject)).length, 2, 'email riêng của lần hai');
+});
+
+t('I209', 'Soát X2 M7, M9, M15, M24: khoá bận KHÔNG tính là lần thử lỗi ở mọi đường; mẫu ADMIN_RELEASE_NOTES tắt thì bỏ đường email và nói rõ; câu "không phải thêm" không xuất hiện khi có mục đo không lưu hết; khoá CONFIG trùng thì dòng CUỐI có hiệu lực', () => {
+  // M7: khoá bận lặp lại nhiều lần (nhiều hơn số lần thử tối đa) không bao giờ làm bỏ cuộc, không tăng tries
+  const f = fx814(), undo = xBusyAfterRecord(f); f.api.setupFirstRun(); undo();
+  for (let i = 0; i < 8; i++) { xRun(f).hourlyJob(); try { xRun(f).setupFirstRun(); } catch (e) { assert.ok(/bận/.test(e.message), e.message); } }
+  const h = xHdr(f); assert.ok(!h.tries || Object.keys(h.tries).every(k => !h.tries[k]), 'khoá bận không tính lần thử: ' + JSON.stringify(h.tries)); assert.deepStrictEqual(['act', 'log', 'notif', 'mail'].map(k => h.legs[k]), [0, 0, 0, 0], 'không đường nào bỏ cuộc');
+  f.env.state.lockBusy = false; xRun(f).hourlyJob(); assert.deepStrictEqual(xState(f), xRef(), 'khoá hết bận thì giao đủ');
+  // M9: mẫu tắt
+  const g = fx814(); g.api.withLock_(() => { const t = g.api.table_('EMAIL_TEMPLATES'), r = t.all().find(x => String(x.key).trim() === 'ADMIN_RELEASE_NOTES'); if (r) t.update(r, { active: false }); }); g.api.clearDbCache_(); g.api.clearContentCache_();
+  // mẫu do seedContent_ thêm lượt này nên chưa có trước menu 1: tắt sau khi gieo, bằng cách chạy menu 1 tới lúc giao: dùng bản ghi dở
+  const k = fx814(), un = xBusyAfterRecord(k); k.api.setupFirstRun(); un(); k.env.state.lockBusy = false;
+  k.api.withLock_(() => { const t = k.api.table_('EMAIL_TEMPLATES'), r = t.all().find(x => String(x.key).trim() === 'ADMIN_RELEASE_NOTES'); t.update(r, { active: false }); }); k.api.clearDbCache_(); k.api.clearContentCache_();
+  const rr = xRun(k).setupFirstRun(), tx = rr.lines.join('\n'); assert.ok(/Không gửi email: mẫu ADMIN_RELEASE_NOTES đang tắt/.test(tx), tx); assert.strictEqual(xState(k).mails, 0); assert.strictEqual(xState(k).pending, 0); assert.strictEqual(xState(k).notif, 1); assert.ok(!/CÒN DỞ/.test(tx));
+  // M15
+  const api = load().api, s1 = api.releaseBuildSummary_('8.1.4', '8.1.9', '14/11/2026', [], null, { truncated: 3 }).menuLines.join('\n'), s2 = api.releaseBuildSummary_('8.1.4', '8.1.9', '14/11/2026', [], null, {}).menuLines.join('\n');
+  assert.ok(!/không phải thêm/.test(s1), 'có mục không lưu hết thì không nói "không phải thêm": ' + s1); assert.ok(/không phải thêm/.test(s2));
+  // M24
+  const rows = [{ key: 'K ', value: 'đầu', _row: 2 }, { key: 'K', value: 'cuối', _row: 7 }], pl = api.cfgKeyPlan_(rows); assert.strictEqual(pl.have.K.value, 'cuối'); assert.strictEqual(pl.twins[0].effective, 7);
+  const pl2 = api.cfgKeyPlan_([rows[1], { key: 'K ', value: 'sau', _row: 9 }]); assert.strictEqual(pl2.have.K.value, 'sau'); assert.strictEqual(pl2.twins[0].effective, 9);
+  const f2 = fx814(), h2 = X2h; h2.put(f2, 'CONFIG', h2.find(f2, 'CONFIG', 'BANK_NAME'), 'value', 'DÒNG ĐẦU'); h2.addRow(f2, 'CONFIG', { key: 'BANK_NAME ', value: 'DÒNG CUỐI' }); f2.api.clearDbCache_(); f2.api.clearConfigCache_(); f2.env.state.cache = {};
+  assert.strictEqual(f2.api.cfg_('BANK_NAME'), 'DÒNG CUỐI', 'cfg_ dùng dòng cuối khi hai dòng cùng khoá chuẩn');
+});
+
+
+t('I211', 'Soát X2 vòng 4 (M08, M13, M25): nhận ra dòng RELEASE đã ghi dù sau đó có dòng nhật ký khác (cửa sổ 300 dòng cuối, không chỉ dòng cuối); khoá CONFIG nghi giá trị admin bị bỏ qua chỉ khi dòng có hiệu lực mang mặc định hoặc trống; khoá có ký tự vô hình nằm SAU khoá sạch: câu báo nêu đúng dòng khoá sạch là dòng có hiệu lực', () => {
+  // M08: bị cắt đúng giữa lúc RELEASE đã GHI và lúc đánh dấu; trước lượt làm nốt có thêm dòng nhật ký khác: không ghi trùng dòng RELEASE
+  const f = fx814(); xKilled(f, (n, a) => /getScriptProperties\(\)\.setProperties$/.test(n) && (xRecordLegs(a) || {}).act === 1, (api) => api.setupFirstRun());
+  const rel = () => fxRows(fxModel(f), 'ACTIVITY_LOG').filter(a => a.action === 'RELEASE' && a.entity_id === '8.1.9').length;
+  assert.strictEqual(rel(), 1, 'dòng RELEASE đã ghi, đường chưa được đánh dấu'); assert.strictEqual(xHdr(f).legs.act, 0);
+  const api = xRun(f); api.withLock_(() => { for (let i = 0; i < 5; i++) api.logActivity_('SYSTEM', 'X2_KHAC', 'X', 'x' + i, ''); });
+  xRun(f).hourlyJob(); xRun(f).setupFirstRun();
+  assert.strictEqual(rel(), 1, 'không ghi trùng dòng RELEASE dù có dòng khác ghi sau nó'); assert.deepStrictEqual(xState(f), xRef(), 'trạng thái cuối y hệt lượt không bị cắt');
+  // M13: các trường hợp KHÔNG nghi, và trường hợp nghi bằng chữ mặc định (không chỉ ô trống)
+  const { api: a2 } = load(), def = String(a2.DEFAULTS_.BANK_NAME), P = (rows) => a2.cfgKeyPlan_(rows.map((r, i) => ({ key: r[0], value: r[1], _row: i + 2 }))).twins[0];
+  assert.strictEqual(P([['BANK_NAME ', 'A'], ['BANK_NAME', 'B']]).suspect, null, 'dòng có hiệu lực mang giá trị riêng của admin: không nghi');
+  assert.strictEqual(P([['BANK_NAME ', ''], ['BANK_NAME', 'B']]).suspect, null, 'dòng kia trống: không nghi');
+  assert.strictEqual(P([['BANK_NAME ', def], ['BANK_NAME', 'B']]).suspect, null, 'dòng kia là chữ mặc định: không nghi');
+  assert.deepStrictEqual(P([['BANK_NAME ', 'A'], ['BANK_NAME', def]]).suspect, { effective: 3, others: [2] }, 'dòng có hiệu lực là chữ mặc định, dòng kia khác mặc định: nghi');
+  assert.deepStrictEqual(P([['BANK_NAME ', 'A'], ['BANK_NAME', '  ']]).suspect, { effective: 3, others: [2] }, 'trống toàn dấu cách cũng là trống');
+  assert.deepStrictEqual(P([['KHOA_LA_X2 ', 'A'], ['KHOA_LA_X2', '']]).suspect, { effective: 3, others: [2] }, 'khoá lạ: chỉ trống mới là mặc định');
+  assert.strictEqual(P([['KHOA_LA_X2 ', 'A'], ['KHOA_LA_X2', 'B']]).suspect, null);
+  // M25: khoá có ký tự vô hình nằm SAU khoá sạch: dòng khoá sạch có hiệu lực (như loadConfigTab_), câu báo nêu đúng hàng đó
+  const g = fx814(), h = X2h, r1 = h.find(g, 'CONFIG', 'BANK_NAME'); h.put(g, 'CONFIG', r1, 'value', 'Sạch'); h.addRow(g, 'CONFIG', { key: 'BANK_NAME​', value: 'Vô hình' }); g.api.clearDbCache_(); g.api.clearConfigCache_(); g.env.state.cache = {};
+  const tw = g.api.cfgKeyPlan_(g.api.table_('CONFIG').all()).twins.find(w => w.key === 'BANK_NAME'); assert.strictEqual(tw.effective, r1 + 1, 'dòng khoá sạch có hiệu lực'); assert.ok(tw.effective !== tw.rows[tw.rows.length - 1]);
+  assert.strictEqual(g.api.cfg_('BANK_NAME'), 'Sạch', 'đúng như loadConfigTab_');
+  const txt = g.api.setupFirstRun().lines.join('\n'), ts = g.api.testSystem(), want = new RegExp('dòng có khoá sạch \\(hàng ' + (r1 + 1) + '; dòng có ký tự vô hình chỉ là dự phòng\\), KHÔNG phải dòng cuối');
+  assert.ok(want.test(txt) && !/Đang có hiệu lực: dòng CUỐI/.test(txt.split('\n').filter(l => /BANK_NAME/.test(l)).join('\n')), 'menu 1: ' + txt); assert.ok(ts.warnings.some(w => want.test(w)), 'menu 2');
+});
+
+
+t('I212', 'Soát X2 vòng 4 (DEFECT 4): đường dòng MAIL_LOG không nuốt lỗi thật im lặng và không thử mãi (5 lần rồi bỏ cuộc, báo admin một lần, bản ghi được xoá); bản ghi bản trước còn dở chỉ ở đường MAIL_LOG thì thông báo nêu đúng đường đó, danh sách không bao giờ trống; menu 1 nhắc khoá có ký tự vô hình', () => {
+  const f = fx814(), G = f.env.globals.GmailApp, og = G.sendEmail; let once = 1;
+  G.sendEmail = function (to, s) { const r = og.apply(this, arguments); if (/8\.1\.9/.test(s) && once-- > 0) f.env.state.lockBusy = true; return r; };
+  f.api.setupFirstRun(); f.env.state.lockBusy = false; G.sendEmail = og;
+  assert.strictEqual(xHdr(f).legs.mlog, 0); assert.ok(xHdr(f).legs.mail === 1);
+  delete f.env.state.spreadsheets[FX_DB].sheets.MAIL_LOG;   // ghi MAIL_LOG sẽ lỗi thật (không phải khoá bận) ở mọi lần
+  for (let i = 1; i <= 4; i++) { xRun(f).hourlyJob(); assert.strictEqual(xHdr(f).tries.mlog, i, 'đếm lần lỗi thật: ' + i); assert.strictEqual(xHdr(f).legs.mlog, 0); }
+  xRun(f).hourlyJob(); assert.strictEqual(xPending(f).length, 0, 'bỏ cuộc sau 5 lần: đường đóng, bản ghi xoá');
+  const errs = fxRows(fxModel(f), 'NOTIFICATIONS').filter(n => n.event === 'SYSTEM_ERROR' && /dòng MAIL_LOG của email/.test(n.message)); assert.strictEqual(errs.length, 1, 'báo admin đúng một lần');
+  xRun(f).hourlyJob(); xRun(f).hourlyJob(); assert.strictEqual(fxRows(fxModel(f), 'NOTIFICATIONS').filter(n => n.event === 'SYSTEM_ERROR' && /dòng MAIL_LOG của email/.test(n.message)).length, 1, 'không báo lặp');
+  // thông báo bản trước còn dở: nêu mlog, không bao giờ "còn dở: )"
+  const g = fx814(); g.api.setupFirstRun();
+  const mk = (legs) => { const rec = g.api.releaseEmptyRecord_(); rec.target = '8.1.8'; rec.from = '8.1.7'; rec.date = '12/11/2026'; rec.sealed = true; rec.at = Date.now(); rec.legs = legs; rec.mailLog = { time: Date.now(), to: 'a@x', subject: 's', kind: 'K', transport: 'GMAILAPP' }; g.env.state.props.APP_VERSION_LAST = '8.1.8'; g.api.releasePendingWrite_(rec); };
+  const failing = g.env.globals.PropertiesService.getScriptProperties(); g.api.withLock_(() => { }); delete g.env.state.spreadsheets[FX_DB].sheets.MAIL_LOG;
+  mk({ act: 1, log: 1, notif: 1, mail: 1, mlog: 0 }); xRun(g).setupFirstRun();
+  const n = fxRows(fxModel(g), 'NOTIFICATIONS').filter(x => x.event === 'MAIL_FAILED' && x.entity_id === '8.1.8');
+  assert.strictEqual(n.length, 1); assert.ok(/còn dở: dòng MAIL_LOG của email\)/.test(n[0].message), n[0].message); assert.ok(!/còn dở: \)/.test(n[0].message) && !/left: \)/.test(n[0].message_en));
+  // (iii) dòng menu 1 khi cắt khoá có ký tự vô hình
+  const h = fx814(); X2h.put(h, 'CONFIG', X2h.find(h, 'CONFIG', 'BANK_NAME'), 'key', 'BANK_NAME​'); const r = h.api.setupFirstRun();
+  assert.ok(r.lines.some(l => /^Sửa khoá CONFIG có dấu cách thừa \(hoặc ký tự vô hình\): /.test(l)), r.lines.join('|'));
+});
+
+// ##UPG_END
 module.exports = { results };
 if (require.main === module) {
   results.forEach(r => console.log((r.ok ? '  ĐẠT       ' : '  KHÔNG ĐẠT ') + r.id + '  ' + r.title + (r.ok ? '' : '\n              ' + r.err)));
