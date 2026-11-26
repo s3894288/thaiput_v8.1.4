@@ -5595,7 +5595,7 @@ t('I157', 'Nâng cấp (g): ô chữ web chưa sửa thì nâng lên chữ gốc
   assert.strictEqual(api.cfg_('REASSIGN_STUCK_HOURS'), -1);
   assert.notStrictEqual(api.table_('EMAIL_TEMPLATES').byId('TUTOR_REMIND').body_vi, trOld, 'mẫu còn chữ gốc cũ được nâng lên chữ gốc mới');
   const log = api.table_('RELEASE_LOG').all().filter(x => !/^NOTE_/.test(x.kind)), by = (kind) => log.filter(x => x.kind === kind).map(x => x.item).sort();
-  assert.deepStrictEqual(by('CONTENT_KEPT'), ['h.bank_note (vi)']); assert.deepStrictEqual(by('CONTENT_REFRESHED'), ['h.bank_note (en)', 't.stats_note (en)', 't.stats_note (vi)']);   // t.stats_note: chữ gốc 8.1.4 chưa sửa trong fixture (FIX F1) assert.deepStrictEqual(by('TEMPLATE_UPGRADED'), ['TUTOR_REMIND']);
+  assert.deepStrictEqual(by('CONTENT_KEPT'), ['h.bank_note (vi)']); assert.deepStrictEqual(by('CONTENT_REFRESHED'), ['h.bank_note (en)', 't.stats_note (en)', 't.stats_note (vi)']); assert.deepStrictEqual(by('TEMPLATE_UPGRADED'), ['TUTOR_REMIND']);   // t.stats_note: chữ gốc 8.1.4 chưa sửa trong fixture (FIX F1)
   assert.deepStrictEqual(by('CONFIG_ADDED'), [], 'khoá đã có thì không "thêm"');
   const txt = r.lines.join('\n'); assert.ok(/GIỮ chữ bạn đã sửa dù chữ gốc đã đổi \(1 ô\): h\.bank_note \(vi\)/.test(txt) && /làm mới ô chữ web chưa sửa 3: h\.bank_note \(en\), t\.stats_note \(vi\), t\.stats_note \(en\)/.test(txt) && /nâng mẫu email 1: TUTOR_REMIND/.test(txt), txt);
   assert.ok(/default_vi/.test(txt), 'chỉ cho admin chỗ xem chữ gốc mới');
