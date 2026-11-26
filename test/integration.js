@@ -5096,8 +5096,10 @@ t('I195', 'Soát vòng 3 (D5): --same-version phải kèm ĐÚNG APP.VERSION hi�
 const fxio = require('./tools/fixture_io'), relb = require('./tools/release_baseline');
 const FX814_TEXT = fs.readFileSync(path.join(__dirname, 'fixtures', 'db_8_1_4.json'), 'utf8');
 const FX_DB = 'NEW_DB';
-/** Số dòng RELEASE_LOG khi nâng 8.1.4 lên bản này: mọi gạch đầu dòng của 5 bản + 18 việc đo thật (2 khoá CONFIG, 1 khoá lạ, 1 tab, 1 cột, 8 dòng chữ web, 1 mẫu email, 2 luật thông báo, 2 key trùng). */
-const UPG_MEASURED = 18;
+/** Số dòng RELEASE_LOG khi nâng 8.1.4 lên bản này: mọi gạch đầu dòng của 5 bản + 20 việc đo thật (2 khoá CONFIG, 1 khoá lạ, 1 tab, 1 cột, 8 dòng chữ web, 1 mẫu email, 2 luật thông báo, 2 key trùng, 2 ô chữ web chưa sửa được làm mới: t.stats_note vi và en). */
+const UPG_MEASURED = 20;
+/** Chữ gốc của t.stats_note ở 8.1.4 (nói sai: tự tính Hoàn thành sau 24 giờ). Fixture 8.1.4 giữ chữ này chưa sửa ở cả bốn ô vi, en, default_vi, default_en, nên menu 1 làm mới cả bốn. */
+const STATS_NOTE_OLD = ['Đếm theo cùng luật tính lương. Buổi chưa xác nhận tự tính Hoàn thành sau 24 giờ.', 'Counted with the same rules as payroll. Lessons you have not confirmed are counted as Completed after 24 hours.'];
 const UPG_LOG_ROWS = (api) => api.releaseNoteItems_(api.releaseNotesBetween_('8.1.4', api.APP.VERSION)).length + UPG_MEASURED;
 
 /** Hệ thống 8.1.4 đang chạy thật (giờ giả lập thứ Ba 10/11/2026 10:00), chưa dán code mới vào. */
@@ -5197,7 +5199,7 @@ t('I148', 'Ghi chú phát hành bắt buộc (5R): đổi mặc định CONFIG, 
   assert.strictEqual(relb.invented(dd, [{ version: 'x', config: [{ key: 'KHONG_CO', kind: 'ADDED' }] }]).length, 1, 'ghi chú về khoá không đổi bị bắt là bịa');
 });
 
-t('I149', 'Ghi chú 8.1.5 đến 8.1.9 khớp so sánh thật mã 8.1.4 với mã hiện tại (16 thay đổi: 2 khoá CONFIG, 9 chữ web, 1 mẫu email, 2 luật thông báo, 1 tab, 1 cột), không bịa, đủ hai thứ tiếng; chọn bản theo phiên bản trước; ghi chú CONFIG "Mới ở <bản>:"', () => {
+t('I149', 'Ghi chú 8.1.5 đến 8.1.9 khớp so sánh thật mã 8.1.4 với mã hiện tại (17 thay đổi: 2 khoá CONFIG, 10 chữ web, 1 mẫu email, 2 luật thông báo, 1 tab, 1 cột), không bịa, đủ hai thứ tiếng; chọn bản theo phiên bản trước; ghi chú CONFIG "Mới ở <bản>:"', () => {
   const { api } = load(), old = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'release_baseline_8_1_4.json'), 'utf8')), cur = relb.fingerprint(api);
   assert.strictEqual(old.version, '8.1.4');
   const d = relb.diff(old, cur), notes = api.RELEASE_NOTES_.filter(n => api.cmpVersion_(n.version, '8.1.4') > 0);
@@ -5205,7 +5207,7 @@ t('I149', 'Ghi chú 8.1.5 đến 8.1.9 khớp so sánh thật mã 8.1.4 với m�
   assert.deepStrictEqual(notes.slice(0, 5).map(n => n.version), ['8.1.5', '8.1.6', '8.1.7', '8.1.8', '8.1.9']); assert.strictEqual(notes[notes.length - 1].version, api.APP.VERSION);
   assert.deepStrictEqual(relb.diffItems(d).map(i => i.group + ' ' + i.key + ' ' + i.kind).sort(), [
     'config BANK_QR_IMAGE ADDED', 'config REASSIGN_STUCK_HOURS ADDED', 'content ad.act.ADMIN_MARK_DONE ADDED', 'content ad.act.BANK_QR_REFRESH ADDED', 'content ad.act.REASSIGN_STUCK ADDED', 'content ad.act.TEMPLATE_DEDUPE ADDED', 'content ad.act.TEMPLATE_DEDUPE_TEXT ADDED',
-    'content ad.ev.REASSIGN_STUCK ADDED', 'content ad.ev.RELEASE_NOTES ADDED', 'content h.bank_note CHANGED', 'content h.bank_qr_alt ADDED', 'data BOOKINGS.admin_done_at ADDED', 'data RELEASE_LOG ADDED',
+    'content ad.ev.REASSIGN_STUCK ADDED', 'content ad.ev.RELEASE_NOTES ADDED', 'content h.bank_note CHANGED', 'content h.bank_qr_alt ADDED', 'content t.stats_note CHANGED', 'data BOOKINGS.admin_done_at ADDED', 'data RELEASE_LOG ADDED',
     'notify REASSIGN_STUCK ADDED', 'notify RELEASE_NOTES ADDED', 'templates ADMIN_RELEASE_NOTES ADDED']);
   assert.deepStrictEqual(relb.uncovered(d, notes), [], 'mọi thay đổi thật có ghi chú');
   assert.deepStrictEqual(relb.invented(d, notes), [], 'ghi chú không bịa thay đổi');
@@ -5361,12 +5363,16 @@ t('I152', 'Nâng cấp 8.1.4 (b): menu 1 chạy không lỗi; bản sao Releases
   assert.deepStrictEqual(cells('CONTENT'), [
     'h.bank_note#1|default_en|' + 'Transfer note: your email and the package name. After sending the form, you get your own reference code by email.' + '|' + D['h.bank_note'][1],   // cột code quản lý: chữ gốc mới
     'h.bank_note#1|default_vi|' + 'Nội dung chuyển khoản: email đăng ký và tên gói. Sau khi gửi form, bạn nhận mã nội dung riêng qua email để đối chiếu.' + '|' + D['h.bank_note'][0],
-    'h.bank_note#1|position|Dòng dưới thông tin ngân hàng|' + D['h.bank_note'][2]].sort(), 'CONTENT: chỉ 3 ô code quản lý của h.bank_note (page, position, shown_when, default_vi, default_en); chữ admin vi, en không đổi');
+    'h.bank_note#1|position|Dòng dưới thông tin ngân hàng|' + D['h.bank_note'][2],
+    // t.stats_note (FIX F1): fixture giữ chữ gốc 8.1.4 chưa sửa ở cả bốn ô, nên menu 1 làm mới cả bốn (vi, en nâng theo chữ gốc mới)
+    't.stats_note#1|default_en|' + STATS_NOTE_OLD[1] + '|' + D['t.stats_note'][1], 't.stats_note#1|default_vi|' + STATS_NOTE_OLD[0] + '|' + D['t.stats_note'][0],
+    't.stats_note#1|en|' + STATS_NOTE_OLD[1] + '|' + D['t.stats_note'][1], 't.stats_note#1|vi|' + STATS_NOTE_OLD[0] + '|' + D['t.stats_note'][0]].sort(),
+    'CONTENT: 3 ô code quản lý của h.bank_note (position, default_vi, default_en; chữ admin vi, en không đổi) và 4 ô của t.stats_note (chữ gốc đổi, ô vi, en chưa sửa được nâng theo)');
   assert.deepStrictEqual(cells('EMAIL_TEMPLATES'), ['LOGIN_LINK#1|subject_vi|Link đăng nhập thaiput|Link đăng nhập thaiput của bạn'], 'gộp key trùng: ô tiêu đề chữ admin sửa ở dòng cuối được chuyển lên dòng giữ lại');
   assert.deepStrictEqual(cells('META').map(x => x.split('|').slice(0, 2).join('|')), ['APP_VERSION#1|value', 'ID_FLOOR_AVAILABILITY#1|value', 'ID_FLOOR_BOOKINGS#1|value', 'ID_FLOOR_NOTIFICATIONS#1|value', 'ID_FLOOR_PAYMENTS#1|value',
     'ID_FLOOR_REGISTRATIONS#1|value', 'ID_FLOOR_STUDENT_PACKAGES#1|value', 'META_AT#1|value'].sort(), 'META là tab code ghi mỗi lần menu 1 (phiên bản, giờ, mốc mã tự sinh)');
   assert.ok(cells('META').indexOf('APP_VERSION#1|value|8.1.4|' + api.APP.VERSION) !== -1 && cells('META').indexOf('ID_FLOOR_BOOKINGS#1|value|0|16') !== -1);
-  assert.deepStrictEqual(Object.keys(d).map(n => [n, (d[n].cells || []).length]).filter(x => x[1]).map(x => x.join(':')).sort(), ['CONTENT:3', 'EMAIL_TEMPLATES:1', 'META:8'], 'tổng ô đổi: 12');
+  assert.deepStrictEqual(Object.keys(d).map(n => [n, (d[n].cells || []).length]).filter(x => x[1]).map(x => x.join(':')).sort(), ['CONTENT:7', 'EMAIL_TEMPLATES:1', 'META:8'], 'tổng ô đổi: 16');
   // dữ liệu nghiệp vụ nguyên vẹn đến từng ô (đối chiếu lại độc lập: toàn bộ giá trị thô trước và sau)
   ['BOOKINGS', 'PAYMENTS', 'USERS', 'STUDENT_PACKAGES', 'AVAILABILITY', 'AUTH', 'REGISTRATIONS'].forEach(n => before[n].rows.forEach((row, i) => assert.deepStrictEqual(after[n].rows[i].slice(0, row.length), row, n + ' dòng ' + (i + 2))));
   // Script Properties: chỉ 3 khoá đổi (ghi nhận phiên bản, thư mục Releases, danh sách tab)
@@ -5407,7 +5413,12 @@ t('I153', 'Nâng cấp 8.1.4 (c): mọi tuỳ chỉnh của admin còn nguyên v
   assert.deepStrictEqual([ctB['h.bank_note'].default_vi, ctB['h.bank_note'].default_en], [B.api.DEFAULT_CONTENT_['h.bank_note'][0], B.api.DEFAULT_CONTENT_['h.bank_note'][1]]);
   // chữ đang hiện ra web (contentMap_) cho MỌI khoá: y hệt trước menu 1 (khoá mới thì trước đó dùng chữ gốc trong code, nay chữ gốc trong ô: cùng chữ)
   const mA = A.api.contentMap_(), mB = B.api.contentMap_(); let nKeys = 0;
-  Object.keys(A.api.contentDefaults_()).forEach(k => { assert.deepStrictEqual(mB[k], mA[k], 'chữ hiệu lực ' + k); nKeys++; });
+  Object.keys(A.api.contentDefaults_()).forEach(k => {
+    // t.stats_note (FIX F1): ô chưa sửa nên menu 1 nâng chữ sai của 8.1.4 lên chữ gốc mới; trước menu 1 web còn hiện chữ cũ. Mọi khoá khác y hệt.
+    if (k === 't.stats_note') { assert.deepStrictEqual(mA[k], STATS_NOTE_OLD, 'trước menu 1: chữ cũ'); assert.deepStrictEqual(mB[k], [A.api.DEFAULT_CONTENT_[k][0], A.api.DEFAULT_CONTENT_[k][1]], 'sau menu 1: chữ gốc mới'); }
+    else assert.deepStrictEqual(mB[k], mA[k], 'chữ hiệu lực ' + k);
+    nKeys++;
+  });
   assert.ok(nKeys > 600 && mB['h.hero_sub'][1] === '', 'ô "-" hiệu lực là trống (luật 34)');
   // EMAIL_TEMPLATES
   const etB = {}; B.api.table_('EMAIL_TEMPLATES').all().forEach(r => { assert.ok(!etB[r.key], 'không còn key trùng: ' + r.key); etB[r.key] = r; });
@@ -5451,10 +5462,11 @@ t('I154', 'Nâng cấp 8.1.4 (d): sau menu 1 có đủ phần mới: BANK_QR_IMA
   assert.ok(log.every(x => x.from_version === '8.1.4' && x.to_version === api.APP.VERSION && x.at instanceof Date && x.at.getTime() === api.getNow_().getTime() && typeof x.detail === 'string' && x.detail.length > 5), 'cột bản và giờ');
   ['8.1.5', '8.1.6', '8.1.7', '8.1.8', '8.1.9'].forEach(v => assert.ok(log.some(x => /^NOTE_/.test(x.kind) && x.item.indexOf(v) === 0), 'RELEASE_LOG có ghi chú bản ' + v));
   const cnt = {}; log.filter(x => !/^NOTE_/.test(x.kind)).forEach(x => { cnt[x.kind] = (cnt[x.kind] || 0) + 1; });
-  assert.deepStrictEqual(cnt, { CONFIG_ADDED: 2, CONFIG_UNKNOWN: 1, TAB_ADDED: 1, COLUMN_ADDED: 1, CONTENT_ADDED: 8, TEMPLATE_ADDED: 1, NOTIFY_RULE_ADDED: 2, DUP_MERGED: 2 }, 'việc đo thật');
+  assert.deepStrictEqual(cnt, { CONFIG_ADDED: 2, CONFIG_UNKNOWN: 1, TAB_ADDED: 1, COLUMN_ADDED: 1, CONTENT_ADDED: 8, CONTENT_REFRESHED: 2, TEMPLATE_ADDED: 1, NOTIFY_RULE_ADDED: 2, DUP_MERGED: 2 }, 'việc đo thật');
   assert.deepStrictEqual(log.filter(x => x.kind === 'COLUMN_ADDED').map(x => x.item), ['BOOKINGS.admin_done_at']); assert.deepStrictEqual(log.filter(x => x.kind === 'TAB_ADDED').map(x => x.item), ['RELEASE_LOG']);
   assert.deepStrictEqual(log.filter(x => x.kind === 'DUP_MERGED').map(x => x.item).sort(), ['EMAIL_TEMPLATES.LOGIN_LINK', 'EMAIL_TEMPLATES.REG_RECEIVED']);
-  assert.ok(!log.some(x => x.kind === 'MIGRATION' || x.kind === 'CONTENT_REFRESHED' || x.kind === 'CONTENT_KEPT'), 'không có bước chuyển, không có ô chữ đổi (admin đã dùng đúng chữ mới)');
+  assert.deepStrictEqual(log.filter(x => x.kind === 'CONTENT_REFRESHED').map(x => x.item).sort(), ['t.stats_note (en)', 't.stats_note (vi)'], 'chỉ hai ô chữ web chưa sửa được làm mới: t.stats_note (FIX F1, chữ gốc sai của 8.1.4)');
+  assert.ok(!log.some(x => x.kind === 'MIGRATION' || x.kind === 'CONTENT_KEPT'), 'không có bước chuyển, không có ô chữ admin sửa bị giữ (admin đã dùng đúng chữ mới)');
   assert.ok(log.some(x => x.kind === 'NOTE_CONFIG' && x.item === '8.1.9 · BANK_QR_IMAGE' && /\[mới, mặc định trống\]/.test(x.detail)) && log.some(x => x.kind === 'NOTE_CONTENT' && x.item === '8.1.9 · h.bank_note' && /\[chữ gốc đổi\]/.test(x.detail)));
   // một thông báo và một email
   const nt = api.table_('NOTIFICATIONS').all().filter(n => n.event === 'RELEASE_NOTES'); assert.strictEqual(nt.length, 1);
@@ -5583,9 +5595,9 @@ t('I157', 'Nâng cấp (g): ô chữ web chưa sửa thì nâng lên chữ gốc
   assert.strictEqual(api.cfg_('REASSIGN_STUCK_HOURS'), -1);
   assert.notStrictEqual(api.table_('EMAIL_TEMPLATES').byId('TUTOR_REMIND').body_vi, trOld, 'mẫu còn chữ gốc cũ được nâng lên chữ gốc mới');
   const log = api.table_('RELEASE_LOG').all().filter(x => !/^NOTE_/.test(x.kind)), by = (kind) => log.filter(x => x.kind === kind).map(x => x.item).sort();
-  assert.deepStrictEqual(by('CONTENT_KEPT'), ['h.bank_note (vi)']); assert.deepStrictEqual(by('CONTENT_REFRESHED'), ['h.bank_note (en)']); assert.deepStrictEqual(by('TEMPLATE_UPGRADED'), ['TUTOR_REMIND']);
+  assert.deepStrictEqual(by('CONTENT_KEPT'), ['h.bank_note (vi)']); assert.deepStrictEqual(by('CONTENT_REFRESHED'), ['h.bank_note (en)', 't.stats_note (en)', 't.stats_note (vi)']);   // t.stats_note: chữ gốc 8.1.4 chưa sửa trong fixture (FIX F1) assert.deepStrictEqual(by('TEMPLATE_UPGRADED'), ['TUTOR_REMIND']);
   assert.deepStrictEqual(by('CONFIG_ADDED'), [], 'khoá đã có thì không "thêm"');
-  const txt = r.lines.join('\n'); assert.ok(/GIỮ chữ bạn đã sửa dù chữ gốc đã đổi \(1 ô\): h\.bank_note \(vi\)/.test(txt) && /làm mới ô chữ web chưa sửa 1: h\.bank_note \(en\)/.test(txt) && /nâng mẫu email 1: TUTOR_REMIND/.test(txt), txt);
+  const txt = r.lines.join('\n'); assert.ok(/GIỮ chữ bạn đã sửa dù chữ gốc đã đổi \(1 ô\): h\.bank_note \(vi\)/.test(txt) && /làm mới ô chữ web chưa sửa 3: h\.bank_note \(en\), t\.stats_note \(vi\), t\.stats_note \(en\)/.test(txt) && /nâng mẫu email 1: TUTOR_REMIND/.test(txt), txt);
   assert.ok(/default_vi/.test(txt), 'chỉ cho admin chỗ xem chữ gốc mới');
   // chạy lại: không báo lại ô đã giữ
   const r2 = api.setupFirstRun(); assert.ok(!r2.lines.some(l => /GIỮ chữ|CẬP NHẬT PHIÊN BẢN/.test(l)));
@@ -5925,6 +5937,8 @@ t('I173', 'Soát X2 (FIX C): hai dòng "BANK_NAME " và "BANK_NAME": menu 1 KHÔ
   assert.ok(!/Dòng cuối \(đúng khoá\)|Dòng đầu/.test(txt + JSON.stringify(h.rows(f, 'RELEASE_LOG'))), 'không in giá trị CONFIG ra chữ báo hay RELEASE_LOG (có thể là khoá bí mật)');
   assert.ok(/Khoá CONFIG có hai dòng|CẢNH BÁO: 1 khoá CONFIG có hai dòng chỉ khác nhau ở dấu cách.*BANK_NAME/.test(txt) && h.rows(f, 'RELEASE_LOG').some(x => x.kind === 'CONFIG_KEY_TWIN' && x.item === 'BANK_NAME'), 'có trong tóm tắt và RELEASE_LOG');
   assert.ok(f.env.state.mails.some(m => /CONFIG_KEY_TWIN|BANK_NAME/.test(m.htmlBody) && /Cần bạn xem|Needs your attention/.test(m.htmlBody)), 'email nêu thành khối cần xem');
+  // FIX F13: nhãn của loại CONFIG_KEY_TWIN nói đúng luật (dòng cuối có khoá sạch có hiệu lực, cfgKeyPlan_), cả hai thứ tiếng
+  assert.ok(f.env.state.mails.some(m => m.htmlBody.indexOf('Khoá CONFIG có hai dòng chỉ khác dấu cách hoặc ký tự vô hình (không xoá, dùng dòng cuối có khoá sạch)') !== -1 && m.htmlBody.indexOf('CONFIG keys with two rows differing only by whitespace or invisible characters (kept, the last row with a clean key wins)') !== -1), 'nhãn CONFIG_KEY_TWIN mới ở email tóm tắt');
   const ts = f.api.testSystem(); assert.ok(ts.warnings.some(w => /^CONFIG: khoá CONFIG "BANK_NAME" có 2 dòng chỉ khác nhau ở dấu cách.*Đang có hiệu lực: dòng CUỐI \(hàng \d+\)/.test(w)), 'menu 2: ' + JSON.stringify(ts.warnings));
   // không đoán: chạy lại nhiều lần vẫn y nguyên
   xRun(f).setupFirstRun(); f.api.clearDbCache_(); assert.deepStrictEqual(snap(), before);
@@ -6140,12 +6154,6 @@ function xMatrix(o) {
     out.bad.push({ N, probs });
   }
   return out;
-}
-/** Số điểm cắt của từng cửa sổ còn lại, đúng bằng số đã đo (đổi mã làm số này đổi thì phải xem lại và cập nhật comment đầu đường giao trong Release.gs). Mỗi cửa sổ là MỘT khúc liền. */
-function xWindows(r, label) {
-  const run = (a) => a.length === 0 || a.every((n, i) => i === 0 || n === a[i - 1] + 1);
-  assert.deepStrictEqual([r.tally.zeroMailNotice, r.tally.mailNoticeNoLog, r.tally.extraMailLog], [9, 4, 3], label + ': số điểm cắt của cửa sổ 1 (không email + thông báo), 4 (email đã đi + thông báo, không dòng MAIL_LOG), 2 (thừa một dòng MAIL_LOG): ' + JSON.stringify(r.tally));
-  assert.ok(run(r.zero) && run(r.nl) && run(r.xl), label + ': mỗi cửa sổ liền một khúc: ' + JSON.stringify([r.zero, r.nl, r.xl]));
 }
 /** Cuộc gọi ghi nhận phiên bản (setProperties có APP_VERSION_LAST): ma trận "giao" chỉ đếm từ đây. */
 const xIsRecord = (n, a) => /getScriptProperties\(\)\.setProperties$/.test(n) && a[0] && 'APP_VERSION_LAST' in a[0];
@@ -6455,6 +6463,19 @@ t('I212', 'Soát X2 vòng 4 (DEFECT 4): đường dòng MAIL_LOG không nuốt l
   // (iii) dòng menu 1 khi cắt khoá có ký tự vô hình
   const h = fx814(); X2h.put(h, 'CONFIG', X2h.find(h, 'CONFIG', 'BANK_NAME'), 'key', 'BANK_NAME​'); const r = h.api.setupFirstRun();
   assert.ok(r.lines.some(l => /^Sửa khoá CONFIG có dấu cách thừa \(hoặc ký tự vô hình\): /.test(l)), r.lines.join('|'));
+});
+
+t('I213', 'F1 (hồi quy): chữ gốc t.stats_note (chú thích dưới bảng số của tutor) nói đúng luật 55: buổi chưa chọn kết quả báo đỏ, quá hạn thì Không hoàn thành và không tính lương; không hứa tự tính Hoàn thành sau 24 giờ (sai từ 8.1.4)', () => {
+  const { api } = load(), d = api.DEFAULT_CONTENT_['t.stats_note'], FALSE_RE = /tự tính Hoàn thành|counted as Completed/i;
+  // chữ cũ của 8.1.4 đúng là thứ bị bắt: biểu thức không rỗng nghĩa
+  assert.ok(FALSE_RE.test(STATS_NOTE_OLD[0]) && FALSE_RE.test(STATS_NOTE_OLD[1]), 'biểu thức bắt được chữ sai của 8.1.4');
+  assert.ok(!FALSE_RE.test(d[0]) && !FALSE_RE.test(d[1]), 'chữ gốc mới không hứa tự tính Hoàn thành: ' + d[0] + ' | ' + d[1]);
+  assert.ok(/Không hoàn thành/.test(d[0]) && /Not completed/.test(d[1]), 'nói Không hoàn thành, Not completed');
+  assert.ok(/báo đỏ/.test(d[0]) && /flagged red/.test(d[1]) && /không tính lương/.test(d[0]) && /not paid/.test(d[1]), 'nói báo đỏ và không tính lương ở cả hai thứ tiếng');
+  // chữ hiệu lực trên web (contentMap_, ô trống = mặc định) đúng là chữ gốc mới
+  api.clearContentCache_(); const m = api.contentMap_(); assert.deepStrictEqual([m['t.stats_note'][0], m['t.stats_note'][1]], [d[0], d[1]]);
+  // luật thật (CONFIG, không còn tự Hoàn thành): có mốc báo đỏ và mốc Không hoàn thành
+  assert.ok(api.cfg_('RESULT_NOTICE_AFTER_HOURS') > 0 && api.cfg_('RESULT_EXPIRE_AFTER_HOURS') > api.cfg_('RESULT_NOTICE_AFTER_HOURS'));
 });
 
 // ##UPG_END

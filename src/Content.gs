@@ -267,7 +267,7 @@ var DEFAULT_CONTENT_ = {
   't.res_saved': ['Đã lưu: {label}', 'Saved: {label}', 'Dòng nhỏ ở buổi đã lưu', 'Sau khi lưu'],
   't.tab_account': ['Tài khoản', 'Account', 'Tab thứ tư', 'Luôn hiện'],
   't.stats_title': ['Số buổi của tôi', 'My lessons', 'Tiêu đề tab Tài khoản', 'Luôn hiện'],
-  't.stats_note': ['Đếm theo cùng luật tính lương. Buổi chưa xác nhận tự tính Hoàn thành sau 24 giờ.', 'Counted with the same rules as payroll. Lessons you have not confirmed are counted as Completed after 24 hours.', 'Dòng dưới bảng số', 'Luôn hiện'],
+  't.stats_note': ['Đếm theo cùng luật tính lương. Buổi bạn chưa chọn kết quả sẽ được báo đỏ; quá hạn mà vẫn chưa chọn thì thành Không hoàn thành, không tính lương.', 'Counted with the same rules as payroll. Lessons without your result are flagged red; if still unconfirmed after the deadline they become Not completed and are not paid.', 'Dòng dưới bảng số', 'Luôn hiện'],
   't.st_completed': ['Hoàn thành', 'Completed', 'Dòng trong bảng số', 'Luôn hiện'], 't.st_absent': ['Học viên vắng', 'Student absent', 'Dòng trong bảng số', 'Luôn hiện'], 't.st_tech_paid': ['Lỗi kỹ thuật (có trả)', 'Technical issue (paid)', 'Dòng trong bảng số', 'Luôn hiện'],
   't.st_tech_unpaid': ['Lỗi kỹ thuật (không trả)', 'Technical issue (not paid)', 'Dòng trong bảng số', 'Luôn hiện'], 't.st_tutor_absent': ['Tutor vắng', 'Tutor absent', 'Dòng trong bảng số', 'Luôn hiện'], 't.st_payable': ['Buổi được trả', 'Paid lessons', 'Dòng tổng trong bảng số', 'Luôn hiện'],
   't.st_waiting': ['Chờ bạn xác nhận', 'Waiting for your result', 'Dòng trong bảng số', 'Luôn hiện'],

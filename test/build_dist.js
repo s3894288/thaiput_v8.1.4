@@ -4,7 +4,7 @@
  *   node test/build_dist.js   → dist/Code.gs, dist/appsscript.json, dist/Index.html (dự án chính)
  *                               dist_google_login/GoogleLogin.gs, appsscript.json (dự án phụ đăng nhập Google)
  *
- * Apps Script nạp mọi file .gs vào chung một phạm vi, nên ghép 23 file thành một Code.gs chạy y hệt.
+ * Apps Script nạp mọi file .gs vào chung một phạm vi, nên ghép mọi file .gs trong src/ thành một Code.gs chạy y hệt.
  * Giao diện gộp vào 1 file Index.html (đã nhúng sẵn mọi file con), tên ngắn; Api.gs tự nhận cả tên "ui/Index" lẫn "Index".
  * Không sửa dist/ bằng tay: sửa src/ rồi chạy lại lệnh này. npm test có test I19 nạp đúng bản dist này.
  *

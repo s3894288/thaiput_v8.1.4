@@ -290,7 +290,7 @@ function reassignStuckInLock_(now) {
   return due.length;
 }
 
-/** Mỗi giờ: tự từ chối yêu cầu huỷ quá hạn duyệt (câu 20), tự hoàn thành buổi quá 24 giờ (câu 29). */
+/** Mỗi giờ: tự từ chối yêu cầu huỷ quá hạn duyệt (câu 20); báo đỏ buổi chưa có kết quả quá hạn rồi chuyển Không hoàn thành (câu 29, đổi 01/11; không tự Hoàn thành). */
 function hourlyJob(e) { requireOperator_(e);
   var logQueued = [];
   var res = runJob_('hourlyJob', function () {
@@ -311,9 +311,8 @@ function hourlyJob(e) { requireOperator_(e);
         rejected++;
       }
     });
-    // Bảo trì: tutor không xác nhận được kết quả, nên tạm dừng tự Hoàn thành (soát R1 L3); hết bảo trì thì chạy tiếp.
     // Chunk 5J (câu 29 đổi 01/11): không tự Hoàn thành. Báo đỏ khi quá hạn xác nhận; quá hạn tiếp thì Không hoàn thành.
-    // Bảo trì: tutor không xác nhận được, nên tạm dừng bước chuyển Không hoàn thành (vẫn báo).
+    // Bảo trì (soát R1 L3): tutor không xác nhận được, nên tạm dừng bước chuyển Không hoàn thành (vẫn báo); hết bảo trì thì chạy tiếp.
     var completed = resultOverdueInLock_(now, maintMode_() === 'OFF');
     // Chunk 5N: buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: báo admin một lần.
     var stuck = 0; try { stuck = reassignStuckInLock_(now); } catch (se) { Logger.log('Báo buổi kẹt lỗi: ' + se.message); mailAdminError_('Báo buổi kẹt (hourlyJob)', (se && se.stack) || String(se)); }
