@@ -9,7 +9,7 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const ROOT = path.join(__dirname, '..', '..');
 const GROUPS = {
-  SRC_BUNDLE: ['src', 'companion', 'loadtest', 'package.json'],
+  SRC_BUNDLE: ['src', 'companion', 'loadtest', 'package.json', 'package-lock.json', '.gitignore', '.clasp.json.example', '.github'],
   TEST_BUNDLE: ['test']
 };
 const SKIP = new Set(['test/REPORT.md']);

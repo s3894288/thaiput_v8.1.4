@@ -1,6 +1,23 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 02/11/2026 (lần 8). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 27/11/2026 (lần 11). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 27/11 (lần 10)
+
+* Đánh số lại 3 câu của main: BL70 thành **BL96**, BL71 thành **BL97**, BL72 thành **BL98**, vì nhánh 8.1.9 trên GitHub (PR 1) đã dùng BL70 đến BL95 cho câu khác. Số mới nối sau số cao nhất ở mọi nhánh.
+* BL97 xong 27/11 (repo main đồng bộ với project qua PR 3), chuyển xuống "Đã chốt".
+* BL98: Alex thử chuyển Private bị chặn, anh tự làm.
+* Thêm **BL99**: nhánh 8.1.9 (PR 1) đã làm 5O, 5N, 5R nhưng chưa gộp main.
+* PR 2 (bản 8.1.5 gửi email qua Amazon SES, kế hoạch v9) đã đóng 27/11 theo lệnh anh, nhánh `claude/hopeful-galileo-xa1dv9` giữ nguyên.
+* Tổng còn chờ: 35 câu (mục A 31, mục B 4).
+
+## Thay đổi so với bản 12/11 (lần 9)
+
+* Thêm BL97: repo GitHub `s3894288/thaiput_v8.1.4` lệch project (đối chiếu 27/11). Thêm BL98: repo đang Public, phải chuyển Private. Chưa sửa gì trên GitHub. Tổng còn chờ: 35 câu (mục A 31, mục B 4).
+
+## Thay đổi so với bản 02/11 (lần 8)
+
+* Thêm BL96: admin không mở được giờ rảnh hộ tutor, nên "Đặt thay" không xếp được buổi vào giờ tutor chưa mở. Chưa đổi code. Tổng còn chờ: 33 câu (mục A 29, mục B 4).
 
 ## Thay đổi so với bản 01/11 lần 7
 
@@ -49,6 +66,9 @@
 | BL67 | Nút Đăng nhập Google mở thẻ mới (Google Sites có thể chặn chuyển trang trong khung nhúng); trang quản trị mở ở link `/exec`, không trong Sites. (a) giữ; (b) mở cùng thẻ | (a), đã làm | Tuần sau (rà) |
 | BL68 | Nâng 8.0.10 lên 8.1.4: ô cũ `ARCHIVE_LOG_KEEP_MONTHS` không chép sang `LOG_KEEP_DAYS`, nên email, thông báo cũ hơn 60 ngày sang file lưu trữ ở đêm đầu (không mất). (a) giữ; (b) chép (đổi tháng ra ngày) | (a) | Tuần sau (rà) |
 | BL69 | Phần còn lại của 5Q: bảng hạn mức 5 dòng ở menu 2 và ô `MAIL_DAILY_CAP`; kiểm thư tới 5 loại hộp thư (Gmail, Outlook, Yahoo, tên miền trường, Workspace khác) trên STAGING | Làm cùng 5N | Tuần sau |
+| BL96 | Admin không mở được giờ rảnh hộ tutor. "Đặt thay" chỉ chọn giờ tutor đã mở (`OPEN` ở AVAILABILITY; test I48 xác nhận lý do `NO_TUTOR`); hiện chỉ tutor tự mở giờ của mình (`apiTutorSetAvailability`). Học viên nhắn riêng xin giờ tutor chưa mở thì admin phải nhờ tutor mở trước (Phần L4 đã ghi cách làm), hoặc gõ tay một dòng AVAILABILITY (chưa thử trên Google thật). (a) giữ cách hiện tại; (b) trang Đặt thay thêm bước "Mở giờ cho tutor": chọn tutor và giờ, ghi dòng `OPEN` kèm nhật ký `AVAIL_OPEN` do admin làm, tutor nhận email, rồi đặt luôn; vẫn chặn giờ đã bắt đầu, ngoài `BOOKING_HORIZON_DAYS`, giờ BLOCKED, tutor bị khoá | (b), chưa làm; anh duyệt vì đổi quyền mở giờ (hiện chỉ tutor) | Tuần sau (rà) |
+| BL98 | Repo GitHub `s3894288/thaiput_v8.1.4` đang Public (đọc được không cần đăng nhập), trong khi `HUONG_DAN_GITHUB_CLAUDE_CODE.md` mục 1 ghi bắt buộc Private vì có tài liệu nội bộ. Alex thử chuyển ngày 27/11 bằng quyền admin của repo nhưng bị chặn (proxy của phiên Claude cấm sửa cài đặt repo, lỗi 403). Anh tự làm: github.com, repo, Settings, kéo xuống Danger Zone, Change visibility, Make private | Làm ngay | Ngay |
+| BL99 | Repo có nhánh `claude/wizardly-gates-8xzfbn` (PR 1, nháp, phiên Claude Code 05/11 đến 27/11) chứa bản **8.1.9**: 5O (8.1.5, 8.1.6), 5N (8.1.7), bản vá 8.1.8, 5R (gộp dòng trùng EMAIL_TEMPLATES và CONTENT, QR chuyển khoản, tăng tốc tải, tóm tắt sau nâng cấp), đã soát chéo PASS. Alex chạy test nhánh này ngày 27/11: 34/34, 46/46, 228/228, 71/71, 2/2; chưa kiểm trên Google thật. Nhánh có BACKLOG riêng (lần 15, 55 câu chờ, BL70 đến BL95 là câu khác với main). Anh chốt 27/11: giữ main 8.1.4, không đụng nhánh này. (a) gộp PR 1 vào main sau khi diễn tập 8.1.9 trên bản sao STAGING, rồi gộp hai BACKLOG; (b) bỏ nhánh, làm lại 5N, 5O trên main | (a); quyết trước khi làm 5N, 5O để không làm lại việc đã xong | Trước 5N |
 | BL60 | Số điện thoại nước ngoài gõ không có + và mã nước (ví dụ số Thái `081 234 5678`) bị hiểu là số Việt Nam và lưu `+84812345678`, có link Zalo sai người. (a) giữ, gợi ý trên form đã ghi "số nước ngoài ghi + và mã nước"; (b) chỉ chuẩn hoá khi bắt đầu bằng 0 hoặc +84 hoặc 84 và đủ 10 hay 11 số | (a) | 5Q (rà) |
 | BL61 | Gói giá 0 chỉ đăng ký qua Zalo: nếu TRIAL để giá 0 thì Trial thành chỉ qua Zalo. Bản cài mới có giá mặc định 0, menu 2 báo LƯU Ý (không phải LỖI). (a) giữ LƯU Ý; (b) báo LỖI khi mọi gói đang bán đều giá 0 | (a) | 5Q (rà) |
 | BL62 | Khoá tutor huỷ giờ rảnh tương lai; mở khoá không tự mở lại giờ rảnh (tutor mở lại trên trang). (a) giữ; (b) mở khoá tự mở lại các giờ đã huỷ khi khoá mà còn ở tương lai | (a) | 5Q (rà) |
@@ -110,6 +130,8 @@
 
 | Ngày | Mã | Kết quả |
 |---|---|---|
+| 27/11 | BL97 | Repo GitHub main đồng bộ với project (PR 3): thêm `.github/`, `.gitignore`, `.clasp.json.example`, `THIET_KE_GIAO_DIEN.md`, `test/unit.js`; cập nhật `BACKLOG.md`, `CLAUDE.md`, `HUONG_DAN_VAN_HANH.md`, `PROGRESS.md`, `test/tools/bundle.js`; thêm `PROJECT_MEMORY.md`, `HUONG_DAN_DOC_PROJECT.md`. Không đổi code |
+| 27/11 | Mới | Giữ main 8.1.4, không gộp PR 1 (8.1.9), không đụng các nhánh khác; đóng PR 2 (SES), giữ nhánh |
 | 01/11 tối | Mới | 5K, 5L soát chéo 1 agent mỗi sub chunk; từ 5P lại 2 agent |
 | 01/11 tối | Mới | Chưa tách STAGING và PRODUCTION tới hết chunk 5; mọi bản chỉ dán STAGING. Chunk 6: chuyển PRODUCTION đơn giản nhất, không mất dữ liệu, 2 bản chức năng tương đương chạy song song, hướng dẫn tắt hết trigger STAGING khi PRODUCTION chạy chính thức. Thay BL11 |
 | 01/11 tối | Mới | Mục chưa duyệt, chưa trả lời, chưa xử lý giữ ở BACKLOG; anh rà ở sub chunk cuối chunk 5 (5Q), coder nhắc |
