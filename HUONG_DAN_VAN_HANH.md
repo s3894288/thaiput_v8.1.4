@@ -6,7 +6,7 @@
 
 Bản trước: 8.0.10 (18/10/2026, đã xuất) và bản nháp 8.1.1 (01/11, chưa xuất). Những điểm mới:
 
-* **Bổ sung 12/11/2026 (không đổi code):** Phần L4 thêm tình huống học viên nhắn riêng xin giờ mà tutor chưa mở. **Đặt thay chỉ chọn được giờ tutor đã mở**; trang quản trị chưa có nút mở giờ hộ tutor (BACKLOG BL70).
+* **Bổ sung 12/11/2026 (không đổi code):** Phần L4 thêm tình huống học viên nhắn riêng xin giờ mà tutor chưa mở. **Đặt thay chỉ chọn được giờ tutor đã mở**; trang quản trị chưa có nút mở giờ hộ tutor (BACKLOG BL96).
 * **Email gửi cố định qua GmailApp (8.1.4):** không còn file MailFix, không còn bước tìm và thay sau mỗi lần dán code. Ô mới `MAIL_TRANSPORT` (B8). Tab MAIL_LOG thêm cột `transport`. Tình huống thư không tới: Phần L3.
 * **Phần B viết lại đủ 98 ô CONFIG** theo bản 8.1.4. Ô mới: bù buổi (8.1.0), link đăng nhập theo vai trò, lịch tutor kiểu `THỨ GIỜ`, 3 ô kết quả buổi (8.1.1), `LOG_KEEP_DAYS`, 4 ô `SHORT_URL_*`, `MOVED_TO_URL` (8.1.3), `MAIL_TRANSPORT` (8.1.4). Ô cũ đã bỏ: B15.
 * **Phần C viết lại theo menu gom nhóm** (8.1.3): menu con Người dùng, Gói học, Báo cáo, Email, Cập nhật phiên bản, Chuyển hệ thống, Lưu trữ, Công cụ kỹ thuật, Test. Menu mới: Khoá tutor, Mở khoá tutor, Thêm gói, Lưu trữ mở file, Các bước chuyển dữ liệu, Chuyển hệ thống 4 bước, Tắt hết trigger. Menu 3 tạo **8** trigger (không còn 10). Menu chuyển dữ liệu v6 đã bỏ.

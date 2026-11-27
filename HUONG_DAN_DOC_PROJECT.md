@@ -4,7 +4,7 @@
 
 ## Thay đổi so với bản trước
 
-Bản đầu tiên.
+Bản đầu tiên (27/11). Sửa tối 27/11: dòng "Làm bằng Claude Code trên GitHub" ghi trạng thái repo sau khi đồng bộ.
 
 ## 1. Thứ tự đọc nhanh
 
@@ -25,7 +25,7 @@ Chat mới không thấy chat cũ. Mọi thứ cần biết nằm trong file c�
 | Rà BACKLOG | `v8/BACKLOG.md`; `v8/plan/KE_HOACH_5J_5P.md` | BACKLOG: mục A (chờ trả lời), B (câu cũ chưa thấy trả lời), C (để sau), D (còn phải kiểm trên Google thật), "Đã chốt". Rà ở lượt cuối của chunk 5, sau 5N và 5O; coder nhắc lúc đó |
 | Go live chunk 6 | `v8/plan/KE_HOACH_5J_5P.md`; `v8/HUONG_DAN_PHAT_HANH.md`; `v8/HUONG_DAN_TRIEN_KHAI_WORKSPACE.md`; `v8/docs/04_CHECKLIST.md`; `v8/HUONG_DAN_VAN_HANH.md` | Plan: mục 5. Phát hành: mục 6. Triển khai: mục 7. Checklist: phần B, C, D. Vận hành: Phần C, nhóm "Chuyển hệ thống". Hai mục 6 và 7 chỉ là ghi chú tạm, hướng dẫn go live mới viết khi vào chunk 6 |
 | Thử tải | `v8/HUONG_DAN_THU_TAI.md`; `v8/loadtest/run.js`, `v8/loadtest/browser.js` | Mục 1 (đo gì), mục 2 (chuẩn bị), mục 3 (mỗi lượt thử), mục 4 (dọn), mục 5 (an toàn), mục 6 (khác biệt với người thật). Chỉ chạy trên STAGING |
-| Làm bằng Claude Code trên GitHub | `v8/HUONG_DAN_GITHUB_CLAUDE_CODE.md`; `v8/CLAUDE.md`; `v8/README.md` | Hướng dẫn: mục 1 đến 4. CLAUDE.md: mục "Làm việc bằng Claude Code". README: Cấu trúc, Lệnh. Tại 27/11 repo `s3894288/thaiput_v8.1.4` chưa khớp với project (thiếu `.github/`, `.gitignore`, `.clasp.json.example`, `THIET_KE_GIAO_DIEN.md`, `test/unit.js`; cũ ở `BACKLOG.md`, `HUONG_DAN_VAN_HANH.md`, `PROGRESS.md`, `test/tools/bundle.js`) |
+| Làm bằng Claude Code trên GitHub | `v8/HUONG_DAN_GITHUB_CLAUDE_CODE.md`; `v8/CLAUDE.md`; `v8/README.md` | Hướng dẫn: mục 1 đến 4. CLAUDE.md: mục "Làm việc bằng Claude Code". README: Cấu trúc, Lệnh. Repo `s3894288/thaiput_v8.1.4`: main là 8.1.4 (đã đồng bộ với project 27/11); nhánh `claude/wizardly-gates-8xzfbn` (PR 1, chưa gộp) là 8.1.9, có BACKLOG và PROGRESS riêng. Xem `v8/PROJECT_MEMORY.md` mục 3 |
 | Dựng lại repo trong chat | `v8/repo/BOOTSTRAP.md`; `v8/repo/SRC_BUNDLE.txt`; `v8/repo/TEST_BUNDLE.txt` | BOOTSTRAP: mục 1 (giải bundle, cài, chạy test) và mục 4 (cuối việc: đóng lại bundle). Chỉ đưa bundle cho công cụ giải, không đọc vào chat |
 | Tra quyết định nghiệp vụ | `v8/docs/01_QUYET_DINH_50_CAU.md`; `v8/plan/TU_VAN_BU_BUOI.md`; `v8/policy/` | 01: 7 nhóm quyết định (mục 1 đến 7) và các mục "Thay đổi ngày ..." cuối file. TU_VAN_BU_BUOI: luật bù buổi, bù ngày. Policy: luật nhìn từ học viên và tutor. Lý do một thiết kế: `v8/plan/TRA_LOI_01_11.md` |
 | Tra lịch sử cũ | Thư mục `archive/` trên GitHub, repo `s3894288/thaiput_v8.1.4` | `v8/archive/` đã xoá khỏi project ngày 27/11. Đọc thư mục `archive/` trên GitHub repo `s3894288/thaiput_v8.1.4`. Lịch sử gần: tìm trong `v8/PROGRESS.md` bằng `project_search` |
