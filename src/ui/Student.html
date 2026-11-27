@@ -254,7 +254,8 @@
         return '<label class="pkg' + (k === 0 ? ' on' : '') + '" for="r-' + x.code + '"><span class="row" style="flex-wrap:nowrap;gap:12px"><input type="radio" name="rpkg" id="r-' + x.code + '" value="' + x.code + '"' + (k === 0 ? ' checked' : '') + '><b>' + T.esc(T.pkgName(x)) + '</b></span><span class="price">' + T.money(x.price) + '</span></label>';
       }).join('') + rp.filter(function (x) { return !(x.price > 0); }).map(T.pkgContact).join('') + (rpaid.length ? '' : '<div class="alert warn">' + T.t('a.pkg_none') + '</div>') + '</div>';
       T.$$('#renew-pkgs input', body).forEach(function (r) { r.onchange = function () { T.$$('#renew-pkgs .pkg', body).forEach(function (l) { l.classList.toggle('on', l.contains(T.$('input:checked', l))); }); }; });
-      if (i.bank && i.bank.account) T.$('#renew-bank', body).innerHTML = '<div class="panel mono">' + T.esc(i.bank.name) + ' · ' + T.esc(i.bank.account) + '<br>' + T.esc(i.bank.holder) + '</div>';
+      T.$('#renew-bank', body).innerHTML = T.bankPanel(i);
+      T.bankQrFill(T.$('#renew-bank', body));
     };
     if (info) withInfo(info); else T.api('apiPublicInfo').then(function (r) { if (r.ok) withInfo(r.data); });
     T.$('#renew', body).onsubmit = function (e) {

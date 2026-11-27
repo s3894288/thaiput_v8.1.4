@@ -115,7 +115,7 @@ function marketingRender_(row, u, testTag) {
     var txt = foot && foot.active && String(foot['body_' + lang] || '').trim() ? foot['body_' + lang] : fd[lang === 'en' ? 6 : 3];
     var h = renderBody_(txt, vars, lang);
     if (!h.replace(/<[^>]*>/g, '').trim()) h = renderBody_(fd[lang === 'en' ? 6 : 3], vars, lang);   // chữ admin sửa ra rỗng: dùng chữ gốc (soát 5H B6)
-    return h ? '<div style="margin-top:18px;font-size:12px;color:#6b7280">' + h + '</div>' : '';
+    return h ? '<div style="margin-top:18px;font-size:12px;color:#63635d">' + h + '</div>' : '';
   };
   var bVi = marketingCell_(row, 'body_vi'), bEn = marketingCell_(row, 'body_en');
   var htmlVi = bVi ? renderBody_(bVi, vars, 'vi') + footHtml('vi') : '', htmlEn = bEn ? renderBody_(bEn, vars, 'en') + footHtml('en') : '';

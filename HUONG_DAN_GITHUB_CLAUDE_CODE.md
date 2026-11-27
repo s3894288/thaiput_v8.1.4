@@ -1,4 +1,4 @@
-# Hướng dẫn dùng repo GitHub với Claude Code (bản 8.1.4)
+# Hướng dẫn dùng repo GitHub với Claude Code (bản 8.1.9)
 
 *Cập nhật 05/11/2026. Dành cho admin không viết code. Chiến lược: sau go live, sửa hệ thống bằng Claude Code (gói Pro) trên repo này; code JavaScript trong `src/` được kiểm bằng bộ test Node rồi đưa lên Apps Script.*
 

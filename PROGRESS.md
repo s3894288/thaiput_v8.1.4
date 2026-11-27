@@ -1,5 +1,314 @@
 # Thaiput v8 · Tiến độ theo chunk
 
+**Trạng thái 15/11/2026: 5R XONG VÀ ĐÃ SOÁT CHÉO ĐỘC LẬP, bản 8.1.9.** Hệ thống anh đang chạy vẫn là **8.1.4**; repo giữ 8.1.9 ở nhánh `claude/wizardly-gates-8xzfbn` (draft PR #1, `main` vẫn là 8.1.4). Bốn việc của 5R: (1) gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT (anh thấy tận mắt LOGIN_LINK, REG_RECEIVED bị 2 dòng); (2) khung chuyển khoản mới có ô mã QR (CONFIG `BANK_QR_IMAGE`) và dòng lưu ý đậm, nổi; (3) tăng tốc tải trang, 5 mục an toàn; (4) tóm tắt thay đổi sau mỗi lần nâng cấp (tab RELEASE_LOG, thông báo và email), kèm bài thử nâng cấp thật từ database 8.1.4 lên 8.1.9 so từng ô. Sau khi giao lần đầu (14/11), anh yêu cầu soát gắt: hai agent soát chéo độc lập (X1 soát chéo toàn bộ 5R; X2 soát bằng đột biến và vận hành), rồi ba vòng sửa, mỗi vòng có supervisor (Opus) soát lại. Soát tìm ra lỗi thật (bảng ở mục "Soát chéo và sửa (14 đến 15/11)"), đã sửa hết; vòng soát thứ ba trả REVISE với một lỗi chặn (job mỗi giờ hoặc một lượt menu 1 thứ hai chen vào giữa lúc niêm phong bản ghi và lúc nhận gửi email có thể làm admin nhận 2 email tóm tắt, 2 thông báo, RELEASE_LOG gấp đôi; dữ liệu nghiệp vụ không bị ảnh hưởng), đã sửa ở commit `5292935`. Test tới commit `5292935`: hàm thuần 34/34, kịch bản 46/46, tích hợp 211/211 (228/228 sau lượt rà lần 2, thêm I213 đến I229), giao diện web 67/67 (71/71 sau lượt rà lần 2, thêm U68 đến U71), thử tải 2/2. **Hai câu ở bản giao 14/11 đã rút lại:** "13 đột biến bắt cả 13" quá lạc quan (lần soát đột biến 102 cái cho thấy 69 bị bắt, 33 sống sót), và "tích hợp 156/156 xanh" chỉ đúng khoảng 30 phút sau khi dựng dữ liệu mẫu, vì test I151 phụ thuộc đồng hồ thật. **Kết luận soát xác nhận của supervisor (Opus) trên commit sửa cuối `5292935`: ĐẠT (PASS).** Supervisor tự chạy lại ma trận của riêng mình: xen một lượt chạy thứ hai trước MỖI lần lấy khoá (6 kiểu ghép, 17, 17, 10, 10, 10 và 10 điểm khoá) cho 0 lượt giao trùng; cắt hoặc báo khoá bận ở MỌI lời gọi dịch vụ (cả menu 1: 1590 điểm; phần giao: 201 điểm; job mỗi giờ làm nốt: 417 và 336 điểm) cho 0 email, 0 thông báo và 0 dòng `RELEASE` thừa, chỉ đúng các cửa sổ đã ghi (9, 4 và 3 điểm); 30 mẫu email dựng ra chữ không đổi (180 trên 180 phép so sánh giống bản trước); các tab nghiệp vụ sau menu 1 trên database 8.1.4 mẫu giống hệt. Còn một cuộc đua thấp, không chặn, có từ trước đợt này: hai lượt menu 1 bấm cách nhau trong khoảng 6 lời gọi dịch vụ, trước lúc phiên bản được ghi nhận, đều có thể giao tóm tắt (2 email, 2 thông báo, RELEASE_LOG gấp đôi); supervisor đánh giá gần như không thể xảy ra trên Google thật. Lời khuyên: bấm menu 1 một lần và chờ hộp thoại hiện. Hỏi "có chạy bản này trên database 8.1.4 đang chạy thật không", supervisor trả lời: có, sau khi chạy thử một lượt trên bản sao STAGING của database thật (BL94). **Chưa chạy trên Google thật** (danh sách việc chỉ kiểm được trong bộ mô phỏng ở mục Giới hạn). BACKLOG còn **55 câu chờ anh** (mục A 52, mục B 3; thêm BL95 ngày 27/11, giao diện 390 px bằng tiếng Anh): 17 câu là của 5R (BL76 đến BL86 và BL89 đến BL94), BL87 và BL88 đã đóng. Hai việc nên quyết trước: **BL89** (PR #2 "gửi email qua Amazon SES" cũng đòi số bản 8.1.5 và xung đột với nhánh này ở 12 file) và **BL76** (chữ chuyển khoản tự mâu thuẫn). Chi tiết: mục "Chunk 5R" dưới đây.
+
+**Trạng thái 12/11/2026: VÁ NỐT 2 MỤC PLAN CÒN THIẾU CỦA 5N VÀ 5O, bản 8.1.8.** Soát lại toàn bộ plan 5J đến 5P bằng 2 sub agent trước khi go live chunk 6 thì thấy 2 mục có tên trong plan nhưng chưa làm, nay đã làm:
+
+* **5N mục 6 (bảng màu trong Hướng dẫn vận hành):** trước đó bảng màu chỉ nằm trong `PROGRESS.md`, còn `HUONG_DAN_VAN_HANH.md` vẫn tả màu CŨ (2 màu), nay SAI so với 8.1.7. Đã viết lại K6 BOOKINGS (6 màu) và K5 STUDENT_PACKAGES (5 màu), mỗi bảng có cột "làm gì để hết màu"; thêm lựa chọn "Đã xử lý (giữ nguyên)" vào bảng `admin_action`, ô CONFIG `REASSIGN_STUCK_HOURS` vào Phần B (99 ô), thông báo `REASSIGN_STUCK` vào Phần J, cột `admin_done_at` vào danh sách cột hệ thống. Hướng dẫn lên bản 8.1.7, có mục "Thay đổi so với bản trước".
+* **5O mục Form (BL22, viền đỏ đúng ô nhập sai):** trước đó chỉ ô số điện thoại có viền đỏ, các ô khác chỉ gộp câu báo vào hộp đỏ phía trên. Nay gửi form thiếu thì tô viền đỏ ĐÚNG ô sai (tên, email, điện thoại, ảnh chuyển khoản, ô đồng ý, nhóm gói), con trỏ nhảy về ô sai đầu tiên, sửa ô nào thì ô đó hết đỏ ngay. Test mới U50 (giao diện web 50/50).
+
+Còn lại trước go live chunk 6: **5P** (xuất 3 hướng dẫn còn lại và 2 chính sách, soát tổng 2 agent, thử tải lại) và phần còn lại của 5Q (BL69). BACKLOG còn **37 câu chờ anh** (mục A 34, mục B 3).
+
+**Trạng thái 07/11/2026: 5N XONG, bản 8.1.7** (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt Chờ đổi tutor; soát chéo 2 agent tìm ra và đã sửa lỗi buổi kẹt không xử lý được). Chi tiết: mục "Chunk 5N" dưới đây. Chunk 5 còn 5P (hợp nhất, chốt v8). BACKLOG còn **38 câu chờ anh** (mục A 34, mục B 4). **Đến lượt anh rà BACKLOG** (đã hẹn sau 5N, 5O).
+
+## Chunk 5R: key trùng, mã QR chuyển khoản, tốc độ, tóm tắt nâng cấp (14/11/2026, bản 8.1.9; soát chéo và sửa 14 đến 15/11)
+
+### Làm gì
+
+Phần này tả code ở commit `5292935` (đã gồm các sửa sau soát chéo). Bản giao đầu (14/11, commit `bbd2aef`) khác ở những chỗ ghi rõ "sau soát" dưới đây.
+
+**T1. Hết dòng trùng key ở EMAIL_TEMPLATES (và CONTENT)**
+
+* Triệu chứng anh gặp trên file thật: tab EMAIL_TEMPLATES có từng cặp 2 dòng cùng key (LOGIN_LINK, REG_RECEIVED).
+* **Gốc lỗi đã chứng minh:** khi thêm dòng mặc định, menu 1 tra key bằng so khớp tuyệt đối, còn khi gửi thư thì key được cắt khoảng trắng đầu cuối. Một ô key có khoảng trắng thừa làm menu 1 thêm dòng thứ hai. Ngoài ra khi gửi thư dùng dòng CUỐI, còn phần logic menu dùng dòng ĐẦU, nên hai nơi hiểu khác nhau.
+* **Đã sửa:** tra key sau khi cắt khoảng trắng; hai nơi dùng chung một dòng. Menu 1 tự **gộp** dòng trùng ở EMAIL_TEMPLATES và CONTENT thành một dòng ở vị trí đầu: chữ admin đã sửa thắng chữ mặc định hoặc ô trống; hai dòng cùng có chữ admin khác nhau thì dòng CUỐI (dòng 8.1.4 thật sự dùng khi gửi) thắng.
+* **Chữ admin bị bỏ khi gộp luôn lưu ĐỦ (sau soát):** ở tab ACTIVITY_LOG, hành động `TEMPLATE_DEDUPE_TEXT`, ghi xuống Sheets TRƯỚC khi ghi đè bất kỳ dòng nào. Mỗi lượt gộp một tab có mã `run` (cũng nằm ở dòng tóm tắt `TEMPLATE_DEDUPE`, dòng này không chứa chữ); chữ dài chia mảnh 19.000 ký tự (`part`, `parts`) để ô không vượt giới hạn và trang quản trị hiện đủ. Hộp thoại menu 1 chỉ hiện 300 ký tự đầu của chữ bị bỏ và nói chỗ lấy bản đủ (cách ghép lại: `HUONG_DAN_VAN_HANH.md` Phần F). Bản giao đầu chỉ ghi bản cắt ngắn ở kết quả menu 1: chữ dài của anh có thể mất thật.
+* **Cột `active` của mẫu email theo dòng CUỐI (sau soát):** 8.1.4 đọc dòng cuối khi gửi thư, nên gộp không được đổi việc một email đang gửi hay đang tắt. Nếu các dòng trùng nói khác nhau về `active`, menu 1 ghi riêng dòng "CHÚ Ý QUAN TRỌNG: mẫu email <key> có nhiều dòng nói KHÁC NHAU về ô active ..." (cũng vào RELEASE_LOG và email tóm tắt). Bản giao đầu coi chữ `FALSE` ở bất kỳ dòng nào là "anh đã sửa" và cho thắng, nên có thể tắt một email mà 8.1.4 đang gửi.
+* **Sao lưu trước nâng cấp hỏng thì không gộp key nào sẽ bỏ chữ admin (sau soát):** để nguyên các dòng trùng, ghi "CẢNH BÁO: KHÔNG gộp key trùng ...", menu 2 vẫn nhắc. Gộp xong mà bị ngắt giữa chừng: dòng "CẢNH BÁO: gộp dở ..." trỏ tới chữ đã lưu; chạy lại menu 1 để gộp nốt.
+* Gộp CONTENT lấy `default_vi`, `default_en` từ CÙNG dòng với chữ `vi`, `en` đã chọn (sau soát), nếu không lần gieo chữ sau coi ô chưa sửa là "anh đã sửa" và không bao giờ nâng chữ gốc mới.
+* Menu 2 và menu **Cập nhật nội dung web và email** báo khi một key xuất hiện 2 lần.
+* **Anh cần biết hệ quả:** nếu dòng đầu có chữ anh sửa mà dòng cuối là chữ mặc định, thì sau khi gộp chữ anh sửa trở thành chữ thật sự được gửi (ví dụ thân tiếng Anh của REG_RECEIVED bắt đầu "Thaiput received"). Đó là chữ anh đã viết, nhưng trước đây thư gửi đi dùng dòng cuối, nên thư có thể đổi nội dung sau lần menu 1 này. Đọc lại các mẫu sau menu 1 (Việc của admin, bước 6).
+* Test: I141 đến I145 (bản đầu); sau soát: I159 đến I162, I164, I175 đến I179, I190 đến I193.
+
+**T2. Khung chuyển khoản mới, có mã QR**
+
+* Khung ở trang đăng ký và trang gia hạn của học viên dùng chung một hàm dựng (`T.bankPanel`). Có ô QR vuông: 200 x 200 px trên điện thoại (nằm giữa, dưới các dòng tài khoản), 184 x 184 px trên máy tính (cột phải của khung). Ô CONFIG trống thì không hiện ô QR; `BANK_ACCOUNT` trống thì không dựng khung (kể cả khi có ảnh).
+* Dòng lưu ý (key `h.bank_note`) thành khung nổi: chữ khoảng 16,8 px, đậm 700, nền vàng nhạt, vạch vàng bên trái, ở cả hai ngôn ngữ. Chữ mặc định mới: "Nội dung chuyển khoản: vui lòng chỉ ghi số điện thoại của bạn." và "Transfer reference: Please enter only your phone number." Chữ anh đã sửa trong CONTENT được giữ. Key mới `h.bank_qr_alt`.
+* Ô CONFIG mới **`BANK_QR_IMAGE`**: link chia sẻ Drive hoặc mã file của ảnh. Máy chủ đọc file (png, jpeg, webp, gif; tối đa 300 KB) bằng `bankQrRead_`, nhớ đệm tối đa 6 giờ (mảnh 90.000 ký tự, dưới giới hạn 100 KB của CacheService; lỗi chỉ nhớ 300 giây); trình duyệt tải ảnh SAU khi khung đã hiện, qua API công khai `apiBankQr` (không đăng nhập, chỉ đọc), nên trang không chậm đi. `apiPublicInfo` chỉ mang dấu ngắn 10 ký tự (`qr`), JSON khởi động không mang gì về ngân hàng; cả hai không mang mã file hay ảnh. Menu 2 báo: trống, hợp lệ (loại, KB), hoặc hỏng (mã lỗi và cách sửa).
+* **Ảnh mới hiện ngay, không chờ 6 giờ (sau soát):** số phiên bản ảnh nằm ở Script Property `BANK_QR_REV`, là một phần của dấu (`bankQrMarker_`) và của khoá bộ nhớ đệm máy chủ lẫn khoá ảnh trong trình duyệt (bộ nhớ của tab, theo dấu máy chủ trả về). Số này tăng bởi 3 đường: (1) mỗi lần chạy **menu 2**; (2) sửa tay ô `BANK_QR_IMAGE`, `BANK_NAME`, `BANK_ACCOUNT` hoặc `BANK_HOLDER` ở tab CONFIG (trigger sửa tay; đổi tài khoản mà còn QR cũ là chuyển nhầm tiền); (3) menu mới **thaiput → Email → Làm mới ảnh QR chuyển khoản (sau khi thay file ảnh)** (ghi nhật ký `BANK_QR_REFRESH`). Đổi LINK thì dấu đổi nên ảnh mới hiện ngay như trước. Bản giao đầu chỉ có cách đổi LINK; thay nội dung file cùng link thì khách thấy QR của tài khoản cũ tới 6 giờ (đây là BL87, nay đã đóng; phần còn lại là BL90).
+* Test: U51, I146 (bản đầu); sau soát: I165, I180 đến I182, I194, U55 đến U61, U66.
+
+**Phê bình ý anh muốn dán ảnh THẲNG VÀO ô CONFIG, và quyết định**
+
+Anh muốn chèn ảnh vào ô của tab CONFIG. Không làm, 3 lý do:
+
+1. Apps Script không đọc được nội dung ảnh nằm trong ô; chỉ lấy được một link tạm của Google, hết hạn hoặc trả về rỗng. Web không có gì để gửi cho học viên.
+2. Cột `value` của CONFIG là chữ; `cfg_` và bộ nhớ đệm CONFIG 60 giây chỉ chứa chữ, không chứa đối tượng ảnh.
+3. Nhật ký sửa tay (`logSheetEdit_`, luật 52) sẽ gặp một đối tượng ảnh thay vì chữ.
+
+Cách đã chọn: ảnh là một file trên Drive, ô CONFIG giữ link. Anh vẫn làm đúng việc chỉ một chỗ (dán link), và ảnh nằm ngoài Sheets nên không làm file dữ liệu nặng thêm.
+
+**T3. Tăng tốc tải trang**
+
+Kiểm toàn bộ đường tải rồi làm 5 mục an toàn: (1) stylesheet Google Fonts không còn chặn hiển thị và lượt gọi máy chủ đầu tiên; (2) khung chờ tĩnh trong `#app` nên có gì đó hiện trước khi chạy script; (3) ảnh bìa có sẵn rộng và cao (không giật bố cục); (4) cổng tutor tải trước giờ rảnh ở nền, mở tab Giờ rảnh là hiện ngay khi dữ liệu còn mới (dưới 60 giây); bản tải trước gắn với phiên của đúng tutor đã tải nó (sau soát: tutor khác vào cùng tab không bao giờ thấy giờ rảnh của người trước); (5) đọc tab tính sẵn bộ chuẩn hoá từng cột (nhanh hơn khoảng 9 phần trăm trên tab 5.000 dòng trong bộ mô phỏng). Test U52, U53, I147; sau soát U54, U62 đến U65, U67.
+
+**Một lỗi tutor có từ 8.1.4, sửa trong lượt soát:** ở trang tutor, phản hồi tải giờ rảnh tới muộn (sau khi tutor đổi tab rồi mở lại và chọn giờ chưa lưu) ghi đè giờ vừa chọn, rồi nút Lưu không gửi gì. Đã chặn phản hồi cũ (đối chiếu `git diff` Tutor.html giữa `origin/main` và HEAD: hàm `drawAvail` của 8.1.4 gán `st.av`, `st.dirty` cho mọi phản hồi, không kiểm lượt vẽ). Test U62, U67.
+
+Số đo khi kiểm toán: `Index.html` dựng xong khoảng 290 KB, khoảng 125 KB nén, trong đó ảnh bìa nhúng khoảng 74 KB (59 phần trăm). Trang chủ cần 1 lượt gọi máy chủ (`apiPublicInfo`); cổng học viên và cổng tutor mỗi nơi 1 lượt. Các mục tối ưu lớn hơn (nén ảnh bìa, nhúng thông tin công khai vào trang đầu, kéo dài bộ nhớ đệm, gửi email link ngoài khoá...) cần anh quyết: BL77 đến BL84. Con số tăng tốc vẫn là ước lượng cho tới khi đo trên Google thật.
+
+**T4. Bản 8.1.9 và tóm tắt nâng cấp**
+
+* Đóng số bản 8.1.9, ngày 14/11/2026 (đầu `Code.gs`, dòng đầu menu 1, JSON khởi động, `package.json`).
+* `RELEASE_NOTES_` trong code giữ ghi chú của 8.1.5 đến 8.1.9. Khi menu 1 thấy phiên bản đã đổi trên file đã có dữ liệu, nó lập **tóm tắt**: ghi chú tĩnh của mọi bản sau bản đang chạy, cộng những gì lượt chạy THẬT SỰ làm (khoá CONFIG thêm, khoá CONFIG lạ chỉ báo không xoá, dòng CONTENT thêm, chữ mặc định làm mới ở ô admin chưa sửa, chữ admin được giữ khi mặc định đổi, mẫu email thêm, dòng trùng gộp, cột và tab thêm). Tóm tắt đi ba đường: hộp thoại menu 1, tab mới **RELEASE_LOG** (chỉ ghi thêm), và MỘT thông báo `RELEASE_NOTES` cùng MỘT email (mẫu `ADMIN_RELEASE_NOTES`, tới `ADMIN_EMAIL`) mỗi lần đổi phiên bản. Menu mới **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này**. Khoá CONFIG mới được thêm ghi chú "Mới ở <bản>: ..." ở cột note; giá trị và ghi chú đã có không bao giờ bị ghi đè. Trên bộ dữ liệu mẫu 8.1.4, RELEASE_LOG có 64 dòng (44 mục ghi chú cộng 20 mục đo thật).
+* **Giao bền (sau soát):** bản ghi `RELEASE_PENDING` trong Script Properties (tối đa 12 phần, mỗi giá trị dưới 8.000 byte UTF-8) được ghi CÙNG một lệnh với dấu phiên bản. Năm đường giao có trạng thái riêng: nhật ký `RELEASE`, tab RELEASE_LOG, thông báo, email, dòng MAIL_LOG của email. Khoá bận, bị Google cắt giữa chừng hay email lỗi thì menu 1 lần sau (cùng phiên bản; hộp thoại ghi "TIẾP TỤC giao tóm tắt cập nhật bản ...") hoặc job mỗi giờ làm nốt đúng phần thiếu, không làm lại phần đã xong; khi còn đường chưa xong hộp thoại ghi "CÒN DỞ (...)". Bản giao đầu ghi nhận phiên bản rồi mới giao: cắt giữa chừng là mất tóm tắt vĩnh viễn.
+* **Email gửi đúng một lần (sau soát):** email đi qua `sendTpl_` (luật 32; tuỳ chọn mới `opts.beforeSend`, `opts.collect`). Lượt chạy nhận việc gửi trong khoá (dấu 4 ghi bền) TRƯỚC khi gửi, nên một bản ghi không bao giờ cho hai email (bấm menu 1 hai lần sát nhau vẫn có thể sinh hai bản ghi, BL94). Mỗi đường giao (nhật ký `RELEASE`, RELEASE_LOG, thông báo, email, dòng MAIL_LOG) còn đọc lại bản ghi đang lưu TRONG khoá của nó (`sync`), ghi và đánh dấu trong cùng khoá, và một bản ghi đã được lượt khác giao xong thì lượt này không bao giờ ghi lại (`gone`); việc nhận gửi cũng kiểm mốc ghi nhận `at`. Lượt đến sau trong hộp thoại ghi "một lượt chạy khác đã giao (hoặc đang giao) tóm tắt này". Bản ghi chưa niêm phong còn sót thì menu 1 cùng phiên bản hoặc job mỗi giờ dọn. Email lỗi thật thì thử lại tối đa 5 lần rồi báo MỘT thông báo `MAIL_FAILED` chỉ chỗ đọc tóm tắt; khoá bận không tính là lần lỗi. Đường dòng MAIL_LOG cũng bỏ cuộc sau 5 lỗi thật (ghi log, không nuốt im). Nếu một lượt bị ngắt đúng khoảng hẹp từ lúc nhận việc tới lúc Google nhận thư, hoặc ngay sau khi Google nhận thư, anh có thể KHÔNG nhận email, hoặc nhận email mà vẫn có thông báo "có thể đã hoặc chưa gửi"; trong cả hai trường hợp chỉ MỘT thông báo và tóm tắt nằm ở tab RELEASE_LOG (quyết định: thà thiếu email còn hơn gửi trùng, BL93).
+* **Chạy lại menu 1 cùng phiên bản:** khi mọi đường giao đã xong thì im lặng: không tóm tắt, không dòng RELEASE_LOG, không email, không thông báo, không sao lưu thêm; chỉ thêm đúng một dòng `SETUP_RUN` ở ACTIVITY_LOG (luật 11), và lần chạy lại đầu tiên (lượt 2 trong test I155) cập nhật một ô META (mốc mã thông báo) cho kịp thông báo vừa tạo (test I155). Khi còn đường chưa giao xong thì KHÔNG im lặng: nó làm nốt và nói rõ.
+* **Số đo của menu 1 bị ngắt giữa chừng được giữ (sau soát)** qua các lượt, nên tóm tắt cuối vẫn đủ.
+* **Khoá CONFIG có khoảng trắng thừa hoặc ký tự vô hình (sau soát):** khoá được so khớp sau khi chuẩn hoá (`cfgKeyNorm_`: bỏ U+200B, U+200C, U+200D, U+2060, U+FEFF rồi cắt khoảng trắng), ô khoá được cắt gọn và báo, nên menu 1 không còn thêm dòng mặc định trống đè giá trị của anh. Hai dòng chỉ khác nhau ở khoảng trắng hoặc ký tự vô hình: giữ cả hai, không xoá, không tự đổi giá trị, báo ở menu 1 và menu 2. Dòng có hiệu lực là dòng CUỐI trong các dòng có khoá sạch; dòng chỉ khác ở ký tự vô hình chỉ là dự phòng, nên nếu nó nằm SAU khoá sạch thì dòng khoá sạch vẫn là dòng được dùng (câu báo nêu đúng số hàng). Nếu dòng đang có hiệu lực mang giá trị mặc định hoặc trống trong khi dòng kia có giá trị khác thì thêm câu "CHÚ Ý" nêu số hàng và cách sửa tay (BL91).
+* Menu 1 cũng dọn mốc bỏ dòng dở `PURGE_OPEN_<tab>` còn sót từ lần bỏ dòng bị cắt (trước đây báo nhầm "tab bị sửa tay").
+* **Bằng chứng nâng cấp:** một database 8.1.4 đầy đủ (dựng bằng chạy chính code 8.1.4) được nâng bằng menu 1 của 8.1.9 trong test I151 đến I157, so từng ô (bảng dưới); PACKAGES, USERS, REGISTRATIONS, STUDENT_PACKAGES, PAYMENTS, AVAILABILITY, AUTH, METRICS, MARKETING_EMAILS không đổi một ô nào, BOOKINGS chỉ thêm tiêu đề cột. Dán code mới mà chưa chạy menu 1 thì trang, đăng nhập, đặt, huỷ, job vẫn chạy (I151). Sau soát, dữ liệu mẫu không còn phụ thuộc đồng hồ thật (I158). Đây là bằng chứng trong bộ mô phỏng, chưa phải trên Google thật.
+* Không đổi `appsscript.json` (quyền Drive đã có). Số trigger vẫn 8.
+
+### Ảnh QR: thông số cho admin
+
+| Mục | Giá trị |
+|---|---|
+| Định dạng | PNG (nhận cả JPG, WEBP, GIF) |
+| Kích thước | **600 x 600 px**, VUÔNG đúng 1:1 |
+| Cắt | Cắt sát thẻ QR nền trắng, gồm cả logo ngân hàng |
+| Lề trắng | Ít nhất 16 px mỗi cạnh |
+| Dung lượng | Dưới 300 KB (khuyên dưới 150 KB) |
+| Hiện trên web | 200 x 200 px trên điện thoại (giữa, dưới các dòng tài khoản); 184 x 184 px trên máy tính (cột phải của khung) |
+| Ô CONFIG | `BANK_QR_IMAGE`: link chia sẻ Drive hoặc mã file. Trống = không hiện ô QR |
+| Kiểm | Menu 2: trống (thông tin), hợp lệ (loại, KB), hoặc hỏng (mã lỗi và cách sửa) |
+| Đổi ảnh | Đổi LINK: hiện ngay. Thay nội dung file giữ nguyên link: chạy **menu 2** hoặc menu **Email → Làm mới ảnh QR chuyển khoản**, hoặc sửa tay một trong 4 ô `BANK_QR_IMAGE`, `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER` thì hiện ngay; không làm cách nào thì tới 6 giờ (BL90) |
+
+### Soát chéo và sửa (14 đến 15/11)
+
+Anh yêu cầu soát gắt bản 8.1.9 với supervisor Opus. Bản giao 14/11 (commit `bbd2aef`) chỉ có một orchestrator và mỗi việc một worker, nên luật "Soát" của CLAUDE.md chưa được áp dụng (BL88, nay đóng). Lượt soát dưới đây đã áp dụng. Thứ tự và kết quả:
+
+| Ai | Làm gì | Kết quả |
+|---|---|---|
+| A1 (chỉ đọc) | Kiểm mọi sản phẩm của 5O (8.1.5, 8.1.6), 5N (8.1.7) và bản vá 8.1.8 còn nguyên trong `src/` và `dist/` ở 8.1.9 | Đủ. Trong 322 dòng thêm giữa 8.1.4 và 8.1.8, ở 8.1.9 chỉ 2 dòng khác đi (số phiên bản; dòng ảnh bìa có thêm rộng và cao). Không test nào bị xoá, đổi tên hay làm yếu bởi 5R. 0 khai báo cấp cao trùng trong 846 tên (673 hàm và 173 biến; đếm lại 27/11 bằng bộ phân tích cú pháp acorn trên từng file `src/*.gs`, 38 file; số 797 của lượt A1 dùng cách đếm khác), 0 khoá object trùng. `dist/` dựng lại giống từng byte. `appsscript.json` không đổi từ 8.1.4. Lịch sử git thẳng |
+| X1 (Opus) | Soát chéo 5R | REVISE: có lỗi thật |
+| X2 | Soát bằng đột biến và vận hành: 102 đột biến của `src/` | 69 bị test bắt, 33 sống sót, trong đó 9 đột biến tương đương (đổi code mà hành vi không đổi) nên 24 là lỗ hổng test thật; thêm lỗi vận hành thật (bảng dưới) |
+| Vòng sửa 1 | Commit `45f6285` (sửa các lỗi của lượt soát chéo đầu) | Supervisor S1: REVISE, 1 trung bình và 7 thấp, đã áp dụng hết ở commit `9b49cdc` |
+| Vòng sửa 2 | Commit `84a0b96` (lỗi vận hành và đột biến của X2) | Supervisor S2: REVISE, 2 cao, 2 trung bình và các mục thấp, đã áp dụng hết ở commit `c59cbce` |
+| Soát vòng 3 | Supervisor (Opus) soát hai commit sửa `9b49cdc` và `c59cbce` | REVISE: 1 lỗi chặn, 1 trung bình và các mục thấp, đã áp dụng hết ở commit `5292935`. Lỗi chặn: job mỗi giờ hoặc một lượt menu 1 thứ hai chen vào giữa lúc niêm phong bản ghi và lúc nhận gửi email có thể làm admin nhận 2 email tóm tắt, 2 thông báo `RELEASE_NOTES`, RELEASE_LOG gấp đôi (122 dòng thay vì 61) và 2 dòng nhật ký `RELEASE`; dữ liệu nghiệp vụ không bị ảnh hưởng |
+| Vòng sửa 3 | Commit `5292935` (lỗi chặn và các mục của vòng soát 3) | Xem hàng 25 đến 29 của bảng lỗi |
+| Soát xác nhận | Supervisor (Opus) soát lại commit `5292935` và tự chạy lại các ma trận của mình | ĐẠT (PASS), chỉ còn một cuộc đua thấp, không chặn, có từ trước (BL94); chi tiết ở dòng đầu file này |
+| Rà lại 26/11 | Opus rà lại commit `8f08d3d` (không có commit mới từ 15/11) | ĐẠT: `npm test` 34/34, 46/46, 211/211, 67/67, 2/2; `npm run build` không làm lệch `dist/`; CI xanh; 320 trên 322 dòng thêm từ 8.1.4 tới 8.1.8 còn nguyên ở 8.1.9 (2 dòng khác: số phiên bản, thẻ ảnh bìa thêm kích thước); các dòng 5R xoá hoặc thay của bản cũ đều đã chuyển chỗ (menu 1 vẫn chạy `migrate5M_`, thêm luật thông báo, điền `name_en`, tô màu); `dist/Code.gs` và 8 đoạn script của `dist/Index.html` hợp lệ cú pháp; `appsscript.json` không đổi từ 8.1.4. Phát hiện mới: số điện thoại không bắt buộc nên dòng đậm "chỉ ghi số điện thoại" không dùng được cho học viên bỏ trống số (ghi thêm vào BL76) |
+| Rà lại lần 2, 26 đến 27/11 | Opus rà lại lần nữa: dựng thật bằng Playwright 5 trang x 2 chiều rộng x 2 ngôn ngữ, có QR và không QR; kiểm sự thật tài liệu (338 nhóm khẳng định); thử lại đột biến | ĐẠT: Playwright 0 tràn ngang, 0 khoá chữ thô, 0 lỗi console; kiểm tài liệu 338 nhóm khẳng định. Sửa ở commit này (F1 đến F16): F1 chú thích bảng số của tutor `t.stats_note` hứa tự tính Hoàn thành sau 24 giờ, sai luật 55, **là lỗi sản phẩm duy nhất phải sửa ngay (BL95 là lỗi giao diện nhỏ, để BACKLOG), có từ 8.1.4** (chữ gốc mới, ghi chú phát hành, test I213, các test nâng cấp I149 đến I157 cập nhật đúng phần làm mới này, comment cũ ở `Jobs.gs`); F2 ghi chú phát hành và tài liệu nói đúng ngoại lệ BL94 về email gửi hai lần; F3 đến F5, F7 đến F12 chữ tài liệu cho khớp mã (trỏ mục 3A.4, mẫu REG_RECEIVED và ADMIN_NEW_REG ở BL76, cách gộp key, chữ hộp thoại sao lưu, danh sách test I197 đến I210, mốc META lần chạy lại đầu, JSON khởi động, phạm vi BL90); F6 chữ nói ACTIVITY_LOG sang file lưu trữ sau LOG_KEEP_DAYS; F13 nhãn `CONFIG_KEY_TWIN` đúng luật dòng có khoá sạch; F14 số, ngày, đếm 846 tên; F15 bỏ khai báo `xWindows` chết trong `test/integration.js`; F16 thêm BL95. Thử lại đột biến: thử phá lại trên mã cuối: 144 đột biến (ít nhất 13 mỗi vùng), bắt 116, lọt 28 (4 tương đương, 24 là khe test); thêm 19 test vá (I214 đến I229, U68 đến U70), supervisor xác nhận không có lỗi sản phẩm mức cao; sửa thêm một lỗi nhỏ: ảnh QR bị ẩn tới khi tải lại trang nếu lần tải ảnh hỏng vì mạng (test U71); sửa test I166 lúc đỏ lúc xanh (đồng hồ thật chen giữa lúc ghi và lúc đọc bộ nhớ đệm) |
+
+**Danh sách lỗi và việc đã làm.** Cột "Mức" là ước lượng của người viết tài liệu theo hậu quả (cao: mất chữ hoặc dữ liệu của admin, gửi trùng hoặc đổi việc gửi thư; trung bình: hiện hoặc báo sai, rò rỉ, bằng chứng test sai; thấp: gọn gàng, tài liệu). Mức do từng reviewer chấm riêng cho từng lỗi không có trong tay tôi; chỉ có số đếm theo vòng ở bảng trên.
+
+| # | Lỗi (hậu quả nếu không sửa) | Mức | Đã làm | Test |
+|---|---|---|---|---|
+| 1 | Test I151 phụ thuộc đồng hồ thật: dữ liệu mẫu lưu mốc theo đồng hồ thật (nhịp tim job, `BACKUP_OK_AT`, `MET_LAST`), khoảng 30 phút sau khi dựng thì trang health báo STALE và test đỏ. "156/156 xanh" chỉ đúng khoảng 30 phút | Trung bình (bằng chứng sai) | Nạp dữ liệu mẫu dời mốc đồng hồ thật về "bây giờ" theo TÊN khoá (`rebaseRealClock`); khoá mốc thời gian chưa phân loại thì ném lỗi | I158 |
+| 2 | Chữ admin bị bỏ khi gộp key chỉ hiện bản cắt ngắn ở kết quả menu 1: chữ dài của anh mất thật | Cao | Lưu ĐỦ ở ACTIVITY_LOG `TEMPLATE_DEDUPE_TEXT`, ghi xuống Sheets TRƯỚC khi ghi đè; mã `run` để ghép đúng lượt; mảnh 19.000 ký tự vừa trang quản trị; báo "gộp dở" | I159, I160, I190 đến I192 |
+| 3 | Sao lưu trước nâng cấp hỏng mà vẫn gộp bỏ chữ admin | Cao | Không gộp key nào sẽ bỏ chữ admin khi sao lưu hỏng; CẢNH BÁO; menu 2 vẫn nhắc | I161 |
+| 4 | Cột `active` của mẫu trùng: dòng nào ghi FALSE thì thắng, trong khi 8.1.4 gửi theo dòng cuối; gộp có thể tắt một email đang gửi | Cao | `active` theo dòng cuối, hai chiều; dòng "CHÚ Ý QUAN TRỌNG" riêng; `emailActiveOn_` khớp biểu thức của 8.1.4 | I162, I193 |
+| 5 | Ảnh QR cũ sống tới 6 giờ sau khi thay file cùng link (đổi tài khoản ngân hàng mà khách còn thấy QR cũ) | Cao | `BANK_QR_REV` trong dấu, khoá bộ nhớ đệm máy chủ và trình duyệt; tăng bởi menu 2, sửa tay 4 ô CONFIG, menu Làm mới ảnh QR; số mới lấy từ UUID, không từ đồng hồ; ảnh nhớ theo dấu máy chủ trả về | I165, I194, U60, U61, U66 |
+| 6 | Bản ghi `RELEASE_PENDING` cắt theo ký tự: chữ Việt có dấu vượt 9 KB mỗi giá trị của Script Properties thì mất mục hoặc lỗi ghi | Trung bình | Cắt theo byte UTF-8; phần quá 8.000 byte sang `RELEASE_PENDING_1`, `_2`...; báo mục không lưu hết | I163, I171, I187 |
+| 7 | Gộp CONTENT: `default_vi`, `default_en` lấy từ dòng đầu trong khi `vi`, `en` lấy từ dòng khác; lần gieo sau không bao giờ nâng chữ gốc mới | Thấp | Lấy cùng dòng với chữ đã chọn | I164 |
+| 8 | Bản giờ rảnh tutor tải trước không gắn với phiên: tutor B vào cùng tab trong 60 giây có thể thấy giờ rảnh của tutor A | Trung bình (rò rỉ giữa hai người dùng chung máy) | Gắn bản tải trước với phiên đã tải; quên dữ liệu người trước khi đổi phiên | U54, U63 đến U65 |
+| 9 | Tóm tắt nâng cấp không bền: ghi nhận phiên bản rồi mới giao, nên khoá bận hoặc Google cắt giữa chừng làm mất tóm tắt, RELEASE_LOG, thông báo, email vĩnh viễn | Cao | Bản ghi `RELEASE_PENDING` ghi cùng lệnh với dấu phiên bản; 5 đường giao có trạng thái riêng; làm nốt bằng menu 1 hoặc job mỗi giờ | I166 đến I169, I197 đến I199 |
+| 10 | Số đo của menu 1 bị ngắt mất, vì lượt sau không còn gì để đo (dữ liệu đã đổi) | Trung bình | Ghi bền số đo từng bước, gộp không trùng qua các lượt | I170, I171, I188 |
+| 11 | Khoá CONFIG có khoảng trắng thừa ("BANK_NAME "): menu 1 thêm dòng mặc định trống ở dưới và dòng đó thắng, giá trị của anh biến mất khỏi trang (theo ghi chú trong code, đây là kiểu hỏng đã có ở menu 1 bản 8.1.4) | Cao | So khớp khoá sau chuẩn hoá, cắt gọn ô khoá, báo; hai dòng song sinh giữ cả hai và báo, không đoán | I172, I173, I200 đến I202 |
+| 12 | Mốc `PURGE_OPEN` sót sau lần bỏ dòng bị cắt: báo nhầm "tab bị sửa tay" | Thấp | Menu 1 và job mỗi giờ dọn khi tab nhất quán; tab thật sự bị sửa thì không xoá gì và báo Khẩn | I174, I207 |
+| 13 | Mock CacheService lỏng hơn Google (luật 14): bộ test tự tin hơn thực tế | Trung bình | Mock nghiêm như Google: mục hết hạn trả null, giá trị phải là chữ, khoá không trống, hạn 1 đến 21.600 giây; mock Script Properties giữ hạn mức tổng 500 KB | I166, I203 |
+| 14 | Tutor: phản hồi tải giờ rảnh tới muộn xoá giờ vừa chọn chưa lưu, nút Lưu không gửi gì (có từ 8.1.4) | Trung bình | Chặn phản hồi của lượt vẽ cũ | U62, U67 |
+| 15 | Khoá bận đúng lúc ghi MAIL_LOG sau khi Google ĐÃ nhận email: menu 1 nói sai "CHƯA gửi" và lượt sau gửi LẦN HAI | Cao | Dòng MAIL_LOG giao qua bản ghi bền, khoá bận không tính là lần lỗi | I196 |
+| 16 | Hai lượt chạy cùng lúc (job và menu, ...) cùng gửi email: hai email | Cao | Nhận việc gửi trong khoá (dấu 4) trước khi gửi; lượt sau thấy dấu 4 thì không gửi, báo một thông báo trung thực. Chưa đủ: xem hàng 25 | I199, I210 |
+| 17 | Dòng nhật ký ghi trong khoá của job mỗi giờ chưa xuống Sheets mà đã đánh dấu đường giao xong | Trung bình | Ghi xuống Sheets rồi mới đánh dấu | I197 |
+| 18 | Khoá CONFIG cũ có khoảng trắng bị cập nhật hai lần trong một lượt (cắt khoá rồi ghi chú "Không dùng từ"): menu 1 ném lỗi "không thấy dòng" | Trung bình | Menu 1 không ném lỗi "không thấy dòng"; khoá đổi tên được chép trong cùng lượt | I200 |
+| 19 | Hai dòng CONFIG song sinh mà giá trị của anh nằm ở dòng KHÔNG có hiệu lực (dòng đang dùng mang mặc định hoặc trống) mà chỉ báo chung chung | Trung bình | Thêm câu "CHÚ Ý" nêu số hàng và cách sửa tay; hệ thống không tự đổi giá trị đang chạy | I201 |
+| 20 | Khoá CONFIG có ký tự vô hình (U+200B, U+200C, U+200D, U+2060, U+FEFF) hoặc dấu cách không ngắt U+00A0 | Trung bình | Chuẩn hoá `cfgKeyNorm_` | I202 |
+| 21 | Bản ghi giao có thể phình vượt kho Script Properties 500 KB | Thấp | Tối đa 12 phần; phần quá đếm vào `trunc` và báo "MEASURED_TRUNCATED" | I203 |
+| 22 | Giao nốt tóm tắt của bản trước bị bỏ phần nào thì biến mất im lặng; bản ghi chưa niêm phong mồ côi | Trung bình | Một thông báo trung thực; không để bản ghi mồ côi | I204, I205 |
+| 23 | Cờ `--same-version` của `release_baseline.js` (ghi lại baseline khi mặc định đổi mà số bản không đổi) chưa buộc gõ kèm đúng số phiên bản hiện tại; dễ ghi baseline nhầm cho một bản đã phát hành | Thấp | Phải kèm đúng `APP.VERSION` hiện tại | I195 |
+| 24 | Các lỗ hổng test do đột biến sống sót (key trùng nhiều dòng, ảnh QR, lỗi bất ngờ khi dựng tóm tắt, quá 400 mục, khoá CONFIG lạ...) | Thấp đến trung bình | Test mới mang tên đột biến (M07 đến M90 trong tiêu đề): chạy khô `seedContent_`, mốc `PURGE_OPEN`, quay về 8.1.4 rồi nâng lần hai, khoá bận ở mọi đường | I175 đến I189, I205 đến I209, U55 đến U59 |
+| 25 | Hai lượt chạy chen nhau (job mỗi giờ hoặc menu 1 thứ hai chạy giữa lúc niêm phong bản ghi và lúc nhận gửi email, rồi ghi lại bản ghi cũ): admin nhận 2 email tóm tắt, 2 thông báo `RELEASE_NOTES`, RELEASE_LOG gấp đôi, 2 dòng `RELEASE`. Dữ liệu nghiệp vụ không bị ảnh hưởng | Cao (lỗi chặn của vòng soát 3) | Mỗi đường đọc lại bản ghi trong khoá (`sync`), ghi và đánh dấu trong cùng khoá; bản ghi đã giao xong và bị xoá không bao giờ được ghi lại (`gone`); nhận gửi kiểm cả mốc `at`; hộp thoại nói "một lượt chạy khác đã giao"; bản ghi chưa niêm phong mồ côi bị menu 1 cùng phiên bản hoặc job mỗi giờ dọn | I210 |
+| 26 | Đường dòng MAIL_LOG nuốt lỗi thật im lặng và thử mãi | Trung bình | Ghi log, đếm lỗi, bỏ cuộc sau 5 lần (báo admin một lần, xoá bản ghi) | I212 |
+| 27 | Email tóm tắt gọi thẳng `sendMail_` thay vì `sendTpl_` (trái luật 32) | Thấp | Đi qua `sendTpl_` với `opts.beforeSend` (nhận việc gửi trước khi gọi Google) và `opts.collect` | I210 đến I212 (đường gửi mới), `src/EmailTemplates.gs` |
+| 28 | Khoá CONFIG có ký tự vô hình nằm SAU khoá sạch: câu báo vẫn nói "dòng CUỐI có hiệu lực" (sai: dòng khoá sạch mới được dùng) | Thấp | `cfgTwinText_` nêu đúng dòng có hiệu lực; menu 1 nhắc cả khoá có ký tự vô hình | I211, I212 |
+| 29 | Giao nốt bản ghi bản trước còn dở chỉ ở đường MAIL_LOG: thông báo không nêu đúng đường, danh sách có thể trống | Thấp | Thêm đường `mlog`, danh sách không bao giờ trống | I212 |
+
+**Thử phá (đột biến), nói thẳng.** Con số "13 đột biến bắt cả 13" của bản giao đầu quá lạc quan: chỉ 13 đột biến, chọn theo test đã có. Lần soát độc lập bằng 102 đột biến cho 69 bị bắt (khoảng 68 phần trăm), 33 sống sót, trong đó 9 là tương đương, tức 24 lỗ hổng test thật. Các test mới ở hàng 24 viết ra để bắt các đột biến sống sót đó. Tôi KHÔNG có số đo lại trọn bộ 102 đột biến sau khi thêm test: chưa có bằng chứng "đột biến sống sót còn bao nhiêu", chỉ biết các test mới đang xanh.
+
+**Bài thử cắt ngang (kill matrix), nói bằng lời.** Bộ mô phỏng giả vờ Google ngắt lượt chạy, hoặc báo "hệ thống bận" (khoá), ở MỌI lời gọi dịch vụ Google trong lượt giao tóm tắt, rồi cho các lượt sau (job mỗi giờ, menu 1) chạy tiếp tới khi yên và kiểm: có đúng một thông báo, một dòng `RELEASE`, RELEASE_LOG đủ và không trùng, không bao giờ hai email từ một bản ghi (hai lượt bấm menu 1 thật sát nhau thì khác, BL94). Kết quả ở commit `5292935` theo test I197, I198, I210 (số điểm cắt do từng test tự đếm khi chạy; ma trận của supervisor bọc nhiều lời gọi dịch vụ hơn của test nên số điểm của hai bên khác nhau, số của supervisor ghi ở dòng đầu file này): không điểm nào cho hai email, hai thông báo hay hai dòng `RELEASE`; khoá bận không bao giờ làm mất email, sinh thông báo hay thừa dòng MAIL_LOG. Trong mỗi ma trận cắt có 3 nhóm điểm rơi vào các cửa sổ còn lại (mục dưới): 9 điểm liền nhau (không email cộng một thông báo), 4 điểm liền nhau (email đã đi nhưng vẫn có thông báo "có thể đã hoặc chưa gửi" và không có dòng MAIL_LOG) và 3 điểm (thừa một dòng MAIL_LOG). **Xen kẽ hai lượt chạy (I210, sau vòng soát 3):** một lượt thứ hai chạy HẾT ngay trước MỖI lần lấy khoá của lượt thứ nhất, ở 6 cặp (menu 1 nâng cấp mới, menu 1 làm nốt, job mỗi giờ làm nốt, mỗi loại xen với menu 1 và với job mỗi giờ), theo test I210 (số điểm khoá do test tự đếm): không vi phạm nào (đúng một email, một thông báo, một dòng `RELEASE`, RELEASE_LOG đủ một bộ, hết bản ghi, không thông báo trung thực). Hai lượt chạy CÙNG LÚC ở cả bốn kiểu ghép (job và menu, job và job, menu và job, menu và menu) cho tối đa một email (I199). Đây là bằng chứng trong bộ mô phỏng; khoá thật của Google và giới hạn 6 phút chưa thử.
+
+**Các cửa sổ còn lại (cố ý, đã đo, ghi trong comment phía trên `RELEASE_LEG_NAME_` của `src/Release.gs`; có bốn):**
+
+1. Không email cộng một thông báo trung thực: lượt nhận việc gửi (dấu 4) rồi bị cắt trước khi Google nhận thư (9 điểm liền nhau mỗi ma trận). Hai lượt chạy cùng lúc cũng có thể báo thông báo đó dù email của lượt kia đã đi. Quyết định hiện tại: không dùng hạn thuê theo giờ (BL93).
+2. Thừa một dòng MAIL_LOG nếu lượt chạy bị cắt đúng giữa lúc ghi dòng đó và lúc đánh dấu (3 điểm; dòng này chỉ để đếm hạn mức email trong ngày).
+3. Thừa một dòng nhật ký `RELEASE` chỉ khi sau lần ghi dở có hơn 300 dòng nhật ký khác được ghi trước khi lượt sau chạy (lượt sau chỉ đọc 300 dòng cuối để nhận ra dòng đã ghi; ma trận cắt: 0 điểm).
+4. Email ĐÃ đi nhưng vẫn có một thông báo "có thể đã hoặc chưa gửi" và không bao giờ có dòng MAIL_LOG: bị cắt ngay SAU khi Google nhận thư, trước khi bản ghi kịp đánh dấu email đã gửi (4 điểm liền nhau); dòng MAIL_LOG của email đó không còn ai ghi (chỉ ảnh hưởng số đếm hạn mức trong ngày).
+5. Hai dòng CONFIG song sinh chỉ được BÁO, không tự sửa (BL91). Khoá có ký tự vô hình ở EMAIL_TEMPLATES và CONTENT chỉ được cắt khoảng trắng, chưa chuẩn hoá ký tự vô hình (BL92).
+6. Thay file ảnh QR cùng link mà không chạy menu 2, không dùng menu Làm mới và không sửa 4 ô CONFIG liên quan thì tới 6 giờ mới đổi (BL90).
+
+### Kết quả test
+
+Chạy `npm test` (TZ Asia/Ho_Chi_Minh) trên nhánh ở commit `5292935`:
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 228/228 (211 tới `5292935`; I213 đến I229 thêm ở lượt rà lần 2: I213 chữ t.stats_note, I214 đến I229 là 16 test vá khe do thử phá). Bản giao đầu 156 test (I141 đến I145 key trùng, I146 ảnh QR, I147 đọc tab nhanh, I148 mỗi bản có ghi chú phát hành, I149 đối chiếu ghi chú với code, I150 tóm tắt và RELEASE_LOG, I151 đến I157 nâng cấp 8.1.4 lên 8.1.9 so từng ô). Sau soát thêm 55 test: I158 đến I165 (vòng sửa 1), I166 đến I189 (vòng sửa 2, gồm các test đột biến), I190 đến I195 (sửa theo S1), I196 đến I209 (sửa theo S2, gồm ma trận cắt ngang I197, I198 và hai lượt chạy cùng lúc I199), I210 đến I212 (sửa theo soát vòng 3: I210 xen kẽ hai lượt chạy ở mọi lần lấy khoá, I211 các đột biến M08, M13, M25, I212 đường MAIL_LOG và khoá có ký tự vô hình) |
+| Giao diện web | 71/71. Bản giao đầu 53 (U51 khung chuyển khoản và QR, U52, U53 tải trang); sau soát thêm U54 đến U67; lượt rà lần 2 thêm U68 đến U70 (3 test vá khe do thử phá) và U71 (hồi quy lỗi ảnh QR bị ẩn khi tải hỏng vì mạng) |
+| Thử tải | 2/2 |
+| Thử phá | Bản giao đầu: 13 đột biến, "cả 13 bị bắt": ĐÃ RÚT LẠI vì quá ít. Soát độc lập X2: 102 đột biến, 69 bị bắt, 33 sống sót (9 tương đương, 24 lỗ hổng test thật); đã thêm test cho các lỗ hổng đó; chưa chạy lại trọn bộ 102 (xem mục Soát chéo) |
+| Soát chéo | X1, X2 độc lập; supervisor S1, S2 và vòng soát 3 (REVISE, đã sửa ở `5292935`) sau mỗi vòng sửa; soát xác nhận trên `5292935` (kết luận ở dòng đầu file). Đây là bản soát đầu tiên của 5R, thay cho "chưa chạy" ở bản giao 14/11 |
+
+Nói thẳng về bản giao 14/11: câu "tích hợp 156/156" chỉ đúng khoảng 30 phút sau khi dựng dữ liệu mẫu, vì test I151 phụ thuộc đồng hồ thật (lỗi số 1 ở bảng trên). Con số 211/211 hiện nay không còn phụ thuộc đồng hồ (I158).
+
+### Nâng cấp từ 8.1.4: những gì đổi trong database
+
+Đây là danh sách khác biệt DUY NHẤT test I152 cho phép khi nâng database 8.1.4 (bộ dữ liệu mẫu) lên 8.1.9 bằng menu 1. Gì ngoài danh sách là lỗi và test đỏ. Có đúng 10 tab có khác biệt; các tab còn lại không đổi một ô nào. Đối chiếu trực tiếp với `test/integration.js` (I152, I154).
+
+| Loại | Nội dung |
+|---|---|
+| Tab mới | `RELEASE_LOG` (chỉ ghi thêm). Trên bộ dữ liệu mẫu có 64 dòng: 44 mục ghi chú của 8.1.5 đến 8.1.9 cộng 20 mục đo thật |
+| Cột mới (chỉ tiêu đề) | `BOOKINGS.admin_done_at` (BOOKINGS từ 28 lên 29 cột; các dòng cũ để trống) |
+| Dòng thêm ở CONFIG (2 khoá) | `BANK_QR_IMAGE` (mặc định trống), `REASSIGN_STUCK_HOURS` (mặc định 1); đều có ghi chú "Mới ở ..." ở cột `note` |
+| Dòng thêm ở NOTIFY_RULES (2) | `REASSIGN_STUCK`, `RELEASE_NOTES` |
+| Dòng thêm ở CONTENT (8 key) | `h.bank_qr_alt`, `ad.ev.REASSIGN_STUCK`, `ad.ev.RELEASE_NOTES`, `ad.act.REASSIGN_STUCK`, `ad.act.ADMIN_MARK_DONE`, `ad.act.BANK_QR_REFRESH`, `ad.act.TEMPLATE_DEDUPE`, `ad.act.TEMPLATE_DEDUPE_TEXT` |
+| Dòng thêm ở EMAIL_TEMPLATES (1) | `ADMIN_RELEASE_NOTES` |
+| Dòng ghi thêm | 1 thông báo ở NOTIFICATIONS (`RELEASE_NOTES`), 1 dòng MAIL_LOG (email tóm tắt), 3 dòng ACTIVITY_LOG (`RELEASE`, `SETUP_RUN`, `TEMPLATE_DEDUPE`). Nếu có chữ admin bị bỏ khi gộp thì thêm các dòng `TEMPLATE_DEDUPE_TEXT` (bộ dữ liệu mẫu không có trường hợp này) |
+| Dòng bỏ | CHỈ các dòng EMAIL_TEMPLATES trùng key (ở bộ dữ liệu mẫu: một dòng của `LOGIN_LINK`, một dòng của `REG_RECEIVED`). Không bỏ dòng nào ở CONTENT và CONFIG |
+| Ô đổi giá trị (tổng 16) | CONTENT: 3 ô do code quản lý của `h.bank_note` (`position`, `default_vi`, `default_en`); cột `vi`, `en` của anh KHÔNG đổi. CONTENT: 4 ô của `t.stats_note` (dòng chú thích dưới bảng số của tutor; chữ gốc 8.1.4 nói sai là tự tính Hoàn thành sau 24 giờ, ô chưa sửa nên `vi`, `en`, `default_vi`, `default_en` đều nâng lên chữ gốc mới; ô anh đã sửa thì giữ nguyên). EMAIL_TEMPLATES: 1 ô (tiêu đề tiếng Việt của `LOGIN_LINK`, chữ anh sửa ở dòng cuối được chuyển lên dòng giữ lại). META: 8 ô (phiên bản `APP_VERSION`, giờ `META_AT`, 6 mốc mã tự sinh `ID_FLOOR_*`) |
+| Script Properties đổi | Đúng 3 khoá: `APP_VERSION_LAST`, `RELEASES_FOLDER_ID`, `SHEET_SNAP` (bản ghi `RELEASE_PENDING` được xoá khi giao xong). `BANK_QR_REV` chỉ xuất hiện khi menu 2, menu Làm mới ảnh QR hoặc sửa tay 4 ô CONFIG liên quan chạy |
+| Không đổi | PACKAGES, USERS, REGISTRATIONS, STUDENT_PACKAGES, PAYMENTS, AVAILABILITY, AUTH, METRICS, MARKETING_EMAILS; mọi ô của BOOKINGS (ngoài tiêu đề cột mới). Sự kiện Calendar, 8 trigger, định dạng ô: không đổi. Tô màu và dropdown của 5 tab NOTIFICATIONS, REGISTRATIONS, AVAILABILITY, BOOKINGS, STUDENT_PACKAGES được đặt lại (3, 1, 2, 6, 5 luật) |
+
+So với bản giao 14/11, bảng này sửa 3 chỗ: CONTENT thêm 8 key chứ không phải 6 (thêm `ad.act.BANK_QR_REFRESH` và `ad.act.TEMPLATE_DEDUPE_TEXT`); thêm dòng Script Properties; ghi rõ số ô đổi.
+
+### Việc của admin (STAGING, theo thứ tự luật 38)
+
+Theo quy ước 5, bản này chỉ dán STAGING; không có bước PRODUCTION. Vì hệ thống đang chạy là 8.1.4, cùng thứ tự này áp dụng khi anh nâng hệ thống thật sau này, và tóm tắt sẽ gồm đủ thay đổi của 8.1.5 đến 8.1.9. Chi tiết từng bước, cách xử lý từng dòng cảnh báo và cách quay lui: `HUONG_DAN_PHAT_HANH.md` mục 3A.
+
+1. **Bảo trì chỉ xem** (khuyên dùng). Chạy thêm **Phát hành: sao lưu ngay** và ghi lại tên bản sao.
+2. Dán `dist/Code.gs` (dòng 2 ghi bản 8.1.9) và `dist/Index.html`, **Lưu** từng file. `appsscript.json` KHÔNG đổi.
+3. F5 Sheets. **Trước menu 1**, chạy **menu 2** (menu 2 của 8.1.9; menu 2 của 8.1.4 chưa có hai kiểm tra này). Trong bộ mô phỏng, trên database 8.1.4 chưa nâng, menu 2 chỉ báo LỖI "Thiếu tab RELEASE_LOG ..." (bình thường, menu 1 sẽ tạo tab; test I151). Đọc kỹ: nếu có dòng "CONFIG: khoá ... có N dòng chỉ khác nhau ở dấu cách hoặc ký tự vô hình" thì dừng, xử lý tay theo câu hướng dẫn trong dòng đó (chép giá trị đúng sang dòng đang có hiệu lực, thường là dòng cuối nhưng câu trong dòng nêu đúng số hàng; rồi xoá dòng thừa), rồi mới sang bước 4. Có dòng "key ... xuất hiện N lần" ở EMAIL_TEMPLATES hoặc CONTENT thì bình thường (menu 1 sẽ gộp), nhưng nên chụp lại các dòng đó trước khi gộp.
+4. Chạy **menu 1: bấm một lần, rồi chờ hộp thoại hiện** (đừng bấm lại khi chưa thấy hộp thoại; xem BL94). Đọc hộp thoại và tìm ba loại dòng: **"CHÚ Ý QUAN TRỌNG"** (mẫu email có `active` mâu thuẫn giữa các dòng trùng, đã giữ trạng thái của dòng cuối), **"CẢNH BÁO"** (không gộp key vì sao lưu hỏng; "gộp dở"; hai dòng CONFIG song sinh) và **"CÒN DỞ"** hoặc "TIẾP TỤC giao tóm tắt" (một đường giao tóm tắt chưa xong: chạy lại menu 1, hoặc chờ job mỗi giờ). Có "CẢNH BÁO: chưa sao lưu được trước cập nhật": **dừng**, chạy **Phát hành: sao lưu ngay**, rồi chạy lại menu 1.
+5. Mở tab **RELEASE_LOG** và email "Tóm tắt cập nhật" (tới `ADMIN_EMAIL`) đối chiếu với hộp thoại. Không thấy email mà có một thông báo MAIL_FAILED nói "có thể đã hoặc chưa gửi": đúng thiết kế (xem mục Soát chéo, cửa sổ 1); đọc tab RELEASE_LOG. Cũng có thể thấy cả email lẫn thông báo đó (cửa sổ 4): đọc RELEASE_LOG như thường.
+6. Mở tab EMAIL_TEMPLATES: **mỗi key đúng một dòng**. Hộp thoại báo chữ bị bỏ khi gộp: lấy bản đủ ở ACTIVITY_LOG, hành động `TEMPLATE_DEDUPE_TEXT` (cách ghép: `HUONG_DAN_VAN_HANH.md` Phần F), rồi quyết giữ hay sửa. Đọc lại thân REG_RECEIVED và LOGIN_LINK: chữ đang hiện là chữ sẽ được gửi. Kiểm ô `active` của mọi mẫu có dòng "CHÚ Ý QUAN TRỌNG".
+7. Tải ảnh QR (PNG 600 x 600 px, vuông, dưới 300 KB) lên Drive của tài khoản chủ hệ thống, dán link vào CONFIG `BANK_QR_IMAGE`. **Sau khi tải lên, và mỗi lần thay file ảnh sau này, chạy menu 2** (hoặc menu **Email → Làm mới ảnh QR chuyển khoản**).
+8. Chạy **menu 2**: dòng `BANK_QR_IMAGE hợp lệ`, không dòng LỖI, không dòng cảnh báo khoá CONFIG song sinh.
+9. Triển khai phiên bản mới (sửa bản cũ, KHÔNG "Triển khai mới"). Tắt bảo trì.
+10. Mở trang đăng ký trên điện thoại và máy tính: khung chuyển khoản, dòng lưu ý đậm; quét mã QR bằng ứng dụng ngân hàng thật; kiểm cả trang gia hạn của học viên. Gửi thử đăng ký để chắc chữ chuyển khoản (BL76).
+
+### Giới hạn còn lại (nói thẳng)
+
+* **Chưa chạy trên Google thật.** Mọi hành vi mới và bằng chứng soát chéo chỉ ở bộ mô phỏng Node và ảnh chụp trình duyệt không giao diện. Danh sách việc chỉ kiểm được trong bộ mô phỏng, chưa kiểm trên Google thật: Drive đọc ảnh QR bằng tài khoản chạy web app; giới hạn chia mảnh của CacheService; link font nạp không chặn (`onload`) trong khung HtmlService; `setProperties` của Script Properties có ghi nguyên tử nhiều khoá không (thiết kế giao bền dựa vào việc này); tranh chấp khoá thật và giới hạn 6 phút (ma trận cắt ngang chỉ chạy trên khoá mô phỏng); ô bắt đầu bằng `=`, `+`, `-`, `@` ở CONTENT và EMAIL_TEMPLATES có còn là chữ khi `purgeRows_` ghi lại tab không; sắp xếp hoặc xoá dòng ở CONFIG có kích hoạt trigger sửa tay (và làm mới ảnh QR) không; quét mã QR bằng điện thoại thật; email tóm tắt hiển thị ra sao ở Gmail web, Gmail điện thoại, Outlook.
+* **Con số tăng tốc là ước lượng** cho tới khi đo bằng menu **Đo tốc độ** trước và sau.
+* **Soát chéo đã chạy**, nhưng còn: bộ 102 đột biến chưa chạy lại sau các sửa; việc soát tổng 2 agent trước go live (5P) vẫn còn. Soát xác nhận cuối trên `5292935` ĐẠT (dòng đầu file).
+* **Cuộc đua còn lại, thấp, không chặn, có từ trước đợt này (BL94):** hai lượt menu 1 bấm cách nhau trong khoảng 6 lời gọi dịch vụ, trước lúc phiên bản được ghi nhận, đều có thể giao tóm tắt: 2 email, 2 thông báo, RELEASE_LOG gấp đôi (dữ liệu nghiệp vụ không bị ảnh hưởng). Supervisor đánh giá gần như không thể xảy ra trên Google thật. Cách tránh: bấm menu 1 một lần và chờ hộp thoại hiện. Cách sửa hẳn (niêm phong trong khoá và đọc lại `APP_VERSION_LAST` ở đó) là thay đổi nhỏ nhưng cần thêm một vòng soát, nên chờ anh quyết ở BL94.
+* Các cửa sổ còn lại đã nêu ở mục Soát chéo (bốn cửa sổ giao tóm tắt: không email cộng một thông báo; thừa một dòng MAIL_LOG; thừa một dòng RELEASE nếu có hơn 300 dòng nhật ký xen vào; email đã đi nhưng có thông báo "có thể đã hoặc chưa gửi" và không có dòng MAIL_LOG; ngoài ra hai dòng CONFIG song sinh chỉ báo; khoá có ký tự vô hình ở EMAIL_TEMPLATES, CONTENT chỉ cắt khoảng trắng; ảnh QR cũ tới 6 giờ nếu không làm mới).
+* Menu 1 vẫn thay toàn bộ luật tô màu ở 5 tab (NOTIFICATIONS, REGISTRATIONS, AVAILABILITY, BOOKINGS, STUDENT_PACKAGES): luật anh tự thêm bằng tay ở đó mất (hành vi cũ, nay ghi trong tóm tắt; BL85).
+* Nguồn gốc các cặp dòng trùng thật anh thấy (đứng cạnh nhau) mới giải thích được MỘT PHẦN: key có khoảng trắng thừa làm ra bản trùng đã chứng minh, nhưng chưa chắc là nguyên nhân duy nhất trên file của anh.
+* Chữ chuyển khoản còn mâu thuẫn: dòng đậm bảo ghi số điện thoại, nhưng sau khi gửi, web và email còn đưa mã chuyển khoản ("Mã nội dung chuyển khoản", "Nội dung chuyển khoản của bạn") (BL76, chờ anh; không chặn kỹ thuật nhưng làm học viên bối rối).
+* Quay lui: tôi chưa có test chạy code 8.1.4 trên database đã nâng lên 8.1.9; theo thiết kế bản cũ bỏ qua cột và tab lạ (chưa kiểm trên Google thật).
+* **Nhánh khác xung đột:** draft PR #2 (nhánh `claude/hopeful-galileo-xa1dv9`, "8.1.5 gửi email qua Amazon SES") cũng ghi số bản 8.1.5 và xung đột với nhánh này ở 12 file (BL89). Đã kiểm bằng `git merge-tree`.
+* Chưa làm phần còn lại của 5Q (BL69), 5P (hướng dẫn còn lại, chính sách, soát tổng, thử tải lại).
+* BACKLOG còn **55 câu chờ anh** (mục A 52, mục B 3); 5R thêm BL76 đến BL86 và BL89 đến BL94 còn mở, BL87 và BL88 đã đóng; BL95 (giao diện 390 px, 27/11) không thuộc 5R.
+
+## Chunk 5N: tô màu Sheets (07/11/2026, bản 8.1.7)
+
+### Làm gì
+
+* **Cột mới `BOOKINGS.admin_done_at`** (optional, luật 38): ghi khi một lựa chọn ở `admin_action` chạy thành công. Lựa chọn lỗi thì không ghi.
+* **Lựa chọn mới "Đã xử lý (giữ nguyên)"** ở dropdown `admin_action` của BOOKINGS: không đổi trạng thái, lương hay gói; chỉ ghi `admin_done_at` và nhật ký `ADMIN_MARK_DONE`. Không cho chọn khi màu chỉ hết bằng việc thật: buổi chưa có kết quả (CONFIRMED), Chờ đổi tutor, Vấn đề kỹ thuật chưa chọn lỗi; ô báo rõ việc cần làm.
+* **"Chưa xử lý"** = `admin_done_at` trống HOẶC cũ hơn `result_at`: kết quả đổi sau lần admin xử lý trước (tutor sửa lại) thì màu hiện lại.
+* **Màu mới** (luật đầu tiên khớp thắng, theo thứ tự trong bảng dưới). Vùng tô màu phủ tới hết tab; tab tự thêm hàng thì đặt lại (trước đây hàng thêm sau không có màu).
+* **Báo buổi kẹt Chờ đổi tutor:** job mỗi giờ thấy buổi ở PENDING_REASSIGN quá `REASSIGN_STUCK_HOURS` giờ (CONFIG mới, mặc định 1, -1 = tắt) thì báo Khẩn qua email (REASSIGN_STUCK), một lần mỗi lần kẹt. Nhiều buổi kẹt cùng lượt: MỘT email liệt kê hết. Chịu lệch nhịp trigger 15 phút.
+* **Sửa theo soát chéo (cả 2 agent cùng thấy, HIGH):** buổi kẹt trước đây KHÔNG xử lý được như thư báo bảo: "Đổi tutor" luôn lỗi, "Huỷ bởi admin" sau 15:00 hôm trước thành Huỷ muộn (học viên mất lượt cho lỗi phía trường). Nay "Đổi tutor" nhận buổi kẹt; chỉ định tutor bận thì buổi vẫn kẹt (trước đây thành CONFIRMED với tutor cũ, người không dạy); "Huỷ bởi admin" buổi kẹt luôn là Huỷ bởi admin, được bù (BL74). Trang quản trị bỏ buổi Không hoàn thành đã "Đã xử lý" khỏi danh sách chờ (cùng một hàm `adminHandled_` với màu Sheets). Tab tự thêm hàng thì chỉ nới vùng tô màu, giữ luật admin tự thêm.
+
+### Màu nghĩa là gì, làm gì để hết màu
+
+| Tab | Màu | Nghĩa | Làm gì để hết màu |
+|---|---|---|---|
+| BOOKINGS | Đỏ | Tutor quá hạn chọn kết quả; hoặc buổi Không hoàn thành chưa xử lý | Nhắc tutor; hoặc chọn kết quả ở `admin_action` (Hoàn thành, Vắng học viên, Vắng tutor); giữ Không hoàn thành thì chọn "Đã xử lý (giữ nguyên)" |
+| BOOKINGS | Cam đậm | Chờ đổi tutor: buổi chưa có tutor dạy (luôn hiện) | Chọn "Đổi tutor" (ghi mã tutor ở `admin_note` nếu muốn) hoặc "Huỷ bởi admin" |
+| BOOKINGS | Hồng | Vấn đề kỹ thuật chưa chọn lỗi | Chọn 1 trong 3 lựa chọn lỗi kỹ thuật |
+| BOOKINGS | Vàng | Vắng học viên chưa xem (BL13) | "Đã xử lý (giữ nguyên)" |
+| BOOKINGS | Xanh dương nhạt | Buổi được bù ngày (`comp_days` > 0) | Chỉ để biết, không cần làm |
+| BOOKINGS | Xám | Huỷ muộn (trừ lượt, không bù) | Chỉ để biết |
+| STUDENT_PACKAGES | Đỏ | Có thông báo "Bù cho gói đã hết hạn" (COMP_ON_EXPIRED) chưa đọc: chờ admin cộng tay | Cộng ngày ở `comp_days_admin` (của gói đang chạy), rồi đánh dấu đã đọc thông báo đó |
+| STUDENT_PACKAGES | Xám | Gói hết hạn | Chỉ để biết |
+| STUDENT_PACKAGES | Vàng | Gói đang dùng còn `EXPIRY_NOTICE_DAYS` ngày (mặc định 3) | Chỉ để biết (học viên đã nhận email sắp hết hạn) |
+| STUDENT_PACKAGES | Tím | Admin đã cộng tay ngày (`comp_days_admin` khác 0) | Chỉ để biết |
+| STUDENT_PACKAGES | Xanh dương | Gói có ngày bù (`comp_days` > 0) | Chỉ để biết |
+
+### Kết quả test
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 139/139 (mới I136 màu BOOKINGS và "Đã xử lý", I137 màu STUDENT_PACKAGES, I138 báo buổi kẹt, I139 vùng tô màu khi thêm hàng và khi thiếu cột, I140 hồi quy xử lý buổi kẹt; I34 đổi số luật). Test chạy CÔNG THỨC THẬT trên dữ liệu thật qua bộ tính công thức trong test (AND, OR, N, TODAY, COUNTIFS, INDIRECT, so sánh), không chỉ so chuỗi |
+| Giao diện web | 49/49 |
+| Thử tải | 2/2 |
+| Thử phá | 39 đột biến (sau vòng sửa): 38 bắt, 1 tương đương (đảo thứ tự luật đỏ và cam: không dòng nào khớp cả hai). Đặt lại 2 lỗi gốc của soát chéo thì I140 bắt cả hai. Các vòng trước lộ 4 lỗ test (admin tự chọn kết quả cùng lúc; báo trùng sau nhiều giờ; tab không tròn 1.000 hàng; mốc bằng nhau ở adminHandled_), đã thêm test |
+| Soát chéo | 2 agent độc lập (code và luật; vận hành, nâng cấp, dữ liệu): 1 HIGH (cả hai cùng thấy: buổi kẹt không xử lý được), 6 MEDIUM, 12 LOW. Đã sửa HIGH và mọi MEDIUM sửa được trong phạm vi (thư báo kẹt gộp, lệch nhịp trigger, web khớp màu Sheets, chống mất thông báo); 4 câu cần anh quyết ghi BACKLOG BL72 đến BL75 |
+
+### Việc của admin (STAGING, theo thứ tự luật 38)
+
+1. Bảo trì chỉ xem (khuyên dùng).
+2. Dán `dist/Code.gs` và `dist/Index.html` (bản 8.1.7 gồm cả giao diện 5O), Lưu. Không đổi `appsscript.json`.
+3. Chạy **menu 1** (tự sao lưu trước vì phiên bản đổi; thêm cột `admin_done_at`, dropdown có lựa chọn mới cho mọi hàng, đặt màu mới).
+4. Triển khai phiên bản mới (sửa bản cũ). Tắt bảo trì.
+5. Mở BOOKINGS và STUDENT_PACKAGES kiểm màu theo bảng trên.
+
+### Giới hạn còn lại (nói thẳng)
+
+* Bảng màu ở trên chưa đưa vào `HUONG_DAN_VAN_HANH.md` (hướng dẫn chỉ xuất khi anh yêu cầu, quy ước 1); sẽ gộp ở 5P.
+* Màu đỏ gói "chờ cộng tay" hết khi thông báo được đánh dấu đã đọc (kể cả "Đã đọc hết"): cộng ngày xong rồi mới đánh dấu (BL73).
+* Buổi Vắng học viên, Không hoàn thành có từ trước vẫn tô màu tới khi chọn "Đã xử lý" từng dòng (BL72).
+* Đổi `EXPIRY_NOTICE_DAYS`: chạy lại menu 1 để màu vàng đổi theo (BL75).
+* Công thức tô màu được kiểm bằng bộ tính trong test, chưa kiểm trên Google Sheets thật: sau menu 1 trên STAGING, xem đúng màu ở vài dòng mẫu.
+* Phần còn lại của 5Q (BL69: bảng hạn mức 5 dòng, kiểm thư 5 loại hộp thư) chưa làm.
+
+**Trạng thái 05/11/2026 tối: 5O XONG CẢ WEB LẪN KHUNG EMAIL, bản 8.1.6.** Thêm so với 8.1.5: ảnh banner thương hiệu nhúng base64 vào trang chủ (đã cắt lề trắng, ~78KB); viên chữ Thái đổi nền trắng, chữ đen, viền vàng (yêu cầu anh 05/11); khung email `emailWrap_`, `btn_`, `emailWrapBi_` theo thiết kế 5O (đầu trang đen gạch vàng `#ffc933`, nút viên thuốc đen, đồng bộ xám `#63635d`); test mới U49 (49/49 web). Soát chéo 2 agent: 0 HIGH, 0 MEDIUM về code, các LOW đã dọn. CHƯA gửi thử email tới Gmail web, Gmail điện thoại, Outlook (việc của admin trên STAGING, BL09); chữ trong ảnh banner là tiếng Việt cố định — BL71 chờ anh chọn. BACKLOG còn **34 câu chờ anh** (mục A 30, mục B 4).
+
+**Trạng thái 05/11/2026 chiều: 5O PHẦN GIAO DIỆN WEB xong, bản 8.1.5** (đen trắng theo ảnh thương hiệu, chỉ `src/ui/Styles.html` + token màu; phần email của 5O chưa làm). Đồng thời khôi phục 5 file bị sót khi upload repo GitHub (`test/unit.js`, `.gitignore`, workflow CI, `.clasp.json.example`, `THIET_KE_GIAO_DIEN.md`) lấy từ zip còn trong lịch sử git — trước đó `npm test` không chạy được vì thiếu `test/unit.js`. BACKLOG còn **33 câu chờ anh** (mục A 29, mục B 4). Chi tiết: mục "Chunk 5O phần giao diện" dưới đây.
+
+## Chunk 5O phần giao diện web (05/11/2026, bản 8.1.5)
+
+> **Mục này ghi lại đúng bản 8.1.5 lúc đó.** Những việc mục này ghi là "chưa làm" đều đã làm ở các bản sau: khung email ở 8.1.6 (trạng thái 05/11 tối), tô màu Sheets 5N ở 8.1.7 (mục "Chunk 5N" đầu file). Giữ lại để tra lịch sử.
+
+### Làm gì
+
+* Giao diện mới theo ảnh thương hiệu (BL08, kế hoạch 5O): nền trắng; màu chính ĐEN TRẮNG (nút chính, mục đang chọn là viên thuốc đen chữ trắng); vàng thương hiệu `#ffc933` chỉ cho dấu nhận diện (ô logo, viên chữ Thái trang chủ, thẻ gói học); màu phụ xanh lá, tím, vàng, xanh dương dạng phấn cho trạng thái; khối bo góc, ĐỔ BÓNG THAY VIỀN. Đúng phạm vi kế hoạch: chỉ `src/ui/Styles.html` và token màu, mọi class, id, cấu trúc giữ nguyên; viền đỏ đúng ô nhập sai giữ nguyên (`input.invalid`).
+* Sửa theo soát chéo: thanh đầu trang có vạch chân mảnh (hết trắng trên trắng khi cuộn), ô số liệu giữ bóng khi trỏ chuột, bóng không bị cắt ở hàng số liệu cuộn ngang trên điện thoại, 3 mã màu tông xanh lá cũ còn sót đổi về token mới, ô `.chip:disabled` đạt tương phản 4.5:1 (lỗi có từ trước).
+* `THIET_KE_GIAO_DIEN.md` viết lại theo bản 5O (BL70, chờ anh duyệt). `VERSION` 8.1.5, `dist/` dựng lại bằng `npm run build`.
+
+### Kết quả test
+
+| Bộ | Kết quả |
+|---|---|
+| Hàm thuần và Db | 34/34 |
+| 40 kịch bản | 46/46 |
+| Tích hợp | 134/134 |
+| Giao diện web | 48/48 |
+| Thử tải | 2/2 |
+| Ảnh màn hình | 4 trang (chủ, học viên, tutor, admin) × 4 cỡ (360, 390, 768, 1280): không vỡ, luật 43 đạt |
+| Soát chéo | 2 agent độc lập (kỹ thuật CSS; thiết kế theo kế hoạch và ảnh chụp): 0 HIGH, 4 MEDIUM, 9 LOW; đã sửa mọi MEDIUM sửa được trong phạm vi và các LOW có ảnh hưởng thật |
+
+### Việc của admin (STAGING, theo thứ tự luật 38)
+
+1. Dán `dist/Code.gs`, `dist/Index.html` vào project STAGING (không đổi `appsscript.json`), Lưu.
+2. Chạy menu 1 (phiên bản code đổi nên tự sao lưu DB trước, luật 49; không có cột mới).
+3. Triển khai phiên bản mới (sửa bản cũ).
+4. Mở web kiểm trên điện thoại và máy tính: nền trắng, nút đen, logo vàng; form nhập sai thấy viền đỏ đúng ô.
+
+### Giới hạn còn lại (nói thẳng)
+
+* Phần email của 5O CHƯA làm: khung `emailWrap_` (Notify.gs) vẫn tông xanh rừng cũ, lệch bản nhận diện mới; chưa gửi thử mọi mẫu email tới Gmail web, Gmail điện thoại, Outlook (BL09). *(Đã làm ở 8.1.6; riêng việc gửi thử 3 hộp thư vẫn chờ anh làm tay trên STAGING.)*
+* Bộ ảnh chưa có ảnh chụp trạng thái ô nhập sai (`input.invalid`); code giữ nguyên bản cũ đã test.
+* Nút Zalo nổi đè nội dung khi cuộn tới đúng vị trí trên điện thoại: hành vi có từ trước 5O, không đổi ở bản này.
+* 5N (tô màu Sheets, BL13) chưa làm. *(Đã làm ở 8.1.7.)*
+
 **05/11/2026: chuyển sang repo GitHub cho Claude Code** (không đổi code, vẫn bản 8.1.4). Repo có đủ `src/`, `test/`, `dist/`, tài liệu; thêm `.gitignore`, `.clasp.json.example`, GitHub Actions chạy `npm test` và kiểm `dist/` khớp `src/`, lệnh `npm run build`, `npm run clasp:push`. Bỏ 2 bundle `v8/repo/` và `repo/BOOTSTRAP.md`. Hướng dẫn: `HUONG_DAN_GITHUB_CLAUDE_CODE.md`; quy trình cho Claude Code: `CLAUDE.md` mục cuối. Test lại sau khi dựng repo từ bundle: 34/34, 46/46, 134/134, 48/48, 2/2; `dist/` dựng lại trùng từng byte với bản trong project.
 
 **Trạng thái 02/11/2026: 5Q phần gửi email XONG, bản 8.1.4** (= 8.1.3 + gửi email cố định qua GmailApp trong code, **không còn MailFix**). Code giao: `dist/Code.gs`, `dist/Index.html`, `dist/appsscript.json` (không đổi quyền so với 8.1.1), `dist_google_login/` (dự án phụ, thêm `oauthScopes`). Việc của admin: `HUONG_DAN_PHAT_HANH.md` mục 3 (nâng STAGING từ 8.0.10 lên thẳng 8.1.4) và `HUONG_DAN_VAN_HANH.md` Phần M (đăng nhập Google). **5N, 5O dời sang tuần sau.** BACKLOG còn **32 câu chờ anh** (mục A 28, mục B 4), rà sau 5N, 5O. Phiên sau: mở repo GitHub bằng Claude Code, đọc `CLAUDE.md` (luật 19, 54 đổi), file này.

@@ -51,6 +51,9 @@ function ensureRows_(sheet, tableName, lastNeeded) {
   var add = Math.max(DB_GROW_ROWS_, lastNeeded - max);
   sheet.insertRowsAfter(max, add);
   applyDropdowns_(sheet, tableName, max + 1, add);
+  // Chunk 5N: luật tô màu có vùng cố định (hàng 2 tới hết tab lúc đặt): nới vùng để phủ cả hàng vừa thêm (giữ luật admin tự thêm).
+  // Lỗi tô màu không được làm hỏng lượt ghi dữ liệu (luật 39): chỉ ghi log.
+  try { extendHighlightRanges_(sheet, max, max + add); } catch (e) { Logger.log('Nới vùng tô màu ' + tableName + ' lỗi: ' + e.message); }
 }
 
 /** Chữ bắt đầu bằng = + - @ ở cột không phải dạng chữ: thêm dấu nháy đơn để Sheets lưu nguyên văn, không chạy công thức. */
@@ -75,6 +78,9 @@ function table_(name) {
     }
     colIndex[c] = i;
   });
+  // Bộ chuẩn hoá chọn MỘT lần cho mỗi cột (trước đây normalizeCell_ chạy nhiều indexOf cho từng ô): kết quả giống hệt normalizeCell_.
+  var colNames = schema.cols, nCols = colNames.length, colPos = [], colNorm = [];
+  for (var cj = 0; cj < nCols; cj++) { colPos.push(colNames[cj] in colIndex ? colIndex[colNames[cj]] : -1); colNorm.push(cellNormalizer_(schema, colNames[cj])); }
   var rows = [];
   for (var r = 1; r < values.length; r++) {
     var line = values[r];
@@ -83,7 +89,7 @@ function table_(name) {
     for (var k = 0; k < line.length; k++) { if (line[k] !== '' && line[k] !== null && line[k] !== false) { empty = false; break; } }
     if (empty) continue;
     var obj = { _row: r + 1 };
-    schema.cols.forEach(function (c) { obj[c] = c in colIndex ? normalizeCell_(schema, c, line[colIndex[c]]) : ''; });
+    for (var ci = 0; ci < nCols; ci++) { obj[colNames[ci]] = colPos[ci] === -1 ? '' : colNorm[ci](line[colPos[ci]]); }
     rows.push(obj);
   }
   var t = new DbTable_(name, schema, sh, colIndex, rows, sh.getLastRow());
@@ -114,6 +120,18 @@ function flushLogAppend_() {
     appendRowsRaw_(n, q);
   });
 }
+
+/** Chọn sẵn hàm chuẩn hoá cho một cột (cùng luật với normalizeCell_, nhưng không tra danh sách cho từng ô). */
+function cellNormalizer_(schema, col) {
+  if (schema.dates && schema.dates.indexOf(col) !== -1) return asDate_;
+  if (schema.text && schema.text.indexOf(col) !== -1) {
+    if (col === 'slot') return asSlot_;
+    return textCell_;
+  }
+  return rawCell_;
+}
+function textCell_(v) { return v === null || v === undefined ? '' : String(v); }
+function rawCell_(v) { return v; }
 
 function normalizeCell_(schema, col, v) {
   if (schema.dates && schema.dates.indexOf(col) !== -1) return asDate_(v);
@@ -238,6 +256,7 @@ DbTable_.prototype.update = function (rowObj, patch) {
       var range = self.sheet.getRange(rowObj._row, self.colIndex[c] + 1);
       if (self.isText_(c)) range.setNumberFormat('@');
       range.setValue(self.writeValue_(c, v));
+      if (c === self.schema.id) self._ids = null;   // ô khoá vừa đổi: bộ nhớ cột khoá của verifyRow_ đã cũ, lần kiểm sau đọc lại
     }
     rowObj[c] = normalizeCell_(self.schema, c, v);
   });
@@ -246,7 +265,7 @@ DbTable_.prototype.update = function (rowObj, patch) {
   if ((this.name === 'BOOKINGS' || this.name === 'AVAILABILITY') && Object.keys(patch).some(function (c) { return SLOT_NEUTRAL_COLS_.indexOf(c) === -1; })) markSlotsDirty_();
   return rowObj;
 };
-var SLOT_NEUTRAL_COLS_ = ['event_id', 'meet_link', 'cal_state', 'cal_attempts', 'cal_next_at', 'reminder_sent_at', 'day_reminder_at', 'admin_action', 'admin_note', 'result_at', 'result_by', 'tech_fault', 'tech_decided_at', 'comp_days', 'comp_gap', 'result_notice_at'];
+var SLOT_NEUTRAL_COLS_ = ['event_id', 'meet_link', 'cal_state', 'cal_attempts', 'cal_next_at', 'reminder_sent_at', 'day_reminder_at', 'admin_action', 'admin_note', 'result_at', 'result_by', 'tech_fault', 'tech_decided_at', 'comp_days', 'comp_gap', 'result_notice_at', 'admin_done_at'];
 
 /**
  * Bỏ các dòng mà keepFn trả false (keepFn nhận object của dòng, đọc MỚI từ Sheets ngay lúc bỏ). Phải gọi trong withLock_.
@@ -324,6 +343,7 @@ function purgeClearTail_(sh, schema, header, fromRow, n, width) {
  * Lần purgeRows_ trước bị cắt (mốc PURGE_OPEN_<tab> còn). Đọc lại tab, so dấu vân tay:
  *   phần giữ đã ghi xong, đuôi còn nguyên như lúc hỏng → xoá đúng đuôi (hàng keep+2 tới hàng cuối cũ);
  *   tab còn nguyên như trước khi ghi (lệnh ghi không chạy) → chỉ bỏ mốc;
+ *   phần giữ đúng và đuôi đã xoá sạch (xong cả, chỉ sót mốc) → chỉ bỏ mốc, KHÔNG báo (soát X2);
  *   khác cả hai (admin đã sắp xếp, sửa tay sau khi hỏng) → KHÔNG xoá gì, báo Khẩn để admin kiểm dòng trùng.
  * Dòng thêm sau khi hỏng nằm sau hàng cuối cũ nên không bao giờ bị đụng. Phải gọi trong withLock_. Trả số hàng đã dọn.
  */
@@ -337,6 +357,8 @@ function purgeRecover_(name) {
     else if (purgeHash_(cur.slice(0, o.keep)) === o.kept && purgeHash_(cur.slice(o.keep)) === o.tail) {
       if (n > 0) { var header = sh.getRange(1, 1, 1, width).getValues()[0].map(function (h) { return String(h).trim(); }); purgeClearTail_(sh, SCHEMA[name], header, o.keep + 2, n, width); cleared = n; }
       outcome = 'cleared';
+    } else if (purgeHash_(cur.slice(0, o.keep)) === o.kept && cur.slice(o.keep).every(function (line) { return line.every(function (v) { return v === '' || v === null || v === undefined; }); })) {
+      outcome = 'completed';   // soát X2 (FIX D): lần bỏ dòng đã xong (phần giữ đúng, đuôi đã xoá), chỉ chưa kịp xoá mốc: tab nhất quán, không phải "sửa tay"
     } else outcome = 'changed';
   }
   props.deleteProperty(key);
@@ -348,6 +370,16 @@ function purgeRecover_(name) {
   try { logActivity_('SYSTEM', 'PURGE_RECOVERED', 'SHEET', name, JSON.stringify({ outcome: outcome, cleared: cleared })); } catch (e) { }
   if (cleared && (name === 'BOOKINGS' || name === 'AVAILABILITY')) markSlotsDirty_();
   return cleared;
+}
+
+/**
+ * Dọn MỌI mốc PURGE_OPEN_<tab> còn sót (lần bỏ dòng bị cắt giữa chừng) bằng đúng cách phục hồi của purgeRecover_ (so dấu vân tay, không bao giờ xoá khi tab đã bị sửa tay).
+ * Job mỗi giờ và menu 1 gọi. Phải gọi trong withLock_. Trả số tab đã xử lý.
+ */
+function purgeRecoverAll_() {
+  var n = 0, pp = props_().getProperties();
+  Object.keys(pp).forEach(function (k) { var tn = k.replace(/^PURGE_OPEN_/, ''); if (k !== tn && SCHEMA[tn]) { purgeRecover_(tn); n++; } });
+  return n;
 }
 
 /**

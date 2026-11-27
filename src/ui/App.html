@@ -34,6 +34,8 @@
   })();
   var TAB_KEY = 'thaiput_tab_session', SHARED_KEY = 'thaiput_session';
   function parse(raw) { try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  /** Việc mỗi view đăng ký để quên dữ liệu của người đang đăng nhập khi phiên kết thúc (thoát, hết hạn): thiết bị dùng chung không để người sau thấy dữ liệu người trước (soát 5R). */
+  T.sessionEnd = [];
   T.session = {
     get: function () {
       var s = parse(T.store.tab.get(TAB_KEY));
@@ -51,6 +53,7 @@
       if (!last || last.token === o.token) T.store.shared.set(SHARED_KEY, v);
     },
     clear: function () {
+      T.sessionEnd.forEach(function (f) { try { f(); } catch (e) { } });
       var mine = parse(T.store.tab.get(TAB_KEY)), last = parse(T.store.shared.get(SHARED_KEY));
       T.store.tab.set(TAB_KEY, null);
       if (!mine || (last && last.token === mine.token)) T.store.shared.set(SHARED_KEY, null);
@@ -139,7 +142,7 @@
   //   Lượt chỉ đọc: tối đa 4 lần. Lượt ghi có mã chống gửi trùng (rid): tối đa 3 lần, cùng một mã, nên không đặt hay huỷ 2 lần.
   //   Lượt ghi khác: chỉ thử lại khi máy chủ báo bận (máy chủ báo bận nghĩa là chưa ghi gì).
   //   Chờ tăng dần cộng ngẫu nhiên, để nhiều người cùng thử lại không dồn vào cùng một giây.
-  var READ_APIS = { apiPublicInfo: 1, apiStudentHome: 1, apiStudentSlots: 1, apiTutorHome: 1, apiTutorAvailability: 1, apiTutorStats: 1,
+  var READ_APIS = { apiPublicInfo: 1, apiBankQr: 1, apiStudentHome: 1, apiStudentSlots: 1, apiTutorHome: 1, apiTutorAvailability: 1, apiTutorStats: 1,
     apiAdminHome: 1, apiAdminNotifications: 1, apiAdminPeople: 1, apiAdminPerson: 1, apiAdminBooking: 1, apiAdminSlots: 1, apiAdminLog: 1, apiAdminLessons: 1, apiAdminLogEntry: 1 };
   var RID_APIS = { apiStudentBook: 1, apiStudentCancel: 1, apiTutorSetAvailability: 1, apiTutorSubmitResult: 1, apiTutorSubmitResults: 1,
     apiAdminBook: 1, apiAdminCancel: 1, apiExchangeToken: 1, apiGoogleExchange: 1 };
@@ -320,6 +323,58 @@
     return '<div class="contact">' +
       (zalo ? '<a class="btn btn-ghost zalo" href="' + T.esc(zalo) + '" target="_blank" rel="noopener">' + T.t('a.zalo') + '</a>' : '') +
       (site ? '<a class="btn btn-ghost" href="' + T.esc(site) + '" target="_blank" rel="noopener">' + T.t('a.website') + '</a>' : '') + '</div>';
+  };
+
+  /** T2: khung chuyển khoản dùng chung cho trang đăng ký và gia hạn. Có dấu qr thì chừa sẵn khung vuông (không nhảy bố cục),
+   *  ảnh nạp riêng bằng T.bankQrFill sau khi khung đã vẽ. Không có QR thì một cột gọn, không ô trống. */
+  T.bankPanel = function (info) {
+    var b = info && info.bank;
+    if (!b || !b.account) return '';
+    var qr = b.qr ? String(b.qr) : '';
+    return '<div class="panel bank' + (qr ? ' has-qr' : '') + '">' +
+      '<div class="bank-head"><span class="eyebrow">' + T.t('h.bank_title') + '</span><div class="mono">' + T.esc(b.name) + ' · ' + T.esc(b.account) + '<br>' + T.esc(b.holder) + '</div></div>' +
+      (qr ? '<div class="bank-qr" data-qr="' + T.esc(qr) + '"><div class="skeleton" aria-hidden="true"></div></div>' : '') +
+      '<p class="bank-note">' + T.t('h.bank_note') + '</p></div>';
+  };
+  var bankQrMem = {}, bankQrReq = {}, bankQrAlias = {};
+  /**
+   * Ảnh QR theo dấu: nhớ trong trang và trong T.store (cùng dấu thì không gọi lại máy chủ, đổi ngôn ngữ cũng không gọi lại). Trả chuỗi rỗng khi không có.
+   * Máy chủ trả kèm dấu của ảnh nó thật sự gửi (r.data.qr). Ảnh có thể đã đổi giữa apiPublicInfo và apiBankQr: khi đó dấu trả về khác dấu đã xin, ảnh được nhớ
+   * theo dấu MÀ MÁY CHỦ TRẢ (không bao giờ theo dấu cũ, để dấu cũ không hiện nhầm ảnh mới), và dấu đã xin chỉ là bí danh trong trang này (bankQrAlias).
+   */
+  T.bankQr = function (marker) {
+    if (!marker) return Promise.resolve('');
+    var real = bankQrAlias[marker] || marker;
+    if (real in bankQrMem) return Promise.resolve(bankQrMem[real]);
+    var v = T.store.tab.get('thaiput_bankqr_' + real);
+    if (v && /^data:image\//.test(v)) { bankQrMem[real] = v; return Promise.resolve(v); }
+    if (bankQrReq[marker]) return bankQrReq[marker];
+    return (bankQrReq[marker] = T.api('apiBankQr').then(function (r) {
+      delete bankQrReq[marker];
+      if (!r || !r.ok) return '';   // trả lời lỗi (mạng, máy chủ): KHÔNG nhớ ảnh rỗng, lần vẽ sau (đổi ngôn ngữ, quay lại trang) hỏi lại; kết quả ok mà rỗng vẫn được nhớ ở dưới
+      var got = r && r.ok && r.data && r.data.qr ? String(r.data.qr) : marker;
+      if (got !== marker) bankQrAlias[marker] = got;
+      var src = r && r.ok && r.data && /^data:image\//.test(r.data.src || '') ? r.data.src : '';
+      bankQrMem[got] = src;   // rỗng cũng nhớ trong trang này, khỏi gọi lại
+      if (src) T.store.tab.set('thaiput_bankqr_' + got, src);
+      return src;
+    }, function () { delete bankQrReq[marker]; return ''; }));
+  };
+  /** Đưa ảnh vào khung QR của T.bankPanel; rỗng hoặc lỗi thì gỡ khung, panel về một cột. Dấu máy chủ trả khác dấu của khung thì khung đổi sang dấu mới cùng lúc nhận ảnh mới. */
+  T.bankQrFill = function (root) {
+    var box = T.$('.bank-qr', root);
+    if (!box) return;
+    var marker = box.getAttribute('data-qr');
+    var done = function (src) {
+      var b = T.$('.bank-qr', root);
+      if (!b || b.getAttribute('data-qr') !== marker) return;   // đã vẽ lại hoặc rời trang
+      if (!src) { if (b.parentNode) b.parentNode.classList.remove('has-qr'); b.parentNode.removeChild(b); return; }
+      b.innerHTML = '<img src="' + T.esc(src) + '" alt="' + T.esc(T.t('h.bank_qr_alt')) + '" width="184" height="184" decoding="async">';
+      b.classList.add('ready');
+      if (bankQrAlias[marker]) b.setAttribute('data-qr', bankQrAlias[marker]);
+    };
+    var real = bankQrAlias[marker] || marker;
+    if (real in bankQrMem) done(bankQrMem[real]); else T.bankQr(marker).then(done);
   };
 
   /** 5K (BL06): gói giá 0 không chọn được trên web; hiện thẻ gói kèm nút Zalo admin. */

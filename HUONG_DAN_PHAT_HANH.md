@@ -1,11 +1,20 @@
-# Hướng dẫn phát hành, cập nhật và quay lui (bản 8.1.4)
+# Hướng dẫn phát hành, cập nhật và quay lui (bản 8.1.9)
 
-*Cập nhật 02/11/2026. Áp dụng cho STAGING ngay; cho PRODUCTION sau go live (chunk 6). Nguyên tắc đã chốt: không đóng băng hệ thống; giữ hết lịch sử; không bao giờ mất file; sửa lỗi được bất cứ lúc nào khi đang chạy.*
+*Cập nhật 15/11/2026 (sau soát chéo 5R). Áp dụng cho STAGING ngay; cho PRODUCTION sau go live (chunk 6). Nguyên tắc đã chốt: không đóng băng hệ thống; giữ hết lịch sử; không bao giờ mất file; sửa lỗi được bất cứ lúc nào khi đang chạy.*
 
-## Thay đổi so với bản trước (8.0.10, 18/10)
+## Thay đổi so với bản trước (8.1.4, 02/11/2026)
+
+* **Mục 3A mới:** nâng từ 8.1.4 lên 8.1.9 từng bước (hệ thống anh đang chạy là 8.1.4), kèm **danh sách việc cần kiểm trước khi nâng** (3A.0), danh sách chính xác những gì đổi trong database (3A.2), cách đọc các dòng cảnh báo trong hộp thoại menu 1 (3A.3) và cách quay lui (3A.4). Sau soát chéo 5R, bước chạy **menu 2 trước menu 1** được thêm vào (để thấy khoá CONFIG trùng và key trùng trước khi menu 1 đụng tới).
+* **Menu 1 nay tự tóm tắt mỗi lần đổi phiên bản (8.1.9):** hộp thoại liệt kê thay đổi của mọi bản sau bản đang chạy cộng những gì lượt chạy thật sự làm; ghi vào tab mới `RELEASE_LOG`; gửi một thông báo `RELEASE_NOTES` và một email "Tóm tắt cập nhật" tới `ADMIN_EMAIL`. Menu mới **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này**. Việc giao tóm tắt được ghi bền: khoá bận hay bị ngắt giữa chừng thì hộp thoại ghi "CÒN DỞ" và lần chạy menu 1 kế tiếp (hoặc job mỗi giờ) làm nốt; mỗi bản tóm tắt chỉ gửi email một lần (ngoại lệ hiếm: bấm menu 1 hai lần thật sát nhau, BL94; hoặc, hiếm khi, nếu bị ngắt đúng lúc, anh nhận thông báo `MAIL_FAILED` "có thể đã hoặc chưa gửi" thay cho email, hoặc cả email lẫn thông báo đó). Chạy lại menu 1 cùng phiên bản khi đã giao đủ thì im lặng (chỉ thêm một dòng `SETUP_RUN` ở nhật ký; lần chạy lại đầu tiên còn có thể nâng mốc mã thông báo ở META cho kịp lượt trước, I155).
+* **Menu 1 gộp dòng trùng key ở EMAIL_TEMPLATES và CONTENT (8.1.9).** Chữ anh bị bỏ khi gộp được lưu ĐỦ ở ACTIVITY_LOG (hành động `TEMPLATE_DEDUPE_TEXT`; cách lấy lại từng bước: `HUONG_DAN_VAN_HANH.md` Phần F). Ô `active` theo dòng cuối, có dòng "CHÚ Ý QUAN TRỌNG" khi các dòng mâu thuẫn. Mục 3A bước 6 và 7 nói rõ phải đọc lại gì sau đó.
+* Ô CONFIG mới `BANK_QR_IMAGE` (ảnh mã QR chuyển khoản, Drive): mục 3A bước 8. Thay file ảnh dưới cùng link thì chạy menu 2 hoặc menu **Email → Làm mới ảnh QR chuyển khoản** để khách thấy ảnh mới ngay (không thì tới 6 giờ).
+* Mục 2 bước 5: đọc thêm tóm tắt và các dòng "CHÚ Ý QUAN TRỌNG", "CẢNH BÁO", "CÒN DỞ"; mục 3A.4 thêm cách quay lui từ 8.1.9.
+* `appsscript.json` KHÔNG đổi từ 8.1.4 lên 8.1.9.
+
+Các thay đổi của bản 8.1.4 so với 8.0.10 (nằm ở bản hướng dẫn 8.1.4, vẫn đúng cho mục 3):
 
 * **Không còn MailFix:** từ 8.1.4 không tạo file MailFix, không tìm và thay sau khi dán `Code.gs`. Còn file `MailFix.gs` cũ trong dự án thì xoá (menu 2 báo LỖI nếu còn).
-* **Mục 3 mới:** nâng STAGING từ 8.0.10 lên thẳng 8.1.4, từng bước, kèm việc phải kiểm sau mỗi bước.
+* **Mục 3:** nâng STAGING từ 8.0.10 lên thẳng 8.1.4, từng bước, kèm việc phải kiểm sau mỗi bước.
 * Mục 2: tên menu theo menu gom nhóm (**Cập nhật phiên bản → ...**), thêm bước F5 Sheets, bước Kiểm tra gửi email; menu 3 tạo 8 trigger.
 * Mục 4: thêm cách quay lui từ 8.1.4.
 * Mục 5: bỏ "Chuyển sang tài khoản mới" (thay bằng menu **Chuyển hệ thống**).
@@ -37,7 +46,7 @@ Quyền: mọi file và thư mục do tài khoản chạy hệ thống tạo. Kh
    * `appsscript.json` ← chỉ khi coder ghi "quyền đổi".
    **Không tìm và thay gì trong code.**
 4. Tải lại trang Sheets (**F5**) để menu mới hiện.
-5. **Ngay sau đó** chạy menu 1. Google hỏi cấp quyền (khi quyền đổi): chọn đúng tài khoản chạy hệ thống → **Cho phép**, rồi chạy lại menu 1. Hộp thoại phải có dòng "Sao lưu trước cập nhật (<bản cũ> sang <bản mới>): THAIPUT_DB_..._TRUOC_<bản mới>_...". Có dòng "CẢNH BÁO: chưa sao lưu được": **dừng**, chạy **Cập nhật phiên bản → Phát hành: sao lưu ngay**, thành công mới đi tiếp.
+5. **Ngay sau đó** chạy menu 1. Google hỏi cấp quyền (khi quyền đổi): chọn đúng tài khoản chạy hệ thống → **Cho phép**, rồi chạy lại menu 1. Hộp thoại phải có dòng "Sao lưu trước cập nhật (<bản cũ> sang <bản mới>): THAIPUT_DB_..._TRUOC_<bản mới>_...". Có dòng "CẢNH BÁO: chưa sao lưu được": **dừng**, chạy **Cập nhật phiên bản → Phát hành: sao lưu ngay**, thành công mới đi tiếp. Từ 8.1.9 hộp thoại còn có **tóm tắt thay đổi** của bản mới: đọc, đối chiếu với tab `RELEASE_LOG` và email "Tóm tắt cập nhật"; gặp dòng "CHÚ Ý QUAN TRỌNG", "CẢNH BÁO" hoặc "CÒN DỞ" thì làm theo mục 3A.3.
 6. Coder ghi "chạy menu 3": chạy menu 3, hộp thoại báo 8.
 7. Menu 2: không có dòng LỖI.
 8. **Triển khai → Quản lý các lần triển khai** → chọn bản triển khai đang dùng → **bút chì (Chỉnh sửa)** → ô **Phiên bản** chọn **Phiên bản mới** → Mô tả: số phiên bản → **Triển khai**. Link `/exec` giữ nguyên. **Không bấm "Triển khai mới"**: tạo link `/exec` mới, làm hỏng `WEBAPP_URL`, Google Sites, đăng nhập Google, link rút gọn.
@@ -125,6 +134,83 @@ Sau 1 tuần chạy ổn: `ADMIN_LINK_LOGIN = FALSE`.
 * Tutor: link đăng nhập bấm được nhiều lần trong 15 phút; mỗi email xin link 1 lần mỗi giờ. Nhắc mở lịch tuần sau lúc 15:00 thứ Sáu, hạn 22:00 thứ Bảy. Không còn tự Hoàn thành: tutor phải chọn kết quả, quá 24 giờ thì báo đỏ, quá 48 giờ thành Không hoàn thành (không lương).
 * Học viên: buổi lỗi phía trường được cộng ngày bù và có email báo. Huỷ muộn (admin huỷ sau 15:00 hôm trước theo yêu cầu học viên) bị trừ lượt.
 * Admin: menu gom nhóm; xử lý theo `HUONG_DAN_VAN_HANH.md`.
+
+## 3A. Nâng từ 8.1.4 lên 8.1.9 (khoảng 30 phút)
+
+Hệ thống anh đang chạy là 8.1.4. Bản 8.1.9 gồm 8.1.5 (giao diện đen trắng), 8.1.6 (khung email), 8.1.7 (tô màu Sheets mới, "Đã xử lý (giữ nguyên)", báo buổi kẹt), 8.1.8 (viền đỏ đúng ô nhập sai) và 8.1.9 (gộp key trùng, mã QR chuyển khoản, tăng tốc, tóm tắt nâng cấp). Menu 1 cộng dồn mọi thay đổi nên lên thẳng được. Theo quy ước đã chốt, bản này chỉ dán STAGING tới khi go live (chunk 6). Chọn giờ vắng.
+
+**Mức độ đã kiểm:** nâng cấp từ một database 8.1.4 đầy đủ lên 8.1.9 đã được chạy và so từng ô trong bộ mô phỏng Node (test I151 đến I157), cộng soát chéo độc lập và bài thử cắt ngang (`PROGRESS.md` mục 5R). **Chưa chạy trên Google thật.** Lần đầu trên hệ thống thật nên làm trên STAGING.
+
+### 3A.0 Trước khi nâng: kiểm hệ thống 8.1.4 đang chạy (10 phút)
+
+1. Đăng nhập bằng tài khoản chủ hệ thống (tài khoản chạy hệ thống), Chrome hồ sơ riêng.
+2. Trên hệ thống 8.1.4: chạy **menu 2** và ghi lại các dòng LỖI, LƯU Ý đang có sẵn (để biết dòng nào có từ trước). Menu 2 của 8.1.4 CHƯA kiểm key trùng và khoá CONFIG trùng; hai kiểm tra này nằm ở menu 2 của 8.1.9 (bước 3A.1 mục 3).
+3. Mở tab **CONFIG** và nhìn: có khoá nào xuất hiện hai lần (tên giống hệt, hoặc chỉ khác dấu cách thừa ở cuối hoặc đầu) không? Đặc biệt `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER`, `ADMIN_EMAIL`, `WEBAPP_URL`. Nếu có, ghi lại dòng nào mang giá trị anh đang muốn dùng.
+4. Mở tab **EMAIL_TEMPLATES** và **CONTENT**: key nào xuất hiện hai lần (anh từng thấy `LOGIN_LINK`, `REG_RECEIVED`)? Chụp màn hình các cặp đó, nhất là ô chữ anh đã sửa và ô `active`. Menu 1 sẽ gộp chúng thành một dòng (3A.2, 3A.3).
+5. Chuẩn bị ảnh QR (PNG 600 x 600 px, vuông, dưới 300 KB) trên Drive của tài khoản chủ hệ thống; chưa dán vào CONFIG vội.
+6. Chạy **Phát hành: sao lưu ngay** và ghi lại tên bản sao (thư mục `THAIPUT_V8_<môi trường>_Releases`). Menu 1 cũng tự sao lưu, nhưng làm thêm cho chắc.
+7. Có sẵn `dist/Code.gs` (dòng 2 ghi `THAIPUT v8.1.9`) và `dist/Index.html`. KHÔNG cần `appsscript.json`.
+
+### 3A.1 Làm theo thứ tự (không đảo)
+
+1. **Bảo trì chỉ xem.**
+2. Trình soạn: dán `Code.gs` và `Index.html`, **Lưu** từng file. **Không dán `appsscript.json`** (không đổi). Không tìm và thay gì.
+3. Sheets: **F5**, rồi chạy **menu 2 TRƯỚC menu 1**. Trong bộ mô phỏng, trên database 8.1.4 chưa nâng, menu 2 chỉ báo LỖI "Thiếu tab RELEASE_LOG ..." (bình thường, menu 1 sẽ tạo tab). Đọc kỹ các dòng LƯU Ý:
+   * "CONFIG: khoá ... có N dòng chỉ khác nhau ở dấu cách hoặc ký tự vô hình": **dừng**, làm theo câu trong dòng đó (chép giá trị đúng sang dòng đang có hiệu lực, thường là dòng cuối nhưng câu trong dòng nêu đúng số hàng, rồi xoá dòng thừa), chạy lại menu 2 tới khi hết;
+   * "EMAIL_TEMPLATES (hoặc CONTENT): key ... xuất hiện N lần": bình thường, menu 1 sẽ gộp; đã chụp ở 3A.0 mục 4.
+4. Chạy **menu 1: bấm một lần, rồi chờ hộp thoại hiện** (đừng bấm lại khi chưa thấy hộp thoại; hai lượt bấm sát nhau có thể làm anh nhận hai email tóm tắt, hai thông báo, xem BL94 trong `BACKLOG.md`). Hộp thoại phải có dòng "Sao lưu trước cập nhật (8.1.4 sang 8.1.9)" rồi tới phần **tóm tắt thay đổi**. Có "CẢNH BÁO: chưa sao lưu được": **dừng**, chạy **Phát hành: sao lưu ngay**, thành công mới chạy lại menu 1. Quá giờ giữa chừng: chạy lại menu 1, nó làm tiếp. Đọc hộp thoại, tìm các dòng bắt đầu bằng **"CHÚ Ý QUAN TRỌNG"**, **"CẢNH BÁO"**, **"CÒN DỞ"**, **"TIẾP TỤC giao tóm tắt"**, **"gộp dở"**: ý nghĩa và việc phải làm ở 3A.3. "CÒN DỞ": chạy lại menu 1 hoặc chờ job mỗi giờ.
+5. Mở tab **`RELEASE_LOG`** (mỗi mục tóm tắt một dòng: `at`, `from_version`, `to_version`, `kind`, `item`, `detail`; trên bộ dữ liệu mẫu có 64 dòng) và email "Tóm tắt cập nhật" tới `ADMIN_EMAIL`; so với hộp thoại. Không thấy email mà có thông báo `MAIL_FAILED` nói "có thể đã hoặc chưa gửi": đúng thiết kế (mỗi bản tóm tắt không gửi email hai lần; hiếm khi email vẫn tới mà thông báo vẫn có), đọc tab `RELEASE_LOG`. Menu **Cập nhật phiên bản → Phát hành: xem thay đổi của bản này** hiện lại ghi chú của bản đang cài.
+6. Mở tab **EMAIL_TEMPLATES**: mỗi key đúng **một** dòng. Hộp thoại báo chữ bị bỏ khi gộp: lấy bản đủ ở ACTIVITY_LOG, hành động `TEMPLATE_DEDUPE_TEXT` (`HUONG_DAN_VAN_HANH.md` Phần F, từng bước), hoặc chép từ bản sao `..._TRUOC_8.1.9_...`, rồi quyết giữ hay sửa. Kiểm ô `active` của mọi mẫu có dòng "CHÚ Ý QUAN TRỌNG".
+7. Đọc lại thân thư các mẫu hay có bản trùng (`REG_RECEIVED`, `LOGIN_LINK`). Sau khi gộp chỉ còn một dòng (ở vị trí dòng đầu); từng ô lấy chữ anh đã sửa nếu có, ở dòng nào cũng được; hai dòng cùng có chữ anh sửa khác nhau thì lấy chữ của dòng cuối (dòng đang được gửi trước khi gộp); ô để trống = chữ mặc định trong code; ô chỉ ghi `-` = cố ý để trống. Ví dụ: nếu dòng đầu có chữ anh sửa mà dòng cuối là chữ mặc định, sau khi gộp thư gửi đi dùng chữ anh sửa (thân tiếng Anh REG_RECEIVED bắt đầu "Thaiput received").
+8. **Ảnh QR:** chuẩn bị ảnh PNG **600 x 600 px**, vuông đúng 1:1, cắt sát thẻ QR nền trắng gồm logo ngân hàng, lề trắng ít nhất 16 px, dưới 300 KB (khuyên dưới 150 KB). Mở Drive bằng **tài khoản chủ hệ thống** (tài khoản chạy web app), tải ảnh lên, bấm chuột phải → **Chia sẻ** → **Sao chép đường liên kết** (ảnh nằm trong Drive của tài khoản chạy hệ thống thì không cần chia sẻ rộng), dán link (hoặc mã file) vào CONFIG `BANK_QR_IMAGE`. Để trống = trang không hiện QR.
+9. Chạy **menu 2**. Phải thấy "BANK_QR_IMAGE hợp lệ: (loại), (KB)" và không có dòng LỖI, không có dòng cảnh báo khoá CONFIG trùng. Báo hỏng thì làm theo câu hướng dẫn kèm theo (sai link, không mở được file, file ở thùng rác, quá 300 KB, không phải ảnh), rồi chạy menu 2 lần nữa (lỗi được web nhớ 5 phút; menu 2 làm mới ngay).
+10. **Triển khai → Quản lý các lần triển khai → bút chì → Phiên bản mới** → Mô tả `8.1.9` → **Triển khai**. Link `/exec` giữ nguyên; không bấm "Triển khai mới". Rồi **Bảo trì: tắt**.
+11. Kiểm trên điện thoại và máy tính: trang đăng ký có khung chuyển khoản mới, dòng lưu ý đậm màu vàng nhạt; ô QR 200 px trên điện thoại, 184 px trên máy tính; **quét mã bằng ứng dụng ngân hàng thật**. Trang gia hạn của học viên có cùng khung. Gửi thử một đăng ký và đọc thư xác nhận.
+12. **Sau này, mỗi lần thay file ảnh QR dưới cùng link** (ví dụ đổi tài khoản ngân hàng): chạy lại **menu 2** hoặc menu **Email → Làm mới ảnh QR chuyển khoản**, rồi quét thử. Sửa tay `BANK_NAME`, `BANK_ACCOUNT`, `BANK_HOLDER` hoặc `BANK_QR_IMAGE` ở CONFIG cũng làm mới ảnh. Quên cả ba thì khách có thể thấy QR cũ tới 6 giờ.
+
+Vì sao thứ tự Lưu → menu 2 → menu 1 → Triển khai: như mục 2 (trigger chạy code vừa Lưu ngay; menu 1 phải có trước để tab, cột, ô mới sẵn sàng). Menu 2 chạy được trước menu 1 (đã kiểm trong bộ mô phỏng). Lỡ dán code mà chưa chạy menu 1 thì hệ thống vẫn chạy (đã kiểm: trang, đăng nhập, đặt, huỷ, job); chạy menu 1 ngay khi nhớ ra.
+
+### 3A.2 Database sẽ đổi những gì (danh sách đầy đủ)
+
+Đối chiếu từ test I152 và I154 (bộ dữ liệu mẫu 8.1.4); số cụ thể trên file của anh có thể khác (ví dụ số dòng RELEASE_LOG, số cặp key trùng).
+
+| Loại | Nội dung |
+|---|---|
+| Tab mới | `RELEASE_LOG` (chỉ ghi thêm; 64 dòng trên bộ dữ liệu mẫu, tối đa 400 dòng mỗi lần nâng cấp) |
+| Cột mới | `BOOKINGS.admin_done_at` (chỉ tiêu đề, các dòng cũ để trống) |
+| Dòng thêm ở CONFIG (2 khoá) | `BANK_QR_IMAGE`, `REASSIGN_STUCK_HOURS`, đều có ghi chú "Mới ở ..." ở cột `note` |
+| Dòng thêm ở NOTIFY_RULES (2) | `REASSIGN_STUCK`, `RELEASE_NOTES` |
+| Dòng thêm ở CONTENT (8 key) | `h.bank_qr_alt`, `ad.ev.REASSIGN_STUCK`, `ad.ev.RELEASE_NOTES`, `ad.act.REASSIGN_STUCK`, `ad.act.ADMIN_MARK_DONE`, `ad.act.BANK_QR_REFRESH`, `ad.act.TEMPLATE_DEDUPE`, `ad.act.TEMPLATE_DEDUPE_TEXT` |
+| Dòng thêm ở EMAIL_TEMPLATES (1) | `ADMIN_RELEASE_NOTES` |
+| Dòng ghi thêm | 1 thông báo (NOTIFICATIONS), 1 dòng MAIL_LOG, 3 dòng ACTIVITY_LOG (`RELEASE`, `SETUP_RUN`, `TEMPLATE_DEDUPE`); thêm các dòng `TEMPLATE_DEDUPE_TEXT` nếu có chữ anh bị bỏ khi gộp |
+| Dòng bỏ | Chỉ dòng EMAIL_TEMPLATES (và CONTENT) trùng key, gộp thành một |
+| Ô đổi | CONTENT `h.bank_note`: các cột do code quản lý (`position`, `default_vi`, `default_en`); cột `vi`, `en` của anh giữ nguyên. CONTENT `t.stats_note` (chú thích dưới bảng số của tutor; chữ cũ nói sai là buổi tự tính Hoàn thành sau 24 giờ): ô chưa sửa thì `vi`, `en`, `default_vi`, `default_en` nâng lên chữ gốc mới, ô anh đã sửa giữ nguyên và được báo. Dòng mẫu email đã gộp (chữ anh sửa ở dòng sau được chuyển lên dòng giữ lại). META: phiên bản, giờ, mốc mã tự sinh (8 ô) |
+| Script Properties | `APP_VERSION_LAST`, `RELEASES_FOLDER_ID`, `SHEET_SNAP` đổi hoặc thêm; `BANK_QR_REV` khi menu 2, menu Làm mới ảnh QR hoặc sửa tay 4 ô CONFIG liên quan chạy |
+| Không đổi gì | PACKAGES, USERS, REGISTRATIONS, STUDENT_PACKAGES, PAYMENTS, AVAILABILITY, AUTH, METRICS, MARKETING_EMAILS; mọi ô của BOOKINGS (ngoài tiêu đề cột mới); sự kiện Calendar; 8 trigger |
+
+Menu 1 cũng đặt lại dropdown `admin_action` và luật tô màu của 5 tab NOTIFICATIONS, REGISTRATIONS, AVAILABILITY, BOOKINGS, STUDENT_PACKAGES: **luật tô màu anh tự thêm bằng tay ở 5 tab này sẽ mất**. Khoá CONFIG anh tự thêm lạ chỉ được báo, không bị xoá. Giá trị và ghi chú CONFIG đã có không bị ghi đè. Khoá CONFIG có khoảng trắng thừa được cắt gọn, giá trị giữ nguyên; hai dòng chỉ khác dấu cách thì giữ cả hai và báo.
+
+Các tab và khoá của bản 8.1.5 đến 8.1.8 (không có tab hay chữ mới ngoài danh sách trên) nằm trong tóm tắt của menu 1.
+
+### 3A.3 Đọc các dòng trong hộp thoại menu 1
+
+Bảng đầy đủ kèm cách xử lý: `HUONG_DAN_VAN_HANH.md` mục L9. Tóm lược:
+
+| Dòng | Làm gì |
+|---|---|
+| **CHÚ Ý QUAN TRỌNG: mẫu email ... ô active** | Kiểm ô `active` của mẫu đó đúng ý chưa (đã giữ trạng thái của dòng cuối, đúng như đang gửi) |
+| **CẢNH BÁO: KHÔNG gộp key trùng** | Sao lưu hỏng: chạy **Phát hành: sao lưu ngay**, rồi chạy lại menu 1 |
+| **CẢNH BÁO: gộp dở** | Chạy lại menu 1; chữ bị bỏ đã lưu ở ACTIVITY_LOG |
+| **CẢNH BÁO: khoá CONFIG ... chỉ khác nhau ở dấu cách** (có thể kèm **CHÚ Ý**) | Chép giá trị đúng sang dòng đang có hiệu lực (câu trong dòng nêu số hàng; thường là dòng cuối), xoá dòng thừa (hệ thống không tự đổi giá trị) |
+| **CÒN DỞ (...)** hoặc **TIẾP TỤC giao tóm tắt** | Chạy lại menu 1 hoặc chờ job mỗi giờ; phần đã xong không làm lại |
+| "Email tóm tắt: ... KHÔNG gửi lại" | Email có thể đã hoặc chưa gửi (hiếm khi vẫn tới mà thông báo vẫn có); đọc tab `RELEASE_LOG`; không cần làm gì thêm |
+| "Một lượt chạy khác đã giao (hoặc đang giao) tóm tắt này ..." | Hai lượt chạy gần nhau; lượt đến sau không giao lại. Không cần làm gì |
+
+### 3A.4 Quay lui từ 8.1.9
+
+* **Chỉ code lỗi, dữ liệu không sao:** như mục 4 dòng đầu (chọn lại phiên bản triển khai cũ, rồi dán lại code cũ và Lưu). Theo thiết kế, bản cũ bỏ qua tab và cột lạ (`RELEASE_LOG`, `admin_done_at`) nên không gây hại; **chưa có test chạy code 8.1.4 trên database đã nâng, và chưa kiểm trên Google thật**.
+* **Muốn lấy lại dòng EMAIL_TEMPLATES đã gộp hoặc chữ bị bỏ:** hai cách. (1) Chữ bị bỏ khi hai dòng cùng có chữ khác nhau nằm ở ACTIVITY_LOG, hành động `TEMPLATE_DEDUPE_TEXT`; làm theo `HUONG_DAN_VAN_HANH.md` Phần F. Sau LOG_KEEP_DAYS ngày (mặc định 60) các dòng TEMPLATE_DEDUPE_TEXT, như mọi dòng ACTIVITY_LOG, được chuyển sang file lưu trữ theo năm "THAIPUT · Lưu trữ · <môi trường> · <năm>", tab ACTIVITY_LOG, không mất; khi đó làm các bước trên ở file lưu trữ đó. Bản sao ..._TRUOC_8.1.9_... trong thư mục Releases cũng giữ nguyên các dòng trước khi gộp. (2) Mở bản sao `THAIPUT_DB_..._TRUOC_8.1.9_...` trong thư mục `THAIPUT_V8_<môi trường>_Releases` (menu 1 sao lưu ngay trước khi đổi cấu trúc, không bao giờ tự xoá) và chép chữ cũ về tab.
+* **Quay cả dữ liệu về trước menu 1:** như dòng "Muốn quay về" ở mục 4: không dùng bản sao Releases để chạy (hệ thống vẫn trỏ vào file gốc); chỉ khi coder đồng ý và đi cùng, khôi phục file bằng **Tệp → Nhật ký phiên bản** về mốc trước menu 1 (mất dữ liệu ghi sau đó). Hiếm khi cần: nâng cấp này không đụng dữ liệu học viên, gói, buổi, thanh toán (đã so từng ô trong bộ mô phỏng).
 
 ## 4. Quay lui khi bản mới có lỗi
 
