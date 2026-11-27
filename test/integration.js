@@ -5735,28 +5735,32 @@ const xAfterRecord = (n, a, st) => { if (st.rec) return true; if (/getScriptProp
 const xRecordLegs = (a) => { try { return JSON.parse(a[0].RELEASE_PENDING).legs; } catch (e) { return null; } };
 
 t('I166', 'Soát X2 (FIX E, luật 14): mock CacheService nghiêm như Google: mục hết hạn thì get trả null (hạn theo đồng hồ thật), giá trị phải là chữ, khoá không trống, hạn 1 đến 21600 giây; code thật dùng bộ đệm CONFIG 60 giây nên sửa tay sau 61 giây phải được đọc lại', () => {
-  const { api, env } = load({ props: {} }), C = env.globals.CacheService.getScriptCache(), st = env.state;
-  C.put('a', 'x', 5); assert.strictEqual(C.get('a'), 'x');
-  st.cacheClockMs = 4999; assert.strictEqual(C.get('a'), 'x', 'chưa hết hạn');
-  st.cacheClockMs = 5000; assert.strictEqual(C.get('a'), null, 'hết hạn đúng lúc: get trả null'); assert.ok(!('a' in st.cache), 'mục hết hạn bị bỏ');
-  st.cacheClockMs = 0; C.put('d', 'y'); st.cacheClockMs = 599e3; assert.strictEqual(C.get('d'), 'y'); st.cacheClockMs = 600e3; assert.strictEqual(C.get('d'), null, 'mặc định 600 giây');
-  st.cacheClockMs = 0; C.put('m', 'z', 21600); C.putAll({ p: '1', q: '2' }, 10); st.cacheClockMs = 11e3; assert.deepStrictEqual(C.getAll(['m', 'p', 'q']), { m: 'z' }, 'getAll bỏ mục hết hạn');
-  st.cacheClockMs = 0; C.put('a', 'old', 1); st.cacheClockMs = 1500; C.put('a', 'new', 100); assert.strictEqual(C.get('a'), 'new', 'ghi đè đặt lại hạn');
-  const throws = (fn, re, why) => assert.throws(fn, re, why);
-  throws(() => C.put('k', 5), /Invalid argument: value/, 'số không phải chữ'); throws(() => C.put('k', { a: 1 }), /Invalid argument: value/); throws(() => C.put('k', null), /Invalid argument: value/); throws(() => C.put('k', undefined), /Invalid argument: value/);
-  throws(() => C.put('', 'x'), /Invalid argument: key/, 'khoá trống'); throws(() => C.get(''), /Invalid argument: key/); throws(() => C.put(null, 'x'), /Invalid argument: key/); throws(() => C.get(undefined), /Invalid argument: key/);
-  throws(() => C.put('k', 'x', 0), /expirationInSeconds/, 'hạn 0'); throws(() => C.put('k', 'x', -3), /expirationInSeconds/); throws(() => C.put('k', 'x', 0.5), /expirationInSeconds/); throws(() => C.put('k', 'x', NaN), /expirationInSeconds/); throws(() => C.put('k', 'x', '60'), /expirationInSeconds/); throws(() => C.put('k', 'x', 21601), /expirationInSeconds/);
-  throws(() => C.putAll({ ok: 'x', bad: 7 }), /Invalid argument: value/); assert.strictEqual(C.get('ok'), null, 'putAll hỏng thì không ghi gì');
-  throws(() => C.put('k'.repeat(251), 'x'), /key/); throws(() => C.put('k', 'x'.repeat(102401)), /value/);
-  // Mục test ghi tay không có hạn (test vẫn đọc ghi st.cache trực tiếp được)
-  st.cache.tay = 'v'; st.cacheClockMs = 1e9; assert.strictEqual(C.get('tay'), 'v');
-  // Tác động thật: bộ đệm CONFIG sống 60 giây (CFG_CACHE_SECONDS_). Sửa ô CONFIG bằng tay (không qua onEdit) chỉ thấy sau 60 giây.
-  const f = fx814(), key = 'BANK_NAME'; f.api.clearConfigCache_(); f.env.state.cacheClockMs = 0;
-  const before = f.api.cfg_(key); assert.ok(before, 'có giá trị mẫu');
-  X2h.put(f, 'CONFIG', X2h.find(f, 'CONFIG', key), 'value', 'NGAN HANG MOI'); f.api.clearConfigMemory_();
-  assert.strictEqual(f.api.cfg_(key), before, 'còn trong bộ đệm 60 giây: chưa thấy giá trị mới (đúng như Google)');
-  f.env.state.cacheClockMs = 61e3; f.api.clearConfigMemory_();
-  assert.strictEqual(f.api.cfg_(key), 'NGAN HANG MOI', 'sau 61 giây bộ đệm hết hạn: đọc lại từ Sheets');
+  // Đồng hồ của mock bộ đệm là Date.now() + cacheClockMs: đóng băng Date.now cho cả test, để một mili giây thật xen giữa lúc ghi và lúc đọc không làm hạn 5 giây lệch (mọi dời giờ bên dưới dùng cacheClockMs).
+  const realNow = Date.now, T0 = realNow(); Date.now = () => T0;
+  try {
+    const { api, env } = load({ props: {} }), C = env.globals.CacheService.getScriptCache(), st = env.state;
+    C.put('a', 'x', 5); assert.strictEqual(C.get('a'), 'x');
+    st.cacheClockMs = 4999; assert.strictEqual(C.get('a'), 'x', 'chưa hết hạn');
+    st.cacheClockMs = 5000; assert.strictEqual(C.get('a'), null, 'hết hạn đúng lúc: get trả null'); assert.ok(!('a' in st.cache), 'mục hết hạn bị bỏ');
+    st.cacheClockMs = 0; C.put('d', 'y'); st.cacheClockMs = 599e3; assert.strictEqual(C.get('d'), 'y'); st.cacheClockMs = 600e3; assert.strictEqual(C.get('d'), null, 'mặc định 600 giây');
+    st.cacheClockMs = 0; C.put('m', 'z', 21600); C.putAll({ p: '1', q: '2' }, 10); st.cacheClockMs = 11e3; assert.deepStrictEqual(C.getAll(['m', 'p', 'q']), { m: 'z' }, 'getAll bỏ mục hết hạn');
+    st.cacheClockMs = 0; C.put('a', 'old', 1); st.cacheClockMs = 1500; C.put('a', 'new', 100); assert.strictEqual(C.get('a'), 'new', 'ghi đè đặt lại hạn');
+    const throws = (fn, re, why) => assert.throws(fn, re, why);
+    throws(() => C.put('k', 5), /Invalid argument: value/, 'số không phải chữ'); throws(() => C.put('k', { a: 1 }), /Invalid argument: value/); throws(() => C.put('k', null), /Invalid argument: value/); throws(() => C.put('k', undefined), /Invalid argument: value/);
+    throws(() => C.put('', 'x'), /Invalid argument: key/, 'khoá trống'); throws(() => C.get(''), /Invalid argument: key/); throws(() => C.put(null, 'x'), /Invalid argument: key/); throws(() => C.get(undefined), /Invalid argument: key/);
+    throws(() => C.put('k', 'x', 0), /expirationInSeconds/, 'hạn 0'); throws(() => C.put('k', 'x', -3), /expirationInSeconds/); throws(() => C.put('k', 'x', 0.5), /expirationInSeconds/); throws(() => C.put('k', 'x', NaN), /expirationInSeconds/); throws(() => C.put('k', 'x', '60'), /expirationInSeconds/); throws(() => C.put('k', 'x', 21601), /expirationInSeconds/);
+    throws(() => C.putAll({ ok: 'x', bad: 7 }), /Invalid argument: value/); assert.strictEqual(C.get('ok'), null, 'putAll hỏng thì không ghi gì');
+    throws(() => C.put('k'.repeat(251), 'x'), /key/); throws(() => C.put('k', 'x'.repeat(102401)), /value/);
+    // Mục test ghi tay không có hạn (test vẫn đọc ghi st.cache trực tiếp được)
+    st.cache.tay = 'v'; st.cacheClockMs = 1e9; assert.strictEqual(C.get('tay'), 'v');
+    // Tác động thật: bộ đệm CONFIG sống 60 giây (CFG_CACHE_SECONDS_). Sửa ô CONFIG bằng tay (không qua onEdit) chỉ thấy sau 60 giây.
+    const f = fx814(), key = 'BANK_NAME'; f.api.clearConfigCache_(); f.env.state.cacheClockMs = 0;
+    const before = f.api.cfg_(key); assert.ok(before, 'có giá trị mẫu');
+    X2h.put(f, 'CONFIG', X2h.find(f, 'CONFIG', key), 'value', 'NGAN HANG MOI'); f.api.clearConfigMemory_();
+    assert.strictEqual(f.api.cfg_(key), before, 'còn trong bộ đệm 60 giây: chưa thấy giá trị mới (đúng như Google)');
+    f.env.state.cacheClockMs = 61e3; f.api.clearConfigMemory_();
+    assert.strictEqual(f.api.cfg_(key), 'NGAN HANG MOI', 'sau 61 giây bộ đệm hết hạn: đọc lại từ Sheets');
+  } finally { Date.now = realNow; }
 });
 
 t('I167', 'Soát X2 (FIX A): khoá bận NGAY SAU KHI ghi nhận phiên bản: menu 1 vẫn ok nhưng chữ nói thật (chưa ghi RELEASE_LOG, còn dở), bản tóm tắt được giữ bền; menu 1 lần sau (hoặc job mỗi giờ) làm nốt đúng phần thiếu, trạng thái cuối y hệt lượt không bị cắt; lần sau nữa im lặng', () => {
