@@ -1,11 +1,12 @@
 # Hướng dẫn vận hành thaiput v8 (bản 8.1.4)
 
-*Cập nhật 02/11/2026. Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
+*Cập nhật 02/11/2026, bổ sung Phần L4 ngày 12/11/2026. Áp dụng cho STAGING; từ chunk 6 (go live) áp dụng cho cả PRODUCTION. Mọi việc trong file này làm trên file Google Sheets của hệ thống hoặc trên trang quản trị, không cần sửa code.*
 
 ## Thay đổi so với bản trước
 
 Bản trước: 8.0.10 (18/10/2026, đã xuất) và bản nháp 8.1.1 (01/11, chưa xuất). Những điểm mới:
 
+* **Bổ sung 12/11/2026 (không đổi code):** Phần L4 thêm tình huống học viên nhắn riêng xin giờ mà tutor chưa mở. **Đặt thay chỉ chọn được giờ tutor đã mở**; trang quản trị chưa có nút mở giờ hộ tutor (BACKLOG BL70).
 * **Email gửi cố định qua GmailApp (8.1.4):** không còn file MailFix, không còn bước tìm và thay sau mỗi lần dán code. Ô mới `MAIL_TRANSPORT` (B8). Tab MAIL_LOG thêm cột `transport`. Tình huống thư không tới: Phần L3.
 * **Phần B viết lại đủ 98 ô CONFIG** theo bản 8.1.4. Ô mới: bù buổi (8.1.0), link đăng nhập theo vai trò, lịch tutor kiểu `THỨ GIỜ`, 3 ô kết quả buổi (8.1.1), `LOG_KEEP_DAYS`, 4 ô `SHORT_URL_*`, `MOVED_TO_URL` (8.1.3), `MAIL_TRANSPORT` (8.1.4). Ô cũ đã bỏ: B15.
 * **Phần C viết lại theo menu gom nhóm** (8.1.3): menu con Người dùng, Gói học, Báo cáo, Email, Cập nhật phiên bản, Chuyển hệ thống, Lưu trữ, Công cụ kỹ thuật, Test. Menu mới: Khoá tutor, Mở khoá tutor, Thêm gói, Lưu trữ mở file, Các bước chuyển dữ liệu, Chuyển hệ thống 4 bước, Tắt hết trigger. Menu 3 tạo **8** trigger (không còn 10). Menu chuyển dữ liệu v6 đã bỏ.
@@ -952,6 +953,7 @@ Phần I2, J. Tick cột `read` = đã đọc. Màu: đỏ Khẩn chưa đọc, 
 | Chọn nhầm kết quả | Chọn lại lựa chọn đúng ở `admin_action`. Ghi đè kết quả đã có bằng "Vắng tutor": chọn 2 lần trong 10 phút |
 | Hai học viên cùng một tutor cùng giờ (`DATA_INVARIANT`) | Mở dòng theo link trong thông báo, Đổi tutor hoặc huỷ một buổi |
 | Admin đặt thay cho học viên | Trang quản trị → tab **Học viên** → chọn học viên → **Đặt thay** |
+| Học viên nhắn riêng xin học vào giờ mà tutor chưa mở (ví dụ Tutor A, thứ Tư 11:00) | **Đặt thay chỉ chọn được giờ tutor đã mở và chưa có buổi.** Trang quản trị không có nút mở giờ hộ tutor. Làm theo thứ tự: 1. Nhắn tutor mở đúng giờ đó trên trang tutor (mở thêm giờ luôn được, kể cả sau thứ Bảy 22:00, miễn giờ chưa bắt đầu và nằm trong `BOOKING_HORIZON_DAYS` ngày; mỗi slot 30 phút, buổi học 25 phút). 2. Trang quản trị → tab **Học viên** → chọn học viên → **Đặt thay** → chọn ngày, giờ, đúng tutor đó. Bỏ qua hạn 15:00 hôm trước; vẫn giữ 1 buổi mỗi ngày, hạn và số buổi của gói. Học viên và tutor nhận email như khi học viên tự đặt. Báo `NO_TUTOR` nghĩa là: tutor chưa mở giờ đó, đã có buổi giờ đó, giờ bị khoá (BLOCKED) hoặc tutor đang bị khoá. Học viên chưa có gói dùng được thì trang báo ngay khi mở Đặt thay. **Cách phụ, chưa thử trên Google thật:** admin gõ tay một dòng ở AVAILABILITY với `avail_id` mới (`AV` và 6 số, lớn hơn mã cuối), `tutor_id`, `date` là ngày thật, `slot` dạng chữ `11:00`, `status = OPEN`. Gõ sai ngày hoặc giờ thì không ai thấy giờ đó và menu 2 không báo lỗi |
 
 ### L5. Tutor
 

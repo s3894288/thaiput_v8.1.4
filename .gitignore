@@ -1,0 +1,8 @@
+node_modules/
+test/REPORT.md
+dist_production/
+demo/
+.clasp.json
+.clasprc.json
+*.log
+.DS_Store
