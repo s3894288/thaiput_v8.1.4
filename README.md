@@ -9,7 +9,7 @@ Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy b
 | Đường dẫn | Nội dung |
 |---|---|
 | `src/` | Mã nguồn thật: 38 file `.gs`, `appsscript.json`, `ui/` (8 file `.html`). **Chỉ sửa ở đây** |
-| `test/` | Bộ giả lập Google (`gas_mock.js`, `load.js`), test hàm, 46 kịch bản, 212 test tích hợp, 67 test giao diện, test công cụ thử tải; `build_dist.js` dựng bản dán tay; `tools/bundle.js` đóng gói cho chat (không cần khi dùng GitHub) |
+| `test/` | Bộ giả lập Google (`gas_mock.js`, `load.js`), test hàm, 46 kịch bản, 228 test tích hợp, 71 test giao diện, test công cụ thử tải; `build_dist.js` dựng bản dán tay; `tools/bundle.js` đóng gói cho chat (không cần khi dùng GitHub) |
 | `dist/` | Bản dán tay sinh từ `src/`: `Code.gs` (gộp 38 file), `Index.html` (gộp giao diện), `appsscript.json`. Không sửa tay |
 | `companion/`, `dist_google_login/` | Dự án phụ đăng nhập Google cho admin (nguồn và bản dán tay) |
 | `loadtest/` | Công cụ thử tải STAGING (`run.js`, `browser.js`) |
@@ -33,7 +33,7 @@ npm run build:prod     dist_production/: mỗi file src/*.gs một file, kèm MA
 npm run clasp:push     đẩy src/ lên dự án Apps Script ghi trong .clasp.json
 ```
 
-Kết quả bản 8.1.9 (tới commit `5292935`, rà lại ngày 26 đến 27/11, sau soát chéo): hàm thuần 34/34, kịch bản 46/46, tích hợp 212/212 (211 tới `5292935`, I213 thêm ở lượt rà lần 2), giao diện 67/67, thử tải 2/2. `npm test` mất khoảng 2,5 phút.
+Kết quả bản 8.1.9 (tới commit `5292935`, rà lại ngày 26 đến 27/11, sau soát chéo): hàm thuần 34/34, kịch bản 46/46, tích hợp 228/228 (211 tới `5292935`; I213 đến I229 thêm ở lượt rà lần 2), giao diện 71/71 (67 tới `5292935`; U68 đến U71 thêm ở lượt rà lần 2), thử tải 2/2. `npm test` mất khoảng 2,5 phút.
 
 **Soát chéo 5R (14 đến 15/11):** bản giao đầu của 8.1.9 chỉ có test và 13 đột biến tự làm. Anh yêu cầu soát gắt: hai agent độc lập (X1, X2; X2 chạy 102 đột biến: 69 bị bắt, 33 sống sót, 9 tương đương), ba vòng sửa, supervisor soát từng vòng (vòng soát 3 tìm ra thêm lỗi hai lượt chạy chen nhau có thể làm hai email tóm tắt, đã sửa) và một lượt soát xác nhận cuối do supervisor (Opus) làm trên commit `5292935`: kết luận ĐẠT (PASS), kèm một cuộc đua thấp, không chặn, có từ trước (hai lượt menu 1 bấm sát nhau có thể giao tóm tắt hai lần, BL94; cách tránh: bấm menu 1 một lần và chờ hộp thoại). Soát tìm ra lỗi thật (mất chữ admin khi gộp key trùng, `active` của mẫu email đổi theo dòng sai, ảnh QR cũ tới 6 giờ, tóm tắt nâng cấp mất khi bị ngắt, email có thể gửi hai lần, khoá CONFIG có khoảng trắng thừa) và đã sửa; câu "156/156 xanh" và "13 đột biến bắt cả 13" của bản giao đầu được rút lại. Chi tiết và kết luận soát xác nhận: `PROGRESS.md` mục "Soát chéo và sửa (14 đến 15/11)". Vẫn chưa chạy trên Google thật.
 

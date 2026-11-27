@@ -6478,6 +6478,299 @@ t('I213', 'F1 (hồi quy): chữ gốc t.stats_note (chú thích dưới bảng 
   assert.ok(api.cfg_('RESULT_NOTICE_AFTER_HOURS') > 0 && api.cfg_('RESULT_EXPIRE_AFTER_HOURS') > api.cfg_('RESULT_NOTICE_AFTER_HOURS'));
 });
 
+t('I214', 'Mutation T1 (T1G01; A1-11): dedupeDuplicateKeys_ kiểm số dòng thực bỏ với số dự định; admin dán thêm một dòng cùng key ĐÚNG lúc sau khi nhật ký đã ghi thì lượt gộp ném lỗi "dự định bỏ" (menu 1 báo CẢNH BÁO), không im lặng bỏ thêm dòng', () => {
+  const { api, env } = dupEnv();
+  addDup(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK');
+  edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 0, { subject_vi: 'Bản đầu' }); edit1(api, 'EMAIL_TEMPLATES', 'LOGIN_LINK', 1, { subject_vi: 'Bản cuối' });
+  const S = env.globals.SpreadsheetApp, of = S.flush, f = { env }; let injected = 0;
+  S.flush = function () {
+    const r = of.apply(this, arguments), log = env.state.spreadsheets.NEW_DB.sheets.ACTIVITY_LOG, ai = log.values[0].indexOf('action');
+    if (!injected && log.values.some(row => row[ai] === 'TEMPLATE_DEDUPE')) { injected++; X2h.addCopy(f, 'EMAIL_TEMPLATES', X2h.find(f, 'EMAIL_TEMPLATES', 'LOGIN_LINK'), { subject_vi: 'Bản admin vừa dán' }); }
+    return r;
+  };
+  try { assert.throws(() => api.dedupeDuplicateKeys_(), /dự định bỏ 1 dòng, thực tế bỏ 2/); } finally { S.flush = of; }
+  assert.strictEqual(injected, 1, 'đã chèn dòng giữa kế hoạch và lần bỏ dòng');
+});
+
+t('I215', 'Mutation T1 (T1G02; A1-19): số đo gộp key được ghi BỀN (onPlan) trước khi sửa tab: menu 1 bị cắt ngay khi lần bỏ dòng đầu tiên sắp xoá mốc PURGE_OPEN (tab đã gộp xong) thì lượt chạy lại vẫn có mục DUP_MERGED của key đã gộp ở lượt bị cắt trong RELEASE_LOG', () => {
+  const f = fx814();
+  const k = xKilled(f, (n, a) => /getScriptProperties\(\)\.deleteProperty$/.test(n) && /^PURGE_OPEN_/.test(String(a[0])), (api) => api.setupFirstRun());
+  assert.ok(/deleteProperty/.test(k.st.at), k.st.at);
+  xRun(f).setupFirstRun();
+  const merged = xSet(f, 'RELEASE_LOG').filter(x => x.kind === 'DUP_MERGED').map(x => x.item).sort();
+  assert.strictEqual(merged.length, 2, 'cả hai key trùng của fixture (một gộp ở lượt bị cắt, một ở lượt chạy lại) đều có mục DUP_MERGED: ' + merged.join(', '));
+});
+
+t('I216', 'Mutation T1 (T1G03; A2-03, A2-04, A2-25): bản ghi giao bị THAY bằng bản ghi của lần nâng cấp khác (cùng bản đích, mốc ghi nhận at khác, mọi đường chưa làm) ngay trước MỖI lần lấy khoá của lượt giao nốt (job mỗi giờ, menu 1): lượt đang chạy nhận ra (gone) ở sync, ở bước nhận gửi email và ở bước đọc lại sau khi gửi, và KHÔNG ghi gì đè lên bản ghi mới', () => {
+  [['job mỗi giờ', (a) => a.hourlyJob()]].forEach(([name, runA]) => {   // (menu 1 đọc lại bản ghi ở bước giao nên thay bản ghi trước lần đọc đó là hợp lệ: chỉ thử ở giữa các lần khoá của job)
+    const f0 = xPendingFixture(), total = xLockCount(f0, () => { try { runA(xRun(f0)); } catch (e) { } }), bad = [];
+    assert.ok(total >= 8, name + ': số lần lấy khoá ' + total);
+    for (let k = 1; k <= total; k++) {
+      const f = xPendingFixture(), L = f.env.globals.LockService, og = L.getScriptLock; let n = 0, tampered = null, read = false;
+      const sp = f.env.globals.PropertiesService.getScriptProperties(), ogp = sp.getProperty; sp.getProperty = function (key) { if (key === 'RELEASE_PENDING') read = true; return ogp.apply(this, arguments); };   // chỉ thay bản ghi SAU khi lượt chạy đã đọc nó
+      L.getScriptLock = function () {
+        const l = og.apply(this, arguments), tl = l.tryLock;
+        l.tryLock = function () {
+          n++;
+          if (n === k && tampered === null && read) { const p = f.env.state.props; if (p.RELEASE_PENDING) { const o = JSON.parse(p.RELEASE_PENDING); o.at = Number(o.at) + 5000; tampered = p.RELEASE_PENDING = JSON.stringify(o); } }
+          return tl.apply(l, arguments);
+        };
+        return l;
+      };
+      try { runA(xRun(f)); } catch (e) { } finally { L.getScriptLock = og; sp.getProperty = ogp; }
+      if (tampered !== null && f.env.state.props.RELEASE_PENDING !== tampered) bad.push(k);
+    }
+    assert.deepStrictEqual(bad, [], name + ': lượt chạy ghi đè bản ghi của lần nâng cấp khác ở các điểm khoá ' + bad.join(','));
+  });
+  // (b) bản ghi bị thay NGAY SAU KHI Google nhận email (giữa lúc nhận gửi và lúc đọc lại để ghi kết quả): cả job và menu 1 không ghi đè bản ghi mới
+  [['job mỗi giờ', (a) => a.hourlyJob()], ['menu 1', (a) => a.setupFirstRun()]].forEach(([name, runA]) => {
+    const f = xPendingFixture(), G = f.env.globals.GmailApp, og = G.sendEmail; let tampered = null;
+    G.sendEmail = function (to, subject) {
+      const r = og.apply(this, arguments);
+      if (/8\.1\.9/.test(subject) && tampered === null && f.env.state.props.RELEASE_PENDING) { const o = JSON.parse(f.env.state.props.RELEASE_PENDING); o.at = Number(o.at) + 5000; tampered = f.env.state.props.RELEASE_PENDING = JSON.stringify(o); }
+      return r;
+    };
+    try { runA(xRun(f)); } finally { G.sendEmail = og; }
+    assert.ok(tampered, name + ': đã thay bản ghi sau khi gửi');
+    assert.strictEqual(f.env.state.props.RELEASE_PENDING, tampered, name + ': bản ghi của lần nâng cấp khác không bị ghi đè sau khi gửi email');
+  });
+});
+
+t('I217', 'Mutation T1 (T1G04; A2-05): lượt B nhận gửi email (dấu 4) và bị cắt NGAY SAU KHI Google nhận thư, đúng lúc trước MỖI lần lấy khoá của lượt A (A đã đọc mail = 0): bước nhận gửi của A thấy dấu 4 và từ chối (veto "taken"), không bao giờ hai email', () => {
+  const killAfterSend = (n, a, st) => { if (st.sent) return true; if (n === 'GmailApp.sendEmail') st.sent = true; return false; };
+  [['job mỗi giờ', (a) => a.hourlyJob()], ['menu 1', (a) => a.setupFirstRun()]].forEach(([name, runA]) => {
+    const f0 = xPendingFixture(), total = xLockCount(f0, () => { try { runA(xRun(f0)); } catch (e) { } }), bad = []; let cut = 0;
+    for (let k = 1; k <= total; k++) {
+      const f = xPendingFixture(), L = f.env.globals.LockService, og = L.getScriptLock; let n = 0, fired = false, wrap = null;
+      wrap = function () {
+        const l = og.apply(this, arguments), tl = l.tryLock;
+        l.tryLock = function () {
+          n++;
+          if (n === k && !fired) { fired = true; L.getScriptLock = og; const kc = xKill(f, killAfterSend); try { xRun(f).hourlyJob(); } catch (e) { } finally { kc.restore(); } if (kc.st.dead) cut++; L.getScriptLock = wrap; }
+          return tl.apply(l, arguments);
+        };
+        return l;
+      };
+      L.getScriptLock = wrap;
+      try { runA(xRun(f)); } catch (e) { } finally { L.getScriptLock = og; }
+      f.env.state.lockBusy = false;
+      for (let i = 0; i < 3; i++) { try { xRun(f).hourlyJob(); } catch (e) { } }
+      const s = xState(f); if (s.mails > 1) bad.push('k=' + k + ' mails=' + s.mails);
+    }
+    assert.ok(cut >= 1, name + ': có ít nhất một lượt B bị cắt sau khi gửi (' + cut + ')');
+    assert.deepStrictEqual(bad, [], name + ': email gửi hơn một lần: ' + bad.join('; '));
+  });
+});
+
+t('I218', 'Mutation T1 (T1G05; A2-14, A2-15): bản ghi giao CHƯA niêm phong của bản đang cài còn sót (lượt khác ghi sau khi phiên bản đã ghi nhận) là rác: menu 1 cùng phiên bản (khi nó xuất hiện SAU bước đầu của menu) và job mỗi giờ đều xoá nó, không giao gì', () => {
+  const stale = (f) => { const api = xRun(f), rec = api.releaseEmptyRecord_(); rec.target = api.APP.VERSION; rec.sealed = false; rec.items = [{ kind: 'CONFIG_ADDED', item: 'RAC_X', vi: 'x', en: 'x' }]; api.releasePendingWrite_(rec); };
+  const done = () => { const f = fx814(); f.api.setupFirstRun(); assert.strictEqual(xPending(f).length, 0, 'nâng cấp xong, hết bản ghi'); return f; };
+  // (a) job mỗi giờ
+  const a = done(); stale(a); assert.ok(xPending(a).length > 0, 'đã dựng bản ghi rác');
+  xRun(a).hourlyJob();
+  assert.strictEqual(xPending(a).length, 0, 'job mỗi giờ xoá bản ghi rác chưa niêm phong');
+  assert.strictEqual(xSet(a, 'NOTIFICATIONS').filter(n => n.event === 'RELEASE_NOTES').length, 1, 'không tạo thêm thông báo');
+  // (b) menu 1: bản ghi rác xuất hiện SAU bước đầu của menu (ở lần SpreadsheetApp.flush ngay trước releaseRecord_), upgradeStart_ đã chạy rồi nên chỉ releaseResumeFromMenu_ còn dọn được.
+  // Lượt đo trước: số lần flush đã chạy tại lần đọc APP_VERSION_LAST CUỐI (chính là của releaseRecord_).
+  const hookRun = (f, onFlush) => {
+    const S = f.env.globals.SpreadsheetApp, of = S.flush, sp = f.env.globals.PropertiesService.getScriptProperties(), og = sp.getProperty, c = { flush: 0, lastRead: 0 };
+    S.flush = function () { c.flush++; onFlush(c); return of.apply(this, arguments); };
+    sp.getProperty = function (k) { if (k === 'APP_VERSION_LAST') c.lastRead = c.flush; return og.apply(this, arguments); };
+    try { xRun(f).setupFirstRun(); } finally { S.flush = of; sp.getProperty = og; }
+    return c;
+  };
+  const F = hookRun(done(), () => { }).lastRead;
+  assert.ok(F > 0, 'đo được lần flush trước releaseRecord_: ' + F);
+  const b = done(); let wrote = 0;
+  hookRun(b, (c) => { if (c.flush === F) { stale(b); wrote++; } });
+  assert.strictEqual(wrote, 1, 'đã chèn bản ghi rác giữa menu');
+  assert.strictEqual(xPending(b).length, 0, 'menu 1 cùng phiên bản xoá bản ghi rác xuất hiện sau bước đầu: còn ' + xPending(b).length + ' khoá');
+});
+
+t('I219', 'Mutation T1 (T1G06; A2-18): releasePack_ khi hết RELEASE_PENDING_MAX_PARTS_ phần: số mục đã lưu cộng trunc bằng ĐÚNG số mục vào (mục làm tràn phần cuối cũng được đếm), không im lặng mất một mục', () => {
+  const { api } = freshEnv();
+  const total = 60, items = Array.from({ length: total }, (_, i) => ({ kind: 'CONTENT_ADDED', item: 'k.' + i, vi: 'Ă'.repeat(1500) + i, en: 'e'.repeat(1500) + i }));
+  const rec = api.releaseEmptyRecord_(); rec.sealed = true; rec.at = 1; rec.items = items;
+  const out = api.releasePack_(rec), keys = Object.keys(out);
+  assert.strictEqual(keys.length, api.RELEASE_PENDING_MAX_PARTS_, 'đầy số phần tối đa: ' + keys.length);
+  const head = JSON.parse(out.RELEASE_PENDING); let stored = head.items.length;
+  keys.filter(k => k !== 'RELEASE_PENDING').forEach(k => { stored += JSON.parse(out[k]).length; });
+  assert.ok(head.trunc > 0 && stored > 0, 'có cắt bớt: trunc ' + head.trunc);
+  assert.strictEqual(stored + head.trunc, total, 'đã lưu ' + stored + ' + bỏ ' + head.trunc + ' phải bằng ' + total);
+  keys.forEach(k => assert.ok(Buffer.byteLength(out[k], 'utf8') <= api.RELEASE_PENDING_MAX_BYTES_, k + ' vượt cỡ byte'));
+});
+
+t('I220', 'Mutation T1 (T1G07; A2-35): email tóm tắt lỗi lần thứ 5 (bỏ cuộc) đúng lúc bản ghi đã bị thay bằng bản ghi của lần nâng cấp khác: lượt chạy nhận ra gone, vẫn báo một thông báo trung thực nhưng KHÔNG xoá bản ghi mới (finish không làm gì khi gone)', () => {
+  [['job mỗi giờ', (a) => a.hourlyJob()], ['menu 1', (a) => a.setupFirstRun()]].forEach(([name, runA]) => {
+    const f = xPendingFixture(), P = f.env.state.props, o0 = JSON.parse(P.RELEASE_PENDING);
+    o0.tries = Object.assign({}, o0.tries, { mail: 4 }); P.RELEASE_PENDING = JSON.stringify(o0);   // đã lỗi 4 lần, lần thứ 5 sẽ bỏ cuộc
+    const G = f.env.globals.GmailApp, og = G.sendEmail; let tampered = null;
+    G.sendEmail = function (to, subject) {
+      if (/8\.1\.9/.test(subject)) { const o = JSON.parse(P.RELEASE_PENDING); o.at = Number(o.at) + 5000; o.tries = {}; tampered = P.RELEASE_PENDING = JSON.stringify(o); throw new Error('Gmail hỏng (giả lập)'); }
+      return og.apply(this, arguments);
+    };
+    try { runA(xRun(f)); } finally { G.sendEmail = og; }
+    assert.ok(tampered, name + ': đã chạm tới lần gửi email');
+    assert.strictEqual(P.RELEASE_PENDING, tampered, name + ': bản ghi của lần nâng cấp khác còn nguyên (không bị xoá khi lượt này bỏ cuộc)');
+    assert.strictEqual(f.env.state.mails.filter(m => /8\.1\.9/.test(m.subject)).length, 0, name + ': không gửi được email nào');
+    assert.strictEqual(xSet(f, 'NOTIFICATIONS').filter(n => n.event === 'MAIL_FAILED' && n.entity === 'RELEASE').length, 1, name + ': đúng một thông báo bỏ cuộc');
+  });
+});
+
+t('I221', 'Mutation T1 (T1G08; A2-33): menu 1 nâng cấp mới (check = false) xen kẽ với job mỗi giờ BỊ CẮT sau khi một số đường giao đã xong và đã ghi bền (act; act+log; act+log+notif) ngay trước MỖI lần lấy khoá của menu: menu thấy các đường đó đã xong (sync chép trạng thái) và không làm lại: nhật ký RELEASE, RELEASE_LOG, thông báo đúng một, email tối đa một', () => {
+  const ref = xRef(), bad = [];
+  const variants = [['act', (l) => l.act === 1 && l.log === 0], ['act+log', (l) => l.log === 1 && l.notif === 0], ['act+log+notif', (l) => l.notif === 1 && l.mail === 0]];
+  const make = () => fx814();
+  const f0 = make(), nLocks = xLockCount(f0, () => { try { xRun(f0).setupFirstRun(); } catch (e) { } });
+  assert.ok(nLocks >= 10, 'số lần lấy khoá của menu 1: ' + nLocks);
+  variants.forEach(([vname, when]) => {
+    let cutOnce = 0;
+    for (let k = 1; k <= nLocks; k++) {
+      const f = make(), L = f.env.globals.LockService, og = L.getScriptLock; let n = 0, fired = false, wrap = null;
+      const pred = (nm, a, st) => { if (st.hit) return true; const legs = /getScriptProperties\(\)\.setProperties$/.test(nm) ? xRecordLegs(a) : null; if (legs && when(legs)) st.hit = true; return false; };
+      wrap = function () {
+        const l = og.apply(this, arguments), tl = l.tryLock;
+        l.tryLock = function () {
+          n++;
+          if (n === k && !fired) { fired = true; L.getScriptLock = og; const kc = xKill(f, pred); try { xRun(f).hourlyJob(); } catch (e) { } finally { kc.restore(); } if (kc.st.dead) cutOnce++; f.env.state.lockBusy = false; L.getScriptLock = wrap; }
+          return tl.apply(l, arguments);
+        };
+        return l;
+      };
+      L.getScriptLock = wrap;
+      try { xRun(f).setupFirstRun(); } catch (e) { } finally { L.getScriptLock = og; }
+      for (let i = 0; i < 3; i++) { try { xRun(f).hourlyJob(); } catch (e) { } }
+      const s = xState(f), probs = [];
+      if (s.activity !== 1) probs.push('RELEASE activity ' + s.activity); if (s.notif !== 1) probs.push('notif ' + s.notif); if (s.mails > 1) probs.push('mails ' + s.mails);
+      if (JSON.stringify(s.log) !== JSON.stringify(ref.log)) probs.push('RELEASE_LOG ' + s.log.length + ' vs ' + ref.log.length);
+      if (probs.length) bad.push(vname + ' k=' + k + ': ' + probs.join(','));
+    }
+    assert.ok(cutOnce >= 1, vname + ': có ít nhất một lượt job bị cắt đúng chỗ (' + cutOnce + ')');
+  });
+  assert.deepStrictEqual(bad.slice(0, 8), [], 'làm lại đường đã xong: ' + bad.length + ' điểm');
+});
+
+t('I222', 'Mutation T1 (T1G09; A3-11, A3-15): khoá CONFIG trùng chỉ khác dấu cách mà dòng kia CŨNG trống hoặc bằng mặc định thì KHÔNG báo "nghi giá trị admin bị bỏ qua" (suspect null, câu báo không có CHÚ Ý/ATTENTION); chỉ báo khi dòng kia mang giá trị khác mặc định', () => {
+  const { api } = freshEnv();
+  const row = (r, key, value) => ({ _row: r, key, value });
+  // (a) cả hai dòng trống: không nghi
+  let tw = api.cfgKeyPlan_([row(2, 'BANK_NAME ', ''), row(3, 'BANK_NAME', '')]).twins;
+  assert.strictEqual(tw.length, 1); assert.strictEqual(tw[0].suspect, null, 'hai dòng trống: không nghi');
+  assert.ok(!/CHÚ Ý/.test(api.cfgTwinText_(tw[0], false)) && !/ATTENTION/.test(api.cfgTwinText_(tw[0], true)));
+  // (b) dòng kia bằng mặc định của khoá (khoá có mặc định khác trống): không nghi
+  const key = Object.keys(api.DEFAULTS_).find(k => String(api.DEFAULTS_[k]).trim() !== '' && !/[\s]/.test(k));
+  tw = api.cfgKeyPlan_([row(2, key + ' ', String(api.DEFAULTS_[key])), row(3, key, '')]).twins;
+  assert.strictEqual(tw[0].suspect, null, 'dòng kia bằng mặc định: không nghi');
+  // (c) dòng kia mang giá trị KHÁC mặc định: nghi, và nêu đúng hàng
+  tw = api.cfgKeyPlan_([row(2, 'BANK_NAME ', 'Vietcombank'), row(3, 'BANK_NAME', '')]).twins;
+  assert.deepStrictEqual(tw[0].suspect, { effective: 3, others: [2] }, 'giá trị admin ở dòng không có hiệu lực: nghi');
+  assert.ok(/CHÚ Ý/.test(api.cfgTwinText_(tw[0], false)) && /ATTENTION/.test(api.cfgTwinText_(tw[0], true)));
+  // (d) câu báo nêu đúng hàng nào đang có hiệu lực (3) và hàng nào mang giá trị khác mặc định (2): "while row 2", "hàng 2 (cùng khoá)", "copy ... into row 3, then delete row 2"
+  const en = api.cfgTwinText_(tw[0], true), vi = api.cfgTwinText_(tw[0], false);
+  assert.ok(/row in effect \(row 3\) holds the DEFAULT or an EMPTY value while row 2 \(same key\)/.test(en), en); assert.ok(/copy the wanted value into row 3, then delete row 2/.test(en), en);
+  assert.ok(/dòng đang có hiệu lực \(hàng 3\) đang mang giá trị MẶC ĐỊNH hoặc TRỐNG, trong khi hàng 2 \(cùng khoá\)/.test(vi), vi);
+});
+
+t('I223', 'Mutation T1 (T1G10; A4-07): bankQrRead_ kiểm cỡ THẬT của nội dung đã tải (getBlob) chứ không tin getSize của Drive: file mà getSize báo nhỏ (hoặc 0) nhưng nội dung quá 300 KB bị từ chối TOO_LARGE, không thành data URI trăm KB trong bộ nhớ đệm và JSON trang', () => {
+  const f = fx814(), h = X2h; f.api.setupFirstRun();
+  h.qrFile(f, 'QRLIEDSIZEFILE', { bytes: Buffer.alloc(301 * 1024, 1) });
+  const DA = f.env.globals.DriveApp, og = DA.getFileById;
+  DA.getFileById = (id) => Object.assign({}, og(id), { getSize: () => 1000 });
+  const r = f.api.bankQrRead_('QRLIEDSIZEFILE');
+  assert.strictEqual(r.ok, false); assert.strictEqual(r.code, 'TOO_LARGE'); assert.ok(/301 KB/.test(r.fix), r.fix);
+  h.setCfg(f, 'BANK_QR_IMAGE', 'QRLIEDSIZEFILE');
+  assert.strictEqual(f.api.apiBankQr().data.src, '', 'trang không nhận ảnh quá cỡ');
+  DA.getFileById = og;
+});
+
+t('I224', 'Mutation T1 (T1G11; A4-19): bankQrEditCheck_ coi vùng sửa tay quá 200 hàng là "có thể chạm khoá QR" và làm mới ảnh ngay, KHÔNG đọc từng hàng (vùng vượt getMaxRows() không bao giờ bị getRange, luật 25); vùng nhỏ không chạm khoá theo dõi thì không làm mới', () => {
+  const f = fx814(), h = X2h; f.api.setupFirstRun(); f.api.clearDbCache_();
+  const ss = f.env.globals.SpreadsheetApp.openById('NEW_DB'), sh = ss.getSheetByName('CONFIG');
+  const range = (row, n) => ({ getRow: () => row, getNumRows: () => n });
+  const rev = () => f.env.state.props.BANK_QR_REV || '';
+  // dòng đầu tiên của khoá không theo dõi (khoá lạ của test), để thử vùng nhỏ không chạm khoá nào theo dõi
+  h.addRow(f, 'CONFIG', { key: 'T1_KHOA_KHAC', value: '1' });
+  const r0 = h.find(f, 'CONFIG', 'T1_KHOA_KHAC') + 1;
+  const before = rev();
+  assert.strictEqual(f.api.bankQrEditCheck_(sh, range(r0, 1)), false, 'một ô khoá khác: không làm mới'); assert.strictEqual(rev(), before);
+  // vùng rất lớn (vượt số hàng của tab): không getRange, coi là chạm, làm mới
+  let calls = 0; const og = sh.getRange; sh.getRange = function () { calls++; if (arguments[2] > 1000) throw new Error('getRange vượt getMaxRows()'); return og.apply(this, arguments); };
+  let hit; try { hit = f.api.bankQrEditCheck_(sh, range(r0, 5000)); } finally { sh.getRange = og; }
+  assert.strictEqual(hit, true, 'vùng quá 200 hàng: coi là chạm khoá theo dõi'); assert.notStrictEqual(rev(), before, 'đã tăng số phiên bản ảnh');
+});
+
+t('I225', 'Mutation T1 (T1G14; A4-24): bankQrEditCheck_ tìm cột "key" theo tiêu đề (admin có thể đổi chỗ cột của tab CONFIG): sửa một ô ở dòng BANK_ACCOUNT khi cột key không còn ở cột 1 vẫn làm mới ảnh QR', () => {
+  const f = fx814(); f.api.setupFirstRun(); f.api.clearDbCache_();
+  const raw = f.env.state.spreadsheets.NEW_DB.sheets.CONFIG.values, ki = raw[0].indexOf('key'), vi = raw[0].indexOf('value');
+  assert.ok(ki === 0 && vi === 1, 'CONFIG: key ở cột 1, value ở cột 2 (điều kiện của test)');
+  raw.forEach(r => { const a = r[ki]; r[ki] = r[vi]; r[vi] = a; });   // admin kéo cột key sang cột 2
+  const row = raw.findIndex((r, i) => i > 0 && String(r[1]).trim() === 'BANK_ACCOUNT') + 1; assert.ok(row > 1);
+  const sh = f.env.globals.SpreadsheetApp.openById('NEW_DB').getSheetByName('CONFIG'), before = f.env.state.props.BANK_QR_REV || '';
+  assert.strictEqual(f.api.bankQrEditCheck_(sh, { getRow: () => row, getNumRows: () => 1 }), true, 'sửa dòng BANK_ACCOUNT (cột key ở cột 2): làm mới');
+  assert.notStrictEqual(f.env.state.props.BANK_QR_REV || '', before, 'đã tăng số phiên bản ảnh');
+  const other = raw.findIndex((r, i) => i > 0 && String(r[1]).trim() === 'SCHOOL_NAME') + 1; assert.ok(other > 1);
+  assert.strictEqual(f.api.bankQrEditCheck_(sh, { getRow: () => other, getNumRows: () => 1 }), false, 'dòng khác: không làm mới');
+});
+
+t('I226', 'Mutation T1 (T1G17; A6-09): sau purgeRows_ (các dòng giữ lại dồn lên) bộ nhớ cột khoá của verifyRow_ phải bị bỏ: một DbTable.update ngay sau đó trong cùng khoá (cùng đối tượng bảng, trong 1,5 giây) ghi đúng dòng mới, không ghi nhầm vào hàng cũ đang chứa dòng khác', () => {
+  const { api, env } = dupEnv();
+  api.withLock_(() => { const t = api.table_('CONFIG'); ['T1_K1', 'T1_K2', 'T1_K3'].forEach((k, i) => t.insert({ key: k, value: 'v' + (i + 1) })); });
+  api.clearDbCache_();
+  // Đồng hồ của verifyRow_ là Date.now (src/Db.gs, VERIFY_FRESH_MS_ = 1500). Đóng băng nó: bộ nhớ cột khoá KHÔNG bao giờ hết hạn theo thời gian, nên chỉ việc bỏ bộ nhớ ở purgeRows_ mới đọc lại được
+  // (không phụ thuộc máy chạy nhanh hay chậm; đột biến A6-09 bị bắt chắc chắn).
+  const realNow = Date.now; Date.now = () => 1.8e12;
+  try {
+    api.withLock_(() => {
+      const t = api.table_('CONFIG'), k1 = t.byId('T1_K1');
+      t.update(k1, { value: 'v1b' });   // đọc cột khoá vào bộ nhớ của verifyRow_
+      const removed = api.purgeRows_('CONFIG', (o) => String(o.key).trim() !== 'T1_K1');
+      assert.strictEqual(removed, 1);
+      const k2 = t.byId('T1_K2'); assert.ok(k2, 'bảng sau purge đã nạp lại');
+      t.update(k2, { value: 'v2b' });
+    });
+  } finally { Date.now = realNow; }
+  api.clearDbCache_();
+  const cfg = {}; api.table_('CONFIG').all().forEach(r => { cfg[String(r.key).trim()] = String(r.value); });
+  assert.strictEqual(cfg.T1_K2, 'v2b', 'K2 được cập nhật'); assert.strictEqual(cfg.T1_K3, 'v3', 'K3 (dòng ngay sau K2) không bị ghi nhầm: ' + cfg.T1_K3); assert.ok(!('T1_K1' in cfg), 'K1 đã bỏ');
+});
+
+t('I227', 'Mutation T1 (T1G18; A6-10): sau khi flush một dòng mới (insert) bộ nhớ cột khoá của verifyRow_ phải bị bỏ: DbTable.update dòng vừa thêm (đã ghi xuống Sheets) ngay sau đó trong cùng khoá không ném "không thấy dòng"', () => {
+  const { api } = dupEnv();
+  // Đồng hồ của verifyRow_ là Date.now (src/Db.gs): đóng băng để bộ nhớ cột khoá không hết hạn theo thời gian; chỉ việc bỏ bộ nhớ khi flush mới đọc lại được (đột biến A6-10 bị bắt chắc chắn, mọi tốc độ máy).
+  const realNow = Date.now; Date.now = () => 1.8e12;
+  try {
+    api.withLock_(() => {
+      const t = api.table_('CONFIG'), a = t.byId('SCHOOL_NAME');
+      t.update(a, { value: String(a.value) });   // đọc cột khoá vào bộ nhớ của verifyRow_
+      const r = t.insert({ key: 'T1_NEW', value: 'x' });
+      api.flushDb_();
+      t.update(r, { value: 'y' });
+    });
+  } finally { Date.now = realNow; }
+  api.clearDbCache_();
+  assert.strictEqual(String(api.table_('CONFIG').byId('T1_NEW').value), 'y');
+});
+
+t('I228', 'Mutation T1 (T1G19; A7-03): sendTpl_ ghi MAIL_LOG với opts.kind khi có (mẫu thử PREVIEW_<key>, BOOKING_NONE ghi kind BOOKING_CONFIRM), không có thì dùng key của mẫu', () => {
+  const { api } = dupEnv();
+  const vars = { name: 'An', login_url: 'https://example.test/x', link_note: '', link_note_en: '' };
+  assert.ok(api.withLock_(() => api.sendTpl_('LOGIN_LINK', 'hoc.vien@example.com', vars, { kind: 'PREVIEW_LOGIN_LINK' })));
+  assert.ok(api.withLock_(() => api.sendTpl_('LOGIN_LINK', 'hoc.vien@example.com', vars)));
+  api.clearDbCache_();
+  const kinds = api.table_('MAIL_LOG').all().filter(r => /LOGIN_LINK/.test(r.kind)).map(r => r.kind);
+  assert.deepStrictEqual(kinds, ['PREVIEW_LOGIN_LINK', 'LOGIN_LINK'], 'kind theo opts.kind, mặc định theo key mẫu');
+});
+
+t('I229', 'Mutation T1 (T1G20; A7-08, A7-12): sendTpl_ với mẫu không có thì NÉM LỖI (luật 8, không return im lặng); emailTemplate_ cắt khoảng trắng của key khi tra (dòng "LOGIN_LINK " vẫn là mẫu LOGIN_LINK: chữ admin sửa và ô active có hiệu lực)', () => {
+  const { api, env } = dupEnv();
+  assert.throws(() => api.sendTpl_('KHONG_CO_MAU_NAY_T1', 'a@example.com', {}), /Không có mẫu email KHONG_CO_MAU_NAY_T1/);
+  // dòng có key thừa dấu cách (admin gõ tay), tắt mẫu và đổi tiêu đề
+  api.withLock_(() => { const t = api.table_('EMAIL_TEMPLATES'), r = t.all().find(x => String(x.key).trim() === 'LOGIN_LINK'); t.update(r, { key: 'LOGIN_LINK ', subject_vi: 'Tiêu đề admin T1', active: false }); });
+  const a2 = attach(env), t = a2.emailTemplate_('LOGIN_LINK');
+  assert.strictEqual(t.subject_vi, 'Tiêu đề admin T1', 'chữ admin sửa ở dòng có key thừa dấu cách vẫn được dùng');
+  assert.strictEqual(t.active, false, 'ô active của dòng đó vẫn có hiệu lực (mẫu tắt không bị gửi)');
+});
+
 // ##UPG_END
 module.exports = { results };
 if (require.main === module) {

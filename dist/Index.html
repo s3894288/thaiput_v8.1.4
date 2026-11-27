@@ -817,6 +817,7 @@ pre.logdetail { margin: 0; max-height: 40vh; overflow: auto; background: var(--s
     if (bankQrReq[marker]) return bankQrReq[marker];
     return (bankQrReq[marker] = T.api('apiBankQr').then(function (r) {
       delete bankQrReq[marker];
+      if (!r || !r.ok) return '';   // trả lời lỗi (mạng, máy chủ): KHÔNG nhớ ảnh rỗng, lần vẽ sau (đổi ngôn ngữ, quay lại trang) hỏi lại; kết quả ok mà rỗng vẫn được nhớ ở dưới
       var got = r && r.ok && r.data && r.data.qr ? String(r.data.qr) : marker;
       if (got !== marker) bankQrAlias[marker] = got;
       var src = r && r.ok && r.data && /^data:image\//.test(r.data.src || '') ? r.data.src : '';

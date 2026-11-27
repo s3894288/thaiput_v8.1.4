@@ -1899,6 +1899,62 @@ t('U67', 'Soát X2 M34: sau khi lưu giờ rảnh, lượt tải lại (drawAvai
 });
 
 
+t('U68', 'Mutation T1 (T1G12; A5-02): ảnh QR RỖNG (file hỏng) mà máy chủ trả dấu KHÁC dấu khung đã xin: kết quả rỗng cũng được nhớ theo dấu máy chủ trả, nên vẽ lại khung (đổi ngôn ngữ) không gọi lại apiBankQr (không dồn lượt vào máy chủ khi file QR hỏng)', async () => {
+  const c = mk(), id = qrSetup(c), hold = { apiPublicInfo: 1 };
+  const p = open(c, { page: 'home' }, { hold }); await p.flush(40);
+  const m1 = c.api.bankQrMarker_();
+  c.env.state.drive.files[id].trashed = true; c.api.bankQrBump_();   // file hỏng và số phiên bản mới giữa apiPublicInfo và apiBankQr
+  const m2 = c.api.bankQrMarker_(); assert.notStrictEqual(m1, m2);
+  p.release('apiPublicInfo'); await p.flush(60); p.clean();
+  const n = () => p.calls.filter(x => x.name === 'apiBankQr').length;
+  assert.strictEqual(n(), 1); assert.strictEqual(p.calls.find(x => x.name === 'apiBankQr').result.data.src, '', 'máy chủ trả ảnh rỗng'); assert.strictEqual(p.calls.find(x => x.name === 'apiBankQr').result.data.qr, m2);
+  assert.ok(!p.$('.bank-qr'), 'file hỏng: gỡ khung QR');
+  p.click('[data-langsw]'); await p.flush(40); p.clean();
+  assert.ok(!p.$('.bank-qr'), 'vẽ lại vẫn không có khung QR'); assert.strictEqual(n(), 1, 'đổi ngôn ngữ không gọi lại apiBankQr (kết quả rỗng đã nhớ theo dấu máy chủ trả)');
+});
+
+t('U69', 'Mutation T1 (T1G13; A5-04): mục ảnh QR trong bộ nhớ tab (sessionStorage) không phải data:image (bị sửa hoặc hỏng) không bao giờ được dùng làm src ảnh: trình duyệt bỏ nó và hỏi máy chủ', async () => {
+  const c = mk(); qrSetup(c);
+  const m = c.api.bankQrMarker_(), tab = { ['thaiput_bankqr_' + m]: 'javascript:alert(1)' };
+  const p = open(c, { page: 'home' }, { tabStorage: tab }); await p.flush(60); p.clean();
+  const img = p.$('.bank-qr img'); assert.ok(img, 'có ảnh QR');
+  assert.ok(/^data:image\//.test(img.getAttribute('src')), 'src là ảnh thật từ máy chủ, không phải mục hỏng: ' + img.getAttribute('src').slice(0, 40));
+  assert.strictEqual(p.calls.filter(x => x.name === 'apiBankQr').length, 1, 'đã hỏi máy chủ vì mục trong bộ nhớ tab không hợp lệ');
+  assert.ok(/^data:image\//.test(tab['thaiput_bankqr_' + m]), 'mục hỏng được thay bằng ảnh đúng');
+});
+
+t('U70', 'Mutation T1 (T1G15; A5-13): phản hồi giờ rảnh (tải trước) tới CHẬM khi tutor đã sang tab khác không được ghi vào st.av (khung đã gỡ, tab không còn là Giờ rảnh): quay lại tab Giờ rảnh rồi đổi ngôn ngữ trong lúc lượt tải mới còn chờ thì hiện khung chờ, không hiện lưới giờ cũ', async () => {
+  const c = mk(); const s1 = (await uiLogin(c, 'T001')).session;
+  const p = open(c, { page: 'tutor' }, { session: s1, hold: { apiTutorAvailability: 3 } }); await p.flush(60); p.clean();
+  assert.strictEqual(p.heldCount('apiTutorAvailability'), 1, 'bản tải trước (lượt 1) đang bị giữ');
+  p.click('.tab[data-tab="avail"]'); await p.flush(20); assert.ok(p.$('#tab-body .skeleton'), 'đang chờ bản tải trước');
+  p.click('.tab[data-tab="schedule"]'); await p.flush(20);   // sang tab khác: khung Giờ rảnh bị gỡ
+  p.release('apiTutorAvailability', 0); await p.flush(40); p.clean();   // phản hồi lượt 1 tới muộn, tab hiện tại không phải Giờ rảnh
+  p.click('.tab[data-tab="avail"]'); await p.flush(40);   // lượt 2 (bị giữ, không còn bản tải trước)
+  assert.strictEqual(p.heldCount('apiTutorAvailability'), 1, 'lượt 2 đang bị giữ');
+  assert.strictEqual(p.$$('.chip[data-key]').length, 0, 'lượt 2 chưa về: chưa có lưới giờ');
+  p.click('[data-langsw]'); await p.flush(40); p.clean();   // đổi ngôn ngữ: vẽ lại từ số đã tải (nếu có); phản hồi muộn của lượt 1 KHÔNG được để lại dữ liệu
+  assert.strictEqual(p.$$('.chip[data-key]').length, 0, 'không hiện lưới giờ từ phản hồi cũ tới muộn của tab đã rời');
+  assert.ok(p.$('#tab-body .skeleton'), 'vẫn là khung chờ');
+});
+
+t('U71', 'Hồi quy (T1, lỗi nhỏ): apiBankQr trả {ok:false} (lỗi mạng hoặc máy chủ) KHÔNG được nhớ thành ảnh rỗng: lần đầu không có khung QR, đổi ngôn ngữ vẽ lại thì hỏi máy chủ lần nữa và QR hiện; kết quả ok mà rỗng vẫn được nhớ (U68)', async () => {
+  const c = mk(); qrSetup(c);
+  const real = c.api.apiBankQr; let n = 0;
+  // T.api tự thử lại tối đa 4 lần với API đọc khi reason là NETWORK: mạng hỏng cả 4 lần của lượt vẽ đầu, rồi mạng lại tốt
+  c.api.apiBankQr = function () { n++; return n <= 4 ? { ok: false, reason: 'NETWORK' } : real.apply(this, arguments); };
+  try {
+    const p = open(c, { page: 'home' }); await p.flush(60); p.clean();
+    const calls = () => p.calls.filter(x => x.name === 'apiBankQr').length;
+    assert.strictEqual(calls(), 4, 'lượt vẽ đầu: 4 lần thử, đều lỗi mạng'); assert.strictEqual(p.calls.find(x => x.name === 'apiBankQr').result.ok, false);
+    assert.ok(!p.$('.bank-qr') && !p.$('.bank-qr img'), 'lần đầu lỗi: không có khung QR');
+    p.click('[data-langsw]'); await p.flush(60); p.clean();
+    assert.strictEqual(calls(), 5, 'đổi ngôn ngữ: hỏi lại apiBankQr (không nhớ trả lời lỗi)');
+    assert.ok(p.$('.bank.has-qr .bank-qr img') && /^data:image\//.test(p.$('.bank-qr img').getAttribute('src')), 'lần hai có ảnh QR');
+    assert.deepStrictEqual(p.errors, [], 'không lỗi trong trang');
+  } finally { c.api.apiBankQr = real; }
+});
+
 module.exports = { run };
 if (require.main === module) {
   run().then(r => { r.forEach(x => console.log((x.ok ? 'ĐẠT  ' : 'TRƯỢT ') + x.id + ' ' + x.title + (x.ok ? '' : '\n      ' + x.err))); process.exit(r.every(x => x.ok) ? 0 : 1); });
