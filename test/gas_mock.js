@@ -25,7 +25,7 @@ function createGasEnv(opts) {
     activeUserEmail: opts.activeUserEmail || 'admin.karn@gmail.com',
     effectiveUserEmail: 'booking@thaiput.vn',
     lockCalls: 0,
-    fetches: [],        // chunk 5R: mọi lượt UrlFetchApp.fetch { url, opts }; state.urlFetch(url, opts) do test đặt trả { code, body, headers }
+    fetches: [],        // chunk 5S: mọi lượt UrlFetchApp.fetch { url, opts }; state.urlFetch(url, opts) do test đặt trả { code, body, headers }
     formulaWrites: [],  // chuỗi bắt đầu bằng = ghi vào ô không phải dạng chữ: Sheets thật sẽ chạy thành công thức
     counter: 0
   };
@@ -198,7 +198,7 @@ function createGasEnv(opts) {
     computeDigest: (alg, s) => Array.from(crypto.createHash(alg).update(toBuf(s)).digest()).map(b => (b > 127 ? b - 256 : b)),
     getUuid: () => crypto.randomUUID(),
     // Google trả mảng byte có dấu (Java), như computeDigest.
-    // Google có 2 dạng: (String, String) và (Byte[], Byte[]); trộn kiểu thì Google báo không có hàm (chunk 5R, SigV4 cần dạng byte).
+    // Google có 2 dạng: (String, String) và (Byte[], Byte[]); trộn kiểu thì Google báo không có hàm (chunk 5S, SigV4 cần dạng byte).
     computeHmacSha256Signature: (value, key) => {
       if (Array.isArray(value) !== Array.isArray(key)) throw new Error('Cannot find method computeHmacSha256Signature(' + typeof value + ',' + typeof key + ')');
       return Array.from(crypto.createHmac('sha256', toBuf(key)).update(toBuf(value)).digest()).map(b => (b > 127 ? b - 256 : b));
@@ -213,7 +213,7 @@ function createGasEnv(opts) {
     sleep: () => {}
   };
 
-  // ── UrlFetchApp (chunk 5R: SES). Test đặt state.urlFetch = (url, opts) => ({ code, body, headers }) hoặc ném lỗi (mất mạng). ──
+  // ── UrlFetchApp (chunk 5S: SES). Test đặt state.urlFetch = (url, opts) => ({ code, body, headers }) hoặc ném lỗi (mất mạng). ──
   const UrlFetchApp = {
     fetch: (url, opts) => {
       opts = opts || {};

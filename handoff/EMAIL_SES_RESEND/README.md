@@ -2,6 +2,8 @@
 
 *Xuất 14/11/2026 từ nhánh `claude/hopeful-galileo-xa1dv9` (PR #2, đang tạm dừng theo lệnh anh Chris). Mục đích: mang toàn bộ phần email sang nhánh khác để hoàn thiện tiếp v8 đang vận hành, trong vòng 5S. Thư mục này tự đủ: không cần đọc nhánh cũ.*
 
+*Ghi chú 28/11: chunk này đã đổi tên từ 5R thành 5S; các file patch giữ tên cũ (`01_code_5R_ses.patch`) và giữ nguyên comment cũ ghi 5R vì đã xuất trước khi đổi tên.*
+
 ## 1. Tóm tắt một đoạn
 
 v8 gửi email qua Google (GmailApp), bị hạn mức của Google: khoảng 100 thư mỗi ngày khi Workspace còn dùng thử, 1.500 khi đã trả phí đủ ngày. Đã viết xong và test xong đường gửi thứ ba qua **Amazon SES** (bản 8.1.5), cắm vào đúng chỗ `src/MailTransport.gs` đã chừa từ 5Q. Bật bằng một ô CONFIG `MAIL_TRANSPORT = SES`; chưa bật thì email chạy y như 8.1.4. **Chưa gửi thật qua AWS lần nào**: chữ ký đã khớp vector mẫu của AWS trong test, lần gửi đầu trên STAGING là lần kiểm thật. **Resend** là phương án dự phòng: đã lên kế hoạch, chưa viết code.
@@ -42,10 +44,10 @@ Lưu ý khi áp:
 3. **`dist/` không nằm trong patch** (luật 28): chạy `npm run build` sau khi áp, commit cả `dist/`.
 4. **Mã test:** patch dùng I136, I137, I138 cho test SES. Nhánh đích đã dùng các mã này thì đổi sang mã trống kế tiếp.
 
-## 4. Thiết kế đã làm (bản 8.1.5, chunk 5R)
+## 4. Thiết kế đã làm (bản 8.1.5, chunk 5S)
 
 ### 4.1 Chỗ cắm
-Mọi email đi `sendTpl_` → `sendMail_` (Notify.gs) → `mailDeliver_` (MailTransport.gs). Chỉ `MailTransport.gs` được gọi dịch vụ gửi thư, đọc hạn mức và (từ 5R) gọi `UrlFetchApp`; test I133 quét `src/` và báo đỏ nếu file khác gọi (luật 19).
+Mọi email đi `sendTpl_` → `sendMail_` (Notify.gs) → `mailDeliver_` (MailTransport.gs). Chỉ `MailTransport.gs` được gọi dịch vụ gửi thư, đọc hạn mức và (từ 5S) gọi `UrlFetchApp`; test I133 quét `src/` và báo đỏ nếu file khác gọi (luật 19).
 
 ### 4.2 Gửi qua SES
 * API SES v2: `POST https://email.<vùng>.amazonaws.com/v2/email/outbound-emails`, thân JSON (`FromEmailAddress` có tên hiển thị, `Destination` To, Cc, Bcc, `ReplyToAddresses` = ADMIN_EMAIL, `Content.Simple` có Subject, Text, Html, đều UTF-8).
@@ -137,7 +139,7 @@ Quay về bất cứ lúc nào: đổi `MAIL_TRANSPORT = GMAILAPP`, không cần
 
 | Mã | Câu hỏi | Đề xuất |
 |---|---|---|
-| BL31 | Gửi email qua dịch vụ ngoài | Đã làm SES ở 5R |
+| BL31 | Gửi email qua dịch vụ ngoài | Đã làm SES ở 5S |
 | BL69 | Bảng hạn mức 5 dòng ở menu 2, kiểm 5 loại hộp thư | Làm cùng lần thử A9 |
 | BL70 | Dịch vụ: Resend, Postmark hay SES | Đổi thành SES (BL80) |
 | BL71 | Làm email bên thứ ba khi nào | Trước khi PRODUCTION tách riêng, để go live đã có hạn mức rộng |

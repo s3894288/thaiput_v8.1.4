@@ -114,12 +114,12 @@ var DEFAULTS_ = {
   REMINDER_WINDOW_MINUTES: 15,
   EXPIRY_NOTICE_DAYS: 3,
   MAIL_FROM_NAME: 'thaiput',
-  // Chunk 5Q: đường gửi email. GMAILAPP (mặc định, như MailFix cũ), MAILAPP (dự phòng, dễ bị trả về) hoặc SES (chunk 5R, Amazon SES,
+  // Chunk 5Q: đường gửi email. GMAILAPP (mặc định, như MailFix cũ), MAILAPP (dự phòng, dễ bị trả về) hoặc SES (chunk 5S, Amazon SES,
   // khoá ở Script Properties SES_KEY, SES_SECRET, SES_REGION). Xem MailTransport.gs.
   MAIL_TRANSPORT: 'GMAILAPP',
-  // Chunk 5R: địa chỉ gửi khi dùng SES, phải thuộc tên miền đã xác minh trong SES. Trống = no-reply@mail.<tên miền của ADMIN_EMAIL>.
+  // Chunk 5S: địa chỉ gửi khi dùng SES, phải thuộc tên miền đã xác minh trong SES. Trống = no-reply@mail.<tên miền của ADMIN_EMAIL>.
   MAIL_FROM_ADDRESS: '',
-  // Chunk 5R: số thư mỗi ngày qua SES (hạn mức tự đặt, tăng dần khi warm up tên miền mới; 0 = không giới hạn). Với GMAILAPP, MAILAPP
+  // Chunk 5S: số thư mỗi ngày qua SES (hạn mức tự đặt, tăng dần khi warm up tên miền mới; 0 = không giới hạn). Với GMAILAPP, MAILAPP
   // hạn mức do Google báo. Thư ưu tiên thấp dừng khi còn MAIL_LOW_QUOTA_RESERVE, marketing dừng khi còn MARKETING_QUOTA_RESERVE.
   MAIL_DAILY_CAP: 1400,
   ADMIN_EMAIL: 'admin@thaiput.vn',

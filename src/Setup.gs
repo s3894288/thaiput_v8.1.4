@@ -430,7 +430,7 @@ function testSystem(e) { requireOperator_(e);
     // 5Q: file MailFix.gs cũ còn trong dự án thì testMailFix là hàm công khai không kiểm quyền (trang web mở cho mọi người, luật 24).
     if (typeof testMailFix === 'function' || typeof sendEmailFix_ === 'function') err('Dự án Apps Script còn file MailFix.gs cũ: xoá file đó ngay (từ 8.1.4 gửi email cố định, không cần MailFix, không tìm và thay).');
     if (mailTransport_() === 'SES') {
-      // Chunk 5R: SES không có hạn mức Google; hạn mức là MAIL_DAILY_CAP tự đặt. Thiếu khoá thì mọi thư đang tự gửi lại bằng GmailApp.
+      // Chunk 5S: SES không có hạn mức Google; hạn mức là MAIL_DAILY_CAP tự đặt. Thiếu khoá thì mọi thư đang tự gửi lại bằng GmailApp.
       if (!sesConfig_()) err('MAIL_TRANSPORT = SES nhưng thiếu SES_KEY, SES_SECRET trong Thuộc tính tập lệnh (Cài đặt dự án → Thuộc tính tập lệnh): mọi thư đang tự gửi lại bằng GmailApp (hạn mức Google). Dán khoá hoặc đổi MAIL_TRANSPORT về GMAILAPP.');
       if (!String(cfg_('MAIL_FROM_ADDRESS') || '').trim()) warn('MAIL_FROM_ADDRESS trống: SES gửi từ ' + (mailFromAddress_() || '(không suy ra được)') + '. Địa chỉ phải thuộc tên miền đã xác minh trong SES.');
       lines.push('Email còn gửi được hôm nay qua SES: ' + (mb < 0 ? 'không giới hạn (MAIL_DAILY_CAP = 0)' : mb + ' (MAIL_DAILY_CAP ' + cfg_('MAIL_DAILY_CAP') + ', đã gửi ' + sesSentToday_(0) + ')'));

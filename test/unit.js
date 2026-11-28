@@ -1,7 +1,7 @@
 /**
  * unit.js · Test hàm thuần và lớp Db (U01 đến U26, P01 đến P08)
  *
- * VIẾT LẠI ngày 10/11/2026 (chunk 5R, kế hoạch P0 mục C3): file gốc không được đưa lên repo GitHub ngày 05/11. Mã và ý của
+ * VIẾT LẠI ngày 10/11/2026 (chunk 5S, kế hoạch P0 mục C3): file gốc không được đưa lên repo GitHub ngày 05/11. Mã và ý của
  * từng test lấy theo danh sách U01 đến U26 trong archive/BAO_CAO_CHUNKS.md và P01 đến P08 (chunk 5M, PROGRESS.md). Test nào
  * nghiệp vụ đã đổi sau khi viết bản gốc thì viết theo luật hiện hành và ghi rõ (U03: lịch tutor THỨ GIỜ, 5J; U06: số điện thoại
  * tự do, 5K; U25: chọn tutor ít buổi nhất rồi xoay vòng, 5A). Kết quả mong đợi lấy từ docs/01, docs/03 (B07 đến B24), không lấy

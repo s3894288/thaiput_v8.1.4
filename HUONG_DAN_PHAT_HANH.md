@@ -4,7 +4,7 @@
 
 ## Thay đổi so với bản trước (8.1.4, 02/11)
 
-* **Bản 8.1.5 (10/11, chunk 5R): quyền đổi.** `appsscript.json` thêm dòng `"https://www.googleapis.com/auth/script.external_request",` (gọi Amazon SES). Dán cả 3 file theo mục 2; ở bước 5 Google hỏi cấp quyền "Kết nối với dịch vụ bên ngoài": chọn tài khoản chạy hệ thống, **Cho phép**. Chưa cài SES thì không phải làm gì thêm: `MAIL_TRANSPORT` vẫn là GMAILAPP, email gửi như 8.1.4. Cài SES: `plan/P0_BUOC_TUNG_BUOC.md` mục 2.
+* **Bản 8.1.5 (10/11, chunk 5S): quyền đổi.** `appsscript.json` thêm dòng `"https://www.googleapis.com/auth/script.external_request",` (gọi Amazon SES). Dán cả 3 file theo mục 2; ở bước 5 Google hỏi cấp quyền "Kết nối với dịch vụ bên ngoài": chọn tài khoản chạy hệ thống, **Cho phép**. Chưa cài SES thì không phải làm gì thêm: `MAIL_TRANSPORT` vẫn là GMAILAPP, email gửi như 8.1.4. Cài SES: `plan/P0_BUOC_TUNG_BUOC.md` mục 2.
 * Quay lui về 8.1.4: dán lại 3 file 8.1.4, đổi `MAIL_TRANSPORT` về `GMAILAPP`. Hai ô mới `MAIL_FROM_ADDRESS`, `MAIL_DAILY_CAP` để nguyên (8.1.4 không đọc).
 
 ## Thay đổi so với bản trước nữa (8.0.10, 18/10)

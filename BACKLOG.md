@@ -4,7 +4,7 @@
 
 ## Thay đổi so với bản 05/11 lần 10
 
-* 5R xong (bản 8.1.5, SES). Thêm BL85 (`test/unit.js` viết lại). BL80, BL84 đã làm theo đề xuất (SES ngay ở 5R, P0 trong tháng 11), chờ anh duyệt.
+* 5S xong (bản 8.1.5, SES). Thêm BL85 (`test/unit.js` viết lại). BL80, BL84 đã làm theo đề xuất (SES ngay ở 5S, P0 trong tháng 11), chờ anh duyệt.
 
 ## Thay đổi so với bản 05/11 lần 9
 
@@ -12,7 +12,7 @@
 
 ## Thay đổi so với bản 02/11 lần 8
 
-* Thêm BL70 đến BL78: quyết định cho kế hoạch v9 chi tiết (`plan/KE_HOACH_V9_CHI_TIET.md`): email bên thứ ba sớm (5R), đăng nhập, repo, Storage, PITR, nâng Claude Max, sửa `CLAUDE.md`.
+* Thêm BL70 đến BL78: quyết định cho kế hoạch v9 chi tiết (`plan/KE_HOACH_V9_CHI_TIET.md`): email bên thứ ba sớm (5S), đăng nhập, repo, Storage, PITR, nâng Claude Max, sửa `CLAUDE.md`.
 * Phát hiện `test/unit.js` không có trong repo GitHub (`npm test` đỏ ngay dòng nạp): ghi mục D.
 
 ## Thay đổi so với bản 01/11 lần 7
@@ -58,13 +58,13 @@
 |---|---|---|---|
 | BL85 | `test/unit.js` viết lại 10/11 vì bản gốc không lên repo. (a) giữ bản viết lại; (b) anh gửi `TEST_BUNDLE.txt`, coder gộp test bản gốc có mà bản mới thiếu | (b) nếu còn file, không thì (a) | Không chặn |
 | BL79 | Mức hạ tầng v9: (a) Pro gọn 35 USD mỗi tháng (Cloudflare Workers 5 + Supabase Pro 25 + SES 5); (b) An toàn 65 USD (Vercel Pro mỗi ghế + Supabase Pro + Resend Pro); (c) Tột cùng 10 USD (Workers + D1 + SES, tự viết đăng nhập) | (a), thử nghiệm S0 đỏ thì web về Vercel | v9 S0 |
-| BL80 | Email: (a) Amazon SES ngay từ 5R (0,10 USD mỗi 1.000 thư, một lần cài, dùng tới hết v9; thay đề xuất Resend ở BL70); (b) Resend Pro 20 USD ở 5R rồi đổi SES ở v9. Kèm: thêm `REMINDER_MODE` giảm khoảng 40% thư ở v9 | (a); `REMINDER_MODE` làm ở v9 | 5R |
+| BL80 | Email: (a) Amazon SES ngay từ 5S (0,10 USD mỗi 1.000 thư, một lần cài, dùng tới hết v9; thay đề xuất Resend ở BL70); (b) Resend Pro 20 USD ở 5S rồi đổi SES ở v9. Kèm: thêm `REMINDER_MODE` giảm khoảng 40% thư ở v9 | (a); `REMINDER_MODE` làm ở v9 | 5S |
 | BL81 | Công cụ AI: (a) bỏ Google AI Pro, dùng Gemini CLI miễn phí 1.000 lượt mỗi ngày cho vai đọc dài và viết chữ; (b) giữ AI Pro | (a) trừ khi anh dùng AI Pro cho việc khác | v9 S0 |
 | BL82 | Nâng Claude Max 5x chỉ trong 2 tháng nặng nhất của v9 (P2, P3), khoảng +160 USD một lần | Có | v9 P2 |
 | BL83 | Tách Worker "jobs" (Hono, TypeScript thuần: cron, outbox, webhook SES) khỏi Worker "web" (Next.js qua vinext hoặc OpenNext) | Có | v9 S0 |
-| BL84 | Làm P0 ngay trong tháng 11 xen kẽ chunk 6, 7: lấy lại `test/unit.js`, `.gitignore`, GitHub Actions, `AGENTS.md` dùng chung, 5R email | Có | P0 |
-| BL70 | Dịch vụ email bên thứ ba cho bước 0 (5R, trước v9) để có hơn 1.500 thư mỗi ngày không chờ Workspace qua 60 ngày: (a) Resend Pro 20 USD, 50.000 thư mỗi tháng, không trần ngày; (b) Postmark; (c) Amazon SES | (a) | 5R |
-| BL71 | Làm 5R khi nào: (a) ngay sau 5N, 5O, trước chunk 6 để go live đã có hạn mức rộng; (b) sau chunk 7 | (a) | 5R |
+| BL84 | Làm P0 ngay trong tháng 11 xen kẽ chunk 6, 7: lấy lại `test/unit.js`, `.gitignore`, GitHub Actions, `AGENTS.md` dùng chung, 5S email | Có | P0 |
+| BL70 | Dịch vụ email bên thứ ba cho bước 0 (5S, trước v9) để có hơn 1.500 thư mỗi ngày không chờ Workspace qua 60 ngày: (a) Resend Pro 20 USD, 50.000 thư mỗi tháng, không trần ngày; (b) Postmark; (c) Amazon SES | (a) | 5S |
+| BL71 | Làm 5S khi nào: (a) ngay sau 5N, 5O, trước chunk 6 để go live đã có hạn mức rộng; (b) sau chunk 7 | (a) | 5S |
 | BL72 | Đăng nhập v9: (a) Supabase Auth (link email hạn chung, ví dụ 15 phút; Google cho admin), bỏ hạn link theo vai trò của luật 36; (b) giữ bảng link tự viết như v8 | (a) | v9 S4 |
 | BL73 | Repo v9: (a) repo GitHub riêng `thaiput_v9`, repo v8 giữ làm đặc tả và sửa lỗi tới khi đóng; (b) thư mục trong repo v8 | (a) | v9 S0 |
 | BL74 | Ảnh chuyển khoản ở v9: (a) Supabase Storage bucket riêng tư; (b) giữ Google Drive | (a) | v9 S1 |

@@ -1,6 +1,6 @@
 # P0 từng bước: việc của anh, việc của Claude, lịch ngày
 
-*Lập 05/11/2026, cập nhật 10/11/2026 (phần code của Claude đã xong, bản 8.1.5). P0 là phần của `plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` mục 4 làm ngay trong v8. Chỉ sub chunk 5R đụng hệ thống đang chạy, và chỉ khi anh đổi `MAIL_TRANSPORT = SES`; trước đó 8.1.5 gửi email y như 8.1.4.*
+*Lập 05/11/2026, cập nhật 10/11/2026 (phần code của Claude đã xong, bản 8.1.5). P0 là phần của `plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` mục 4 làm ngay trong v8. Chỉ sub chunk 5S đụng hệ thống đang chạy, và chỉ khi anh đổi `MAIL_TRANSPORT = SES`; trước đó 8.1.5 gửi email y như 8.1.4.*
 
 ## 0. Ba điều phải biết trước
 
@@ -12,7 +12,7 @@
 
 | Ngày | Anh Chris | Claude Code | Mốc |
 |---|---|---|---|
-| ~~05/11 đến 10/11~~ | | ✅ C1 repo (`.gitignore`, Actions, `AGENTS.md`); ✅ C2 5R SES; ✅ C3 `test/unit.js` viết lại | Bản 8.1.5, CI xanh |
+| ~~05/11 đến 10/11~~ | | ✅ C1 repo (`.gitignore`, Actions, `AGENTS.md`); ✅ C2 5S SES; ✅ C3 `test/unit.js` viết lại | Bản 8.1.5, CI xanh |
 | **Thứ Ba 11/11** | A1 duyệt PR 2 (merge vào `main`); A2 tài khoản AWS | Trực PR, sửa nếu Codex hay CI báo | `main` có 8.1.5, Actions xanh |
 | **Thứ Tư 12/11** | A3 SES identity, DNS; A4 xin ra khỏi sandbox; A5 IAM; A6 SNS báo thư trả về | | Chờ AWS duyệt (khoảng 24 giờ), DNS Verified (tới 72 giờ) |
 | **Thứ Năm 13/11** | A7 cài Gemini CLI, bật Codex review; A8 dán 8.1.5 lên STAGING (chưa đổi SES) | Trực sửa lỗi theo ảnh chụp | STAGING chạy 8.1.5 bằng GmailApp |
@@ -94,7 +94,7 @@ Commit lên nhánh `gemini/spec-v9`, mở PR. Claude soát ở C5.
 | Mã | Việc | Trạng thái |
 |---|---|---|
 | C1 | `.gitignore`, `.clasp.json.example`, `.github/workflows/test.yml`, `AGENTS.md` | ✅ 05/11 |
-| C2 | 5R: SES trong `MailTransport.gs` (SigV4, gửi, tự gửi lại, hạn mức `MAIL_DAILY_CAP`), `MAIL_FROM_ADDRESS`, menu 2, quyền `script.external_request`, test I136 đến I138, I133 mở rộng, thử phá, `VERSION 8.1.5`, `dist/`, hướng dẫn | ✅ 10/11 |
+| C2 | 5S: SES trong `MailTransport.gs` (SigV4, gửi, tự gửi lại, hạn mức `MAIL_DAILY_CAP`), `MAIL_FROM_ADDRESS`, menu 2, quyền `script.external_request`, test I136 đến I138, I133 mở rộng, thử phá, `VERSION 8.1.5`, `dist/`, hướng dẫn | ✅ 10/11 |
 | C3 | `test/unit.js` viết lại 34 test, thử phá 25 đột biến | ✅ 10/11 |
 | C4 | Trực STAGING khi anh gửi ảnh MAIL_LOG, ACTIVITY_LOG | Chờ A10 |
 | C5 | Soát PR `docs/SPEC_V9.md` của Gemini, đối chiếu hàm thuần | Chờ A11 |

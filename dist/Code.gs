@@ -121,12 +121,12 @@ var DEFAULTS_ = {
   REMINDER_WINDOW_MINUTES: 15,
   EXPIRY_NOTICE_DAYS: 3,
   MAIL_FROM_NAME: 'thaiput',
-  // Chunk 5Q: đường gửi email. GMAILAPP (mặc định, như MailFix cũ), MAILAPP (dự phòng, dễ bị trả về) hoặc SES (chunk 5R, Amazon SES,
+  // Chunk 5Q: đường gửi email. GMAILAPP (mặc định, như MailFix cũ), MAILAPP (dự phòng, dễ bị trả về) hoặc SES (chunk 5S, Amazon SES,
   // khoá ở Script Properties SES_KEY, SES_SECRET, SES_REGION). Xem MailTransport.gs.
   MAIL_TRANSPORT: 'GMAILAPP',
-  // Chunk 5R: địa chỉ gửi khi dùng SES, phải thuộc tên miền đã xác minh trong SES. Trống = no-reply@mail.<tên miền của ADMIN_EMAIL>.
+  // Chunk 5S: địa chỉ gửi khi dùng SES, phải thuộc tên miền đã xác minh trong SES. Trống = no-reply@mail.<tên miền của ADMIN_EMAIL>.
   MAIL_FROM_ADDRESS: '',
-  // Chunk 5R: số thư mỗi ngày qua SES (hạn mức tự đặt, tăng dần khi warm up tên miền mới; 0 = không giới hạn). Với GMAILAPP, MAILAPP
+  // Chunk 5S: số thư mỗi ngày qua SES (hạn mức tự đặt, tăng dần khi warm up tên miền mới; 0 = không giới hạn). Với GMAILAPP, MAILAPP
   // hạn mức do Google báo. Thư ưu tiên thấp dừng khi còn MAIL_LOW_QUOTA_RESERVE, marketing dừng khi còn MARKETING_QUOTA_RESERVE.
   MAIL_DAILY_CAP: 1400,
   ADMIN_EMAIL: 'admin@thaiput.vn',
@@ -7105,16 +7105,16 @@ function drainLogQueueNow_() { var keys = withLock_(function () { return drainLo
 
 // ── MailTransport.gs ──
 /**
- * MailTransport.gs · Đường gửi email cố định (chunk 5Q, thay MailFix; chunk 5R thêm Amazon SES)
+ * MailTransport.gs · Đường gửi email cố định (chunk 5Q, thay MailFix; chunk 5S thêm Amazon SES)
  *
  * Chỗ DUY NHẤT trong code được gọi dịch vụ gửi thư và đọc hạn mức email (test I133 quét src/, gọi ở file khác là đỏ;
- * từ 5R cả UrlFetchApp cũng chỉ được gọi ở đây). Mọi email vẫn đi qua sendMail_ (Notify.gs) và sendTpl_ (luật 19, 32).
+ * từ 5S cả UrlFetchApp cũng chỉ được gọi ở đây). Mọi email vẫn đi qua sendMail_ (Notify.gs) và sendTpl_ (luật 19, 32).
  *
  * CONFIG MAIL_TRANSPORT:
  *   GMAILAPP (mặc định) = GmailApp.sendEmail, đúng cách MailFix đã chạy từ 22/10: thư có bản HTML kèm bản chữ thuần,
  *                         tên hiển thị MAIL_FROM_NAME, trả lời về ADMIN_EMAIL. Không bị trả về hàng loạt như MailApp.
  *   MAILAPP             = MailApp.sendEmail (cách cũ, dự phòng; thư từng bị trả về trên tên miền của trường).
- *   SES                 = Amazon SES (chunk 5R, kế hoạch v9 P0): gửi qua HTTP (UrlFetchApp) với chữ ký AWS Signature V4,
+ *   SES                 = Amazon SES (chunk 5S, kế hoạch v9 P0): gửi qua HTTP (UrlFetchApp) với chữ ký AWS Signature V4,
  *                         không bị hạn mức 1.500 (hay khoảng 100 khi Workspace còn dùng thử) của Google. Khoá ở Script
  *                         Properties SES_KEY, SES_SECRET, SES_REGION (mặc định ap-southeast-1); địa chỉ gửi MAIL_FROM_ADDRESS
  *                         (trống = no-reply@mail.<tên miền của ADMIN_EMAIL>), phải thuộc tên miền đã xác minh trong SES.
@@ -7122,7 +7122,7 @@ function drainLogQueueNow_() { var keys = withLock_(function () { return drainLo
  *                         báo admin 1 lần mỗi giờ) để email quan trọng không mất. Hạn mức ngày tự đặt ở CONFIG MAIL_DAILY_CAP
  *                         (tăng dần khi warm up; 0 = không giới hạn), đếm số thư SES hôm nay (bộ đệm theo ngày, mất thì đếm MAIL_LOG).
  *   Gõ sai hoặc trống: dùng GMAILAPP.
- * Quyền: GmailApp dùng gmail.send (từ 5J); SES dùng script.external_request (từ 5R). Google báo thiếu quyền khi gửi bằng
+ * Quyền: GmailApp dùng gmail.send (từ 5J); SES dùng script.external_request (từ 5S). Google báo thiếu quyền khi gửi bằng
  * GmailApp thì thư đó tự gửi lại bằng MailApp (ghi MAIL_FALLBACK, báo admin).
  * Hạn mức Google: tính chung mọi thư Apps Script gửi trong ngày; đọc bằng MailApp.getRemainingDailyQuota (GmailApp
  * không có hàm đọc hạn mức). Đọc lỗi thì trả -1 (không rõ).
@@ -7246,7 +7246,7 @@ function mailFallbackNotice_(to, err, from, used) {
   } catch (x) { }
 }
 
-// ── Amazon SES (chunk 5R) ──
+// ── Amazon SES (chunk 5S) ──
 
 /** Khoá SES trong Script Properties. Trả null khi thiếu. */
 function sesConfig_() {
@@ -9814,7 +9814,7 @@ function testSystem(e) { requireOperator_(e);
     // 5Q: file MailFix.gs cũ còn trong dự án thì testMailFix là hàm công khai không kiểm quyền (trang web mở cho mọi người, luật 24).
     if (typeof testMailFix === 'function' || typeof sendEmailFix_ === 'function') err('Dự án Apps Script còn file MailFix.gs cũ: xoá file đó ngay (từ 8.1.4 gửi email cố định, không cần MailFix, không tìm và thay).');
     if (mailTransport_() === 'SES') {
-      // Chunk 5R: SES không có hạn mức Google; hạn mức là MAIL_DAILY_CAP tự đặt. Thiếu khoá thì mọi thư đang tự gửi lại bằng GmailApp.
+      // Chunk 5S: SES không có hạn mức Google; hạn mức là MAIL_DAILY_CAP tự đặt. Thiếu khoá thì mọi thư đang tự gửi lại bằng GmailApp.
       if (!sesConfig_()) err('MAIL_TRANSPORT = SES nhưng thiếu SES_KEY, SES_SECRET trong Thuộc tính tập lệnh (Cài đặt dự án → Thuộc tính tập lệnh): mọi thư đang tự gửi lại bằng GmailApp (hạn mức Google). Dán khoá hoặc đổi MAIL_TRANSPORT về GMAILAPP.');
       if (!String(cfg_('MAIL_FROM_ADDRESS') || '').trim()) warn('MAIL_FROM_ADDRESS trống: SES gửi từ ' + (mailFromAddress_() || '(không suy ra được)') + '. Địa chỉ phải thuộc tên miền đã xác minh trong SES.');
       lines.push('Email còn gửi được hôm nay qua SES: ' + (mb < 0 ? 'không giới hạn (MAIL_DAILY_CAP = 0)' : mb + ' (MAIL_DAILY_CAP ' + cfg_('MAIL_DAILY_CAP') + ', đã gửi ' + sesSentToday_(0) + ')'));

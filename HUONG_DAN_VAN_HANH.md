@@ -4,7 +4,7 @@
 
 ## Thay đổi so với bản trước
 
-**Bản 8.1.5 (10/11/2026, chunk 5R):** gửi email qua Amazon SES để không còn kẹt hạn mức email của Google. Ba ô mới ở B8 (`MAIL_TRANSPORT` nhận thêm `SES`, `MAIL_FROM_ADDRESS`, `MAIL_DAILY_CAP`), Phần B thành 100 ô. Cài SES từng bước: `plan/P0_BUOC_TUNG_BUOC.md` mục 2 (A2 đến A11).
+**Bản 8.1.5 (10/11/2026, chunk 5S):** gửi email qua Amazon SES để không còn kẹt hạn mức email của Google. Ba ô mới ở B8 (`MAIL_TRANSPORT` nhận thêm `SES`, `MAIL_FROM_ADDRESS`, `MAIL_DAILY_CAP`), Phần B thành 100 ô. Cài SES từng bước: `plan/P0_BUOC_TUNG_BUOC.md` mục 2 (A2 đến A11).
 
 
 Bản trước: 8.0.10 (18/10/2026, đã xuất) và bản nháp 8.1.1 (01/11, chưa xuất). Những điểm mới:

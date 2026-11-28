@@ -4114,7 +4114,7 @@ t('I132', '5Q gửi email cố định: mặc định GmailApp (chữ thuần + 
   assert.strictEqual(st.mails.length, n1);
 });
 
-t('I133', '5Q chặn tái phạm: ngoài MailTransport.gs không file nào trong src/ gọi MailApp, GmailApp, Gmail API hay UrlFetchApp (5R) trực tiếp (gửi thư hoặc đọc hạn mức); bản dist không còn cần tìm và thay', () => {
+t('I133', '5Q chặn tái phạm: ngoài MailTransport.gs không file nào trong src/ gọi MailApp, GmailApp, Gmail API hay UrlFetchApp (5S) trực tiếp (gửi thư hoặc đọc hạn mức); bản dist không còn cần tìm và thay', () => {
   const dir = path.join(__dirname, '..', 'src'), bad = [];
   fs.readdirSync(dir).filter(f => /\.gs$/.test(f) && f !== 'MailTransport.gs').forEach(f => {
     fs.readFileSync(path.join(dir, f), 'utf8').split('\n').forEach((line, i) => {
@@ -4178,7 +4178,7 @@ t('I135', 'Soát tài liệu 5Q (hồi quy): chọn Từ chối sau khi đã Duy
   assert.ok(after.tutor_id !== 'T001' || after.status !== 'CONFIRMED', JSON.stringify({ t: after.tutor_id, s: after.status, n: after.admin_note }));
 });
 
-// ── Chunk 5R: gửi email qua Amazon SES ──
+// ── Chunk 5S: gửi email qua Amazon SES ──
 /** Bản SigV4 độc lập bằng Node crypto (không dùng mã trong src/), để đối chiếu sigV4_. */
 function sigV4Ref(req) {
   const crypto = require('crypto');
@@ -4207,7 +4207,7 @@ function sesOn(c, extra) {
   cfgSet(c, 'MAIL_TRANSPORT', 'SES');
 }
 
-t('I136', '5R chữ ký AWS Signature V4: sigV4_ khớp vector mẫu của tài liệu AWS (IAM ListUsers) và khớp bản tính độc lập bằng Node cho yêu cầu SES có tiếng Việt; HMAC dùng dạng byte như Google (mock từ chối trộn chuỗi và byte)', () => {
+t('I136', '5S chữ ký AWS Signature V4: sigV4_ khớp vector mẫu của tài liệu AWS (IAM ListUsers) và khớp bản tính độc lập bằng Node cho yêu cầu SES có tiếng Việt; HMAC dùng dạng byte như Google (mock từ chối trộn chuỗi và byte)', () => {
   const c = mk('2026-10-12 10:00'), api = c.api;
   const iam = { method: 'GET', path: '/', query: 'Action=ListUsers&Version=2010-05-08', payload: '', amzDate: '20150830T123600Z', region: 'us-east-1', service: 'iam',
     key: 'AKIDEXAMPLE', secret: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY',
@@ -4229,7 +4229,7 @@ t('I136', '5R chữ ký AWS Signature V4: sigV4_ khớp vector mẫu của tài 
   assert.throws(() => c.env.globals.Utilities.computeHmacSha256Signature('x', [1, 2]), /Cannot find method/);
 });
 
-t('I137', '5R gửi qua SES: đúng địa chỉ API của vùng, chữ ký hợp lệ, thân thư có tên người gửi, trả lời về admin, HTML kèm chữ thuần, CC; MAIL_LOG ghi SES; SES lỗi (thiếu khoá, mã 400, 500, mất mạng) thì thư tự gửi lại bằng GmailApp, ghi MAIL_FALLBACK một lần mỗi giờ, không ném lỗi; GmailApp cũng hỏng thì MAIL_FAILED', () => {
+t('I137', '5S gửi qua SES: đúng địa chỉ API của vùng, chữ ký hợp lệ, thân thư có tên người gửi, trả lời về admin, HTML kèm chữ thuần, CC; MAIL_LOG ghi SES; SES lỗi (thiếu khoá, mã 400, 500, mất mạng) thì thư tự gửi lại bằng GmailApp, ghi MAIL_FALLBACK một lần mỗi giờ, không ném lỗi; GmailApp cũng hỏng thì MAIL_FAILED', () => {
   const c = mk('2026-10-12 10:00'), api = c.api, st = c.env.state;
   sesOn(c); cfgSet(c, 'MAIL_FROM_ADDRESS', 'booking@mail.thaiput.vn');
   const seen = sesServer(c);
@@ -4302,7 +4302,7 @@ t('I137', '5R gửi qua SES: đúng địa chỉ API của vùng, chữ ký hợ
   assert.ok(mt.ok && mt.transport === 'SES', JSON.stringify(mt));
 });
 
-t('I138', '5R hạn mức SES: MAIL_DAILY_CAP trừ số thư SES hôm nay; mất bộ đệm thì đếm lại MAIL_LOG; ngày mới đếm lại từ 0; còn tới MAIL_LOW_QUOTA_RESERVE thì thư nhắc (ưu tiên thấp) dừng, thư quan trọng vẫn gửi; MAIL_DAILY_CAP = 0 là không giới hạn; menu 2 hiện hạn mức SES; quyền external_request có trong appsscript.json', () => {
+t('I138', '5S hạn mức SES: MAIL_DAILY_CAP trừ số thư SES hôm nay; mất bộ đệm thì đếm lại MAIL_LOG; ngày mới đếm lại từ 0; còn tới MAIL_LOW_QUOTA_RESERVE thì thư nhắc (ưu tiên thấp) dừng, thư quan trọng vẫn gửi; MAIL_DAILY_CAP = 0 là không giới hạn; menu 2 hiện hạn mức SES; quyền external_request có trong appsscript.json', () => {
   const c = mk('2026-10-12 10:00'), api = c.api, st = c.env.state;
   sesOn(c); cfgSet(c, 'MAIL_DAILY_CAP', 20); cfgSet(c, 'MAIL_LOW_QUOTA_RESERVE', 15);
   const seen = sesServer(c);
