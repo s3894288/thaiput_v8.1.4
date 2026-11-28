@@ -1,6 +1,6 @@
 # Thaiput v8 · Tiến độ theo chunk
 
-**14/11/2026: nhánh `claude/hopeful-galileo-xa1dv9` TẠM DỪNG** theo lệnh anh Chris: chờ chạy pilot v8 và sửa dần ở vòng 5S tới khi chốt bản Apps Script chuẩn, rồi mới lên v9. Phần email (SES, Resend) xuất ra `handoff/EMAIL_SES_RESEND/` (README, 3 patch đã thử áp lên `main` sạch và test xanh, hướng dẫn cài SES) để mang sang nhánh khác.
+**14/11/2026: nhánh `claude/hopeful-galileo-xa1dv9` TẠM DỪNG** theo lệnh anh Chris: chờ chạy pilot v8 và sửa dần ở vòng sửa sau pilot tới khi chốt bản Apps Script chuẩn, rồi mới lên v9. Phần email (SES, Resend) xuất ra `handoff/EMAIL_SES_RESEND/` (README, 3 patch đã thử áp lên `main` sạch và test xanh, hướng dẫn cài SES) để mang sang nhánh khác.
 
 **28/11/2026: chunk SES đổi tên từ 5R thành 5S** để không trùng chunk 5R (ảnh QR, gộp dòng trùng, tóm tắt nâng cấp) của nhánh bản 8.1.9; không đổi nội dung kỹ thuật.
 

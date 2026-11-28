@@ -1,6 +1,6 @@
 # Bàn giao: gửi email qua dịch vụ bên thứ ba (Amazon SES, Resend) cho v8
 
-*Xuất 14/11/2026 từ nhánh `claude/hopeful-galileo-xa1dv9` (PR #2, đang tạm dừng theo lệnh anh Chris). Mục đích: mang toàn bộ phần email sang nhánh khác để hoàn thiện tiếp v8 đang vận hành, trong vòng 5S. Thư mục này tự đủ: không cần đọc nhánh cũ.*
+*Xuất 14/11/2026 từ nhánh `claude/hopeful-galileo-xa1dv9` (PR #2, đang tạm dừng theo lệnh anh Chris). Mục đích: mang toàn bộ phần email sang nhánh khác để hoàn thiện tiếp v8 đang vận hành, trong vòng sửa sau pilot. Thư mục này tự đủ: không cần đọc nhánh cũ.*
 
 *Ghi chú 28/11: chunk này đã đổi tên từ 5R thành 5S; các file patch giữ tên cũ (`01_code_5R_ses.patch`) và giữ nguyên comment cũ ghi 5R vì đã xuất trước khi đổi tên.*
 
@@ -146,7 +146,7 @@ Quay về bất cứ lúc nào: đổi `MAIL_TRANSPORT = GMAILAPP`, không cần
 | BL80 | SES ngay, không đi vòng qua Resend | SES |
 | BL85 | `test/unit.js` viết lại hay lấy bản gốc từ `TEST_BUNDLE.txt` | Bản gốc nếu còn, không thì giữ bản viết lại |
 
-## 9. Lộ trình liên quan (để đặt vào vòng 5S)
+## 9. Lộ trình liên quan (để đặt vào vòng sửa sau pilot)
 
 1. Áp patch, test xanh, `npm run build`, đánh số phiên bản theo nhánh đích.
 2. Dán lên STAGING với `MAIL_TRANSPORT = GMAILAPP` (không đổi hành vi), cấp quyền mới.
