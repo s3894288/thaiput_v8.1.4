@@ -16,7 +16,7 @@
 | Ngày | Anh Chris | Claude Code | Mốc |
 |---|---|---|---|
 | ~~05/11 đến 10/11~~ | | ✅ C1 repo (`.gitignore`, Actions, `AGENTS.md`); ✅ C2 5S SES; ✅ C3 `test/unit.js` viết lại | Bản 8.1.5, CI xanh |
-| **Thứ Ba 11/11** | A1 duyệt PR 2 (merge vào `main`); A2 tài khoản AWS | Trực PR, sửa nếu Codex hay CI báo | `main` có 8.1.5, Actions xanh |
+| ~~Thứ Ba 11/11~~ | ~~A1 duyệt PR 2 (merge vào `main`); A2 tài khoản AWS~~ (A1 bỏ: PR 2 không gộp code, xem ghi chú đầu file) | | |
 | **Thứ Tư 12/11** | A3 SES identity, DNS; A4 xin ra khỏi sandbox; A5 IAM; A6 SNS báo thư trả về | | Chờ AWS duyệt (khoảng 24 giờ), DNS Verified (tới 72 giờ) |
 | **Thứ Năm 13/11** | A7 cài Gemini CLI, bật Codex review; A8 dán 8.1.5 lên STAGING (chưa đổi SES) | Trực sửa lỗi theo ảnh chụp | STAGING chạy 8.1.5 bằng GmailApp |
 | **Thứ Sáu 14/11** | A9 khi AWS đã duyệt và DNS Verified: Kiểm tra gửi email bằng SES tới 5 hộp thư | Đọc kết quả, sửa nếu có | 5 hộp thư nhận ở hộp chính |
@@ -29,7 +29,7 @@ Sau P0: tiếp chunk 6, 7, 8 của `plan/LO_TRINH_V8_TOI_CUOI.md` với hạn m�
 ## 2. Việc của anh, từng bước
 
 ### A1. Duyệt PR (10 phút)
-Mở PR "Kế hoạch v9 ..." trên GitHub (link trong tin nhắn của Claude). Tab **Checks** phải xanh. Bấm **Ready for review** rồi **Merge pull request**. Từ đây `main` là bản 8.1.5.
+~~Mở PR "Kế hoạch v9 ..." trên GitHub (link trong tin nhắn của Claude). Tab **Checks** phải xanh. Bấm **Ready for review** rồi **Merge pull request**. Từ đây `main` là bản 8.1.5.~~ Bỏ từ 28/11: PR 2 không còn; áp bản vá theo `handoff/EMAIL_SES_RESEND/README.md` mục 3.
 
 ### A2. Tài khoản AWS (30 phút)
 1. aws.amazon.com → Create account bằng admin@, thẻ thanh toán, gói Basic support (miễn phí).
