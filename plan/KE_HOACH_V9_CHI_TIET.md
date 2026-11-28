@@ -1,12 +1,13 @@
 # Kế hoạch chi tiết v9: gỡ điểm nghẽn Apps Script, email bên thứ ba sớm, chuyển lên Next.js + Supabase
 
-*Lập 05/11/2026, bám `plan/KE_HOACH_SAU_GO_LIVE.md` (anh đã duyệt 01/11, BL12). File này không thay file đó: nó chi tiết hoá từng sprint, thêm một bước làm NGAY trong v8 (email bên thứ ba) và liệt kê từng điểm nghẽn của Apps Script cùng cách gỡ. Mọi mục cần anh chốt ghi ở mục 12 và BACKLOG BL100 đến BL108. Giá và hạn mức kiểm tháng 10 và 11/2026, phải kiểm lại khi bắt đầu từng sprint.*
+> **Ghi chú gộp 28/11/2026:** kế hoạch v9 từ nhánh PR 2, **chưa duyệt** (BACKLOG BL70 đến BL85). Main vẫn chạy 8.1.4 bằng GmailApp; code SES chưa áp (`handoff/EMAIL_SES_RESEND/`).
+*Lập 05/11/2026, bám `plan/KE_HOACH_SAU_GO_LIVE.md` (anh đã duyệt 01/11, BL12). File này không thay file đó: nó chi tiết hoá từng sprint, thêm một bước làm NGAY trong v8 (email bên thứ ba) và liệt kê từng điểm nghẽn của Apps Script cùng cách gỡ. Mọi mục cần anh chốt ghi ở mục 12 và BACKLOG BL70 đến BL78. Giá và hạn mức kiểm tháng 10 và 11/2026, phải kiểm lại khi bắt đầu từng sprint.*
 
-> **Bản 2 (05/11/2026 chiều): `KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` sửa 3 chỗ trả đắt của file này** (hosting Cloudflare Workers thay Vercel, email Amazon SES thay Resend ngay từ 5R, bỏ Google AI Pro dùng Gemini CLI miễn phí: hạ tầng 65 → 35 USD mỗi tháng) **và thêm kế hoạch tổng P0 đến P5, điều phối Claude, Codex, Gemini.** Mục 2, 3, 10 và BL100 của file này đọc theo bản 2; phần còn lại giữ nguyên.
+> **Bản 2 (05/11/2026 chiều): `KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` sửa 3 chỗ trả đắt của file này** (hosting Cloudflare Workers thay Vercel, email Amazon SES thay Resend ngay từ 5S, bỏ Google AI Pro dùng Gemini CLI miễn phí: hạ tầng 65 → 35 USD mỗi tháng) **và thêm kế hoạch tổng P0 đến P5, điều phối Claude, Codex, Gemini.** Mục 2, 3, 10 và BL70 của file này đọc theo bản 2; phần còn lại giữ nguyên.
 
 ## Thay đổi so với bản 01/11 (`KE_HOACH_SAU_GO_LIVE.md`)
 
-* Thêm **bước 0 làm ngay trong v8, trước v9:** gửi email qua dịch vụ bên thứ ba (Resend) để có hơn 1.500 thư mỗi ngày mà không phải chờ Workspace qua 60 ngày trả phí. Đây là sub chunk 5R (bản 8.1.5), đi qua đúng chỗ `MailTransport.gs` đã chừa (BL31, luật 19).
+* Thêm **bước 0 làm ngay trong v8, trước v9:** gửi email qua dịch vụ bên thứ ba (Resend) để có hơn 1.500 thư mỗi ngày mà không phải chờ Workspace qua 60 ngày trả phí. Đây là sub chunk 5S (bản 8.1.5), đi qua đúng chỗ `MailTransport.gs` đã chừa (BL31, luật 19).
 * Liệt kê 14 điểm nghẽn của Apps Script + Sheets và cái thay thế trong v9 (mục 1). Trước đây chỉ nói chung.
 * Chốt kiến trúc ở mức có thể bắt tay viết: cấu trúc repo, bảng Postgres, ràng buộc, ánh xạ 57 luật `CLAUDE.md`, cron, hàng đợi, môi trường, CI/CD, giám sát, sao lưu, soát bảo mật.
 * Lộ trình giữ nguyên S0 đến S16 và cách chia việc cho 3 công cụ; mỗi sprint có việc cụ thể, test phải chép từ v8 và điều kiện xong.
@@ -17,7 +18,7 @@
 1. **Không chuyển chỉ vì muốn "xịn hơn".** Điều kiện bắt đầu v9 không đổi: v8 chạy ổn ít nhất 8 tuần sau chunk 9, hoặc chạm một ngưỡng trong mục 4.2, 4.4 của tư vấn 16/10 (`archive/TU_VAN_VA_KIEN_TRUC.md`): trên 300 học viên hoạt động mỗi tháng, trên 1.000 người nhận email mỗi ngày, p95 xem slot trên 3 giây trong 3 ngày, lỗi bận trên 0,5% lượt đặt mỗi tuần.
 2. **Hạn mức công cụ AI là nút thắt thật** (Claude Pro bằng khoảng một phần năm Max). 16 tuần với Max, 20 đến 24 tuần với Pro.
 3. **Người không viết code tự xây hệ thống có dữ liệu cá nhân là rủi ro:** bắt buộc test tự động, một vòng soát bảo mật bởi người thật, chạy bóng song song trước khi cắt chuyển.
-4. **Mới:** riêng email thì **không cần chờ v9**. Điểm nghẽn hạn mức thư là điểm duy nhất chặn tăng trưởng ngay bây giờ (tài khoản dùng thử khoảng 100 thư mỗi ngày, trả phí 1.500) và v8 đã có chỗ cắm đường gửi khác. Làm ở 5R, khoảng 2 cửa sổ Claude, không đụng luật nghiệp vụ.
+4. **Mới:** riêng email thì **không cần chờ v9**. Điểm nghẽn hạn mức thư là điểm duy nhất chặn tăng trưởng ngay bây giờ (tài khoản dùng thử khoảng 100 thư mỗi ngày, trả phí 1.500) và v8 đã có chỗ cắm đường gửi khác. Làm ở 5S, khoảng 2 cửa sổ Claude, không đụng luật nghiệp vụ.
 5. **Mới:** `CLAUDE.md` hiện ghi "không thêm máy chủ ngoài" (quyết định 16/10). Bước 0 chỉ thêm một dịch vụ gửi thư (không phải máy chủ chạy code), vẫn hợp luật 19 và BL31. Khi vào S0 của v9 mới sửa dòng chiến lược đó; tới lúc ấy v8 vẫn là hệ thống thật và `CLAUDE.md` của repo v8 giữ nguyên.
 
 ## 1. Điểm nghẽn của Apps Script + Sheets và cách gỡ trong v9
@@ -41,11 +42,11 @@
 
 Giữ nguyên, không phải điểm nghẽn: Google Calendar và Meet (sự kiện trên `LESSON_CALENDAR_ID`, mã sự kiện cố định `lessonEventId_`, khách mời học viên và tutor), tài khoản admin@ Workspace, tên miền.
 
-## 2. Bước 0 (ngay trong v8): email qua bên thứ ba, chunk 5R, bản 8.1.5
+## 2. Bước 0 (ngay trong v8): email qua bên thứ ba, chunk 5S, bản 8.1.5
 
 **Mục tiêu:** hệ thống gửi được 1.500 thư mỗi ngày trở lên ngay, không phụ thuộc tuổi tài khoản Workspace; thư đi từ tên miền riêng có SPF, DKIM, DMARC; biết thư nào bị trả về.
 
-**Chọn dịch vụ (BL100):** đề xuất **Resend**. Lý do: API một lệnh HTTP, tài liệu dễ, gói Free 3.000 thư mỗi tháng nhưng trần 100 mỗi ngày (chỉ để thử trên STAGING); gói Pro 20 USD mỗi tháng 50.000 thư, không trần ngày, dùng cho PRODUCTION. Phương án khác: Postmark (giá theo 10.000 thư, deliverability rất tốt), Amazon SES (rẻ nhất, cài đặt khó hơn cho người mới). Cả ba đều dùng được cùng một chỗ cắm.
+**Chọn dịch vụ (BL70):** đề xuất **Resend**. Lý do: API một lệnh HTTP, tài liệu dễ, gói Free 3.000 thư mỗi tháng nhưng trần 100 mỗi ngày (chỉ để thử trên STAGING); gói Pro 20 USD mỗi tháng 50.000 thư, không trần ngày, dùng cho PRODUCTION. Phương án khác: Postmark (giá theo 10.000 thư, deliverability rất tốt), Amazon SES (rẻ nhất, cài đặt khó hơn cho người mới). Cả ba đều dùng được cùng một chỗ cắm.
 
 **Việc của code (Claude, khoảng 2 cửa sổ):**
 
@@ -104,7 +105,7 @@ Sentry, Better Stack: lỗi và nhịp sống; GitHub Actions: test, migration, 
 | Kiểm đầu vào | Zod ở mọi Server Action và Route Handler | Tin trình duyệt |
 | Database | SQL migration trong `supabase/migrations`, kiểu sinh bằng `supabase gen types` | ORM (Prisma, Drizzle): thêm một lớp phải học; cân nhắc lại khi đội có người viết code |
 | Giao dịch | hàm `withTx` dùng `pg` (node-postgres) qua Supabase connection pooler (transaction mode) | PostgREST của supabase-js: không có giao dịch nhiều câu |
-| Đăng nhập | Supabase Auth: link email cho mọi vai trò, Google cho admin; cookie qua `@supabase/ssr` | Tự viết lại AUTH như v8 (BL102 nếu anh muốn giữ hạn link theo vai trò) |
+| Đăng nhập | Supabase Auth: link email cho mọi vai trò, Google cho admin; cookie qua `@supabase/ssr` | Tự viết lại AUTH như v8 (BL72 nếu anh muốn giữ hạn link theo vai trò) |
 | Việc nền | Vercel Cron gọi `/api/jobs/*` + bảng `outbox`, `job_runs` | pg_cron trong Supabase: khó debug; Inngest, Trigger.dev: thêm dịch vụ |
 | Email | Resend SDK, webhook `email.delivered`, `email.bounced`, `email.complained` | |
 | Calendar | `googleapis` với service account và uỷ quyền toàn miền trên admin@ (một lần cài ở Admin Console) | OAuth tay của admin@: token hết hạn khi đổi mật khẩu |
@@ -134,7 +135,7 @@ Mã cũ (`S0001`, `T001`, `SP00012`, `BK000123`, `AV000045`) **giữ nguyên ở
 | `outbox` | (afterLock_, deferWrite_, CalendarQueue, LOGQ_) | `kind` (MAIL, CALENDAR_CREATE, CALENDAR_UPDATE, CALENDAR_CANCEL, NOTIFY), `payload jsonb`, `run_after`, `attempts`, `last_error`, `done_at`; worker lấy bằng `FOR UPDATE SKIP LOCKED` |
 | `idempotency_keys` | (idem_ trong CacheService) | `(scope, rid) UNIQUE`, `response jsonb`, hết hạn 24 giờ |
 | `job_runs`, `job_marks` | (HB_, DONE_ trong Script Properties) | lượt chạy cron và dấu "đã làm việc tuần này" |
-| `login_links` | AUTH | chỉ cần nếu chọn BL102 phương án giữ hạn link theo vai trò; mặc định dùng Supabase Auth, không có bảng này |
+| `login_links` | AUTH | chỉ cần nếu chọn BL72 phương án giữ hạn link theo vai trò; mặc định dùng Supabase Auth, không có bảng này |
 
 Cột sinh từ công thức (`contact_link`, HYPERLINK) không còn: trang web dựng link Zalo lúc hiển thị.
 
@@ -220,7 +221,7 @@ Thời gian như bản 01/11: 16 tuần với Claude Max, 20 đến 24 tuần v�
 
 | Sprint | Việc cụ thể | Test chép từ v8 | Điều kiện xong |
 |---|---|---|---|
-| **5R** (trước v9, trong v8) | Email Resend (mục 2) | U mới, I133 mở rộng | 1.500 thư mỗi ngày trên PRODUCTION, 5 hộp thư nhận được |
+| **5S** (trước v9, trong v8) | Email Resend (mục 2) | U mới, I133 mở rộng | 1.500 thư mỗi ngày trên PRODUCTION, 5 hộp thư nhận được |
 | **S0** | Tài khoản Supabase, Vercel, Resend, Sentry, Better Stack; repo v9 theo mục 6; CI chạy test rỗng; `CLAUDE.md` v9 (chép luật mục 5); đo hạn mức 3 công cụ | | Trang "Xin chào" trên `staging.<tên miền>`, CI xanh |
 | **S1** | Migration đầy đủ mục 4, RLS, trigger chống xoá, sequence mã; `import_sheets.ts`; kiểu sinh | Kiểm ràng buộc bằng dữ liệu bẩn (Codex) | Nhập đủ v8, số đếm khớp, chỉ mục duy nhất chặn trùng slot |
 | **S2, S3** | Chuyển core: Time, Phone, Packages (`pkgPlan_`, `pkgDailyTransition_`, `pkgPlanNewPurchase_`), Compensation, Assign (`buildTutorCandidates_`, `pickTutor_`), trạng thái buổi, `tutorSchedule_`; `config` mặc định; `content` và `email_templates` mặc định chuyển nguyên | `test/unit.js` (34, hiện thiếu trong repo, mục 11), `scenarios.js` 46 kịch bản | 46 kịch bản xanh trên core v9 |
@@ -250,8 +251,8 @@ Thời gian như bản 01/11: 16 tuần với Claude Max, 20 đến 24 tuần v�
 
 | Khoản | Từ khi nào | USD mỗi tháng |
 |---|---|---|
-| Resend Pro | bước 0 (5R), chỉ khi cần trên 100 thư mỗi ngày | 20 |
-| Supabase Pro (1 dự án production; staging có thể Free nhưng tự dừng sau 1 tuần không dùng) | S0 | 25 (PITR thêm nếu chọn, BL106) |
+| Resend Pro | bước 0 (5S), chỉ khi cần trên 100 thư mỗi ngày | 20 |
+| Supabase Pro (1 dự án production; staging có thể Free nhưng tự dừng sau 1 tuần không dùng) | S0 | 25 (PITR thêm nếu chọn, BL76) |
 | Vercel Pro (1 ghế) | S0 | 20 |
 | Sentry, Better Stack | S11 | 0 (gói free đủ) |
 | Soát bảo mật người thật | S14, một lần | 300 đến 800 một lần |
@@ -263,27 +264,27 @@ Tổng hạ tầng chạy thật sau S15: khoảng 65 USD mỗi tháng. Trong l�
 
 | Rủi ro | Giảm |
 |---|---|
-| `test/unit.js` (34 test hàm thuần) **không có trong repo GitHub**: `npm test` hiện đỏ ngay dòng nạp; `test/harness.js:21` | Việc ngay: lấy lại từ bundle `TEST_BUNDLE.txt` hoặc project claude.ai cũ, đưa vào repo trước 5R; GitHub Actions hiện cũng đỏ vì chuyện này |
+| `test/unit.js` (34 test hàm thuần) **không có trong repo GitHub**: `npm test` hiện đỏ ngay dòng nạp; `test/harness.js:21` | Việc ngay: lấy lại từ bundle `TEST_BUNDLE.txt` hoặc project claude.ai cũ, đưa vào repo trước 5S; GitHub Actions hiện cũng đỏ vì chuyện này |
 | Hạn mức AI làm sprint kéo dài, dở dang giữa chừng | `NEXT.md` một dòng mỗi cửa sổ; không dừng khi test đỏ; dừng ở 80% trần tuần |
 | Hai hệ thống cùng gửi email và mời Calendar trong lúc chạy bóng | v9 staging chặn gửi ra ngoài (danh sách cho phép ở Resend, Calendar lịch thử); v8 vẫn là nguồn tới S15 |
-| Supabase Auth không có hạn link theo vai trò như luật 36 | BL102: chấp nhận một hạn chung (15 phút) hoặc giữ bảng `login_links` tự viết; đề xuất chấp nhận |
+| Supabase Auth không có hạn link theo vai trò như luật 36 | BL72: chấp nhận một hạn chung (15 phút) hoặc giữ bảng `login_links` tự viết; đề xuất chấp nhận |
 | Service account Calendar cần Admin Console uỷ quyền toàn miền (bước admin, dễ sai) | Hướng dẫn có hình ở S10; phương án dự phòng OAuth admin@ với refresh token |
-| Resend tên miền mới bị coi là spam tuần đầu | Warm up 2 tuần ngay ở 5R (sớm hơn v9 nhiều tháng), DMARC `p=none` rồi `quarantine` |
+| Resend tên miền mới bị coi là spam tuần đầu | Warm up 2 tuần ngay ở 5S (sớm hơn v9 nhiều tháng), DMARC `p=none` rồi `quarantine` |
 | Một người hiểu hệ thống | Mục 9.8; sổ tay sự cố; mỗi sprint Gemini cập nhật hướng dẫn |
 
-## 12. Quyết định cần anh chốt (ghi BACKLOG BL100 đến BL108)
+## 12. Quyết định cần anh chốt (ghi BACKLOG BL70 đến BL78)
 
 | Mã | Câu hỏi | Đề xuất |
 |---|---|---|
-| BL100 | Dịch vụ email bước 0: Resend, Postmark hay SES | Resend Pro |
-| BL101 | Làm 5R khi nào: ngay sau 5N, 5O (trước chunk 6) hay sau go live chunk 7 | Ngay sau 5N, 5O: go live đã có hạn mức rộng |
-| BL102 | Đăng nhập v9: Supabase Auth (hạn link chung) hay giữ link theo vai trò tự viết | Supabase Auth |
-| BL103 | Repo v9 tách riêng hay thư mục trong repo v8 | Tách riêng |
-| BL104 | Ảnh chuyển khoản: Supabase Storage hay giữ Drive | Storage |
-| BL105 | Giữ bảng `metrics` hay dùng Sentry và Vercel | Bỏ, dùng Sentry |
-| BL106 | Supabase PITR (thêm phí) hay chỉ sao lưu ngày + `pg_dump` | Sao lưu ngày + `pg_dump` ở giai đoạn đầu |
-| BL107 | Nâng Claude lên Max trong các tháng xây v9 | Có, nếu muốn 16 tuần |
-| BL108 | Sửa dòng "không thêm máy chủ ngoài" trong `CLAUDE.md` v8 khi nào | Khi vào S0, trong repo v9; repo v8 giữ nguyên |
+| BL70 | Dịch vụ email bước 0: Resend, Postmark hay SES | Resend Pro |
+| BL71 | Làm 5S khi nào: ngay sau 5N, 5O (trước chunk 6) hay sau go live chunk 7 | Ngay sau 5N, 5O: go live đã có hạn mức rộng |
+| BL72 | Đăng nhập v9: Supabase Auth (hạn link chung) hay giữ link theo vai trò tự viết | Supabase Auth |
+| BL73 | Repo v9 tách riêng hay thư mục trong repo v8 | Tách riêng |
+| BL74 | Ảnh chuyển khoản: Supabase Storage hay giữ Drive | Storage |
+| BL75 | Giữ bảng `metrics` hay dùng Sentry và Vercel | Bỏ, dùng Sentry |
+| BL76 | Supabase PITR (thêm phí) hay chỉ sao lưu ngày + `pg_dump` | Sao lưu ngày + `pg_dump` ở giai đoạn đầu |
+| BL77 | Nâng Claude lên Max trong các tháng xây v9 | Có, nếu muốn 16 tuần |
+| BL78 | Sửa dòng "không thêm máy chủ ngoài" trong `CLAUDE.md` v8 khi nào | Khi vào S0, trong repo v9; repo v8 giữ nguyên |
 
 ## 13. Việc làm được ngay, không chờ chốt
 

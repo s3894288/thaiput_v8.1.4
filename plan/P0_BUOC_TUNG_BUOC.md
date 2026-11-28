@@ -1,8 +1,9 @@
 # P0 từng bước: việc của anh, việc của Claude, lịch ngày
 
-> **Ghi chú gộp 28/11/2026 (đọc trước):** file này đến từ nhánh `claude/hopeful-galileo-xa1dv9` (PR 2, đã đóng 27/11, nhánh đã xoá 28/11). Anh Chris chốt 28/11: **main giữ code 8.1.4**, chỉ gộp tài liệu. Vì vậy trên main: code SES (bản 8.1.5) CHƯA có, nằm ở `handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch`; `test/unit.js` là bản gốc (patch `02_test_unit_js.patch` không cần); `.github/workflows/test.yml`, `.gitignore`, `.clasp.json.example` đã có (patch `03_repo_ci.patch` không cần). Số BACKLOG BL70 đến BL85 của nhánh cũ đã đổi thành BL100 đến BL115. Chữ "8.1.5" và "5R" dưới đây là bản và đợt của nhánh cũ, khác 5R của nhánh 8.1.9 (PR 1).
-
-*Lập 05/11/2026, cập nhật 10/11/2026 (phần code của Claude đã xong, bản 8.1.5). P0 là phần của `plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` mục 4 làm ngay trong v8. Chỉ sub chunk 5R đụng hệ thống đang chạy, và chỉ khi anh đổi `MAIL_TRANSPORT = SES`; trước đó 8.1.5 gửi email y như 8.1.4.*
+> **Ghi chú gộp 28/11/2026 (đọc trước):** file này đến từ nhánh `claude/hopeful-galileo-xa1dv9` (PR 2). Anh Chris chốt 28/11: **main giữ code 8.1.4**, chỉ gộp tài liệu; nhánh PR 2 xoá sau khi gộp. Trên main: code SES (bản 8.1.5, chunk 5S) CHƯA có, nằm ở `handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch`; `test/unit.js` là bản gốc; `.github/workflows/test.yml`, `.gitignore`, `.clasp.json.example` đã có. Số BACKLOG BL70 đến BL85 giữ nguyên số của nhánh PR 2 (nhánh 8.1.9 đã đổi số của nó sang BL150 đến BL175 ngày 28/11, không trùng).
+>
+> Lịch ngày ở mục 1 là lịch cũ của nhánh PR 2, bỏ qua. Bước A1 (duyệt PR 2) thay bằng: áp bản vá theo `handoff/EMAIL_SES_RESEND/README.md` mục 3. Bước A8 dán bản có SES theo số phiên bản lúc áp. Các bước A2 đến A12 dùng nguyên.
+*Lập 05/11/2026, cập nhật 10/11/2026 (phần code của Claude đã xong, bản 8.1.5). P0 là phần của `plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` mục 4 làm ngay trong v8. Chỉ sub chunk 5S đụng hệ thống đang chạy, và chỉ khi anh đổi `MAIL_TRANSPORT = SES`; trước đó 8.1.5 gửi email y như 8.1.4.*
 
 ## 0. Ba điều phải biết trước
 
@@ -14,7 +15,7 @@
 
 | Ngày | Anh Chris | Claude Code | Mốc |
 |---|---|---|---|
-| ~~05/11 đến 10/11~~ | | ✅ C1 repo (`.gitignore`, Actions, `AGENTS.md`); ✅ C2 5R SES; ✅ C3 `test/unit.js` viết lại | Bản 8.1.5, CI xanh |
+| ~~05/11 đến 10/11~~ | | ✅ C1 repo (`.gitignore`, Actions, `AGENTS.md`); ✅ C2 5S SES; ✅ C3 `test/unit.js` viết lại | Bản 8.1.5, CI xanh |
 | **Thứ Ba 11/11** | A1 duyệt PR 2 (merge vào `main`); A2 tài khoản AWS | Trực PR, sửa nếu Codex hay CI báo | `main` có 8.1.5, Actions xanh |
 | **Thứ Tư 12/11** | A3 SES identity, DNS; A4 xin ra khỏi sandbox; A5 IAM; A6 SNS báo thư trả về | | Chờ AWS duyệt (khoảng 24 giờ), DNS Verified (tới 72 giờ) |
 | **Thứ Năm 13/11** | A7 cài Gemini CLI, bật Codex review; A8 dán 8.1.5 lên STAGING (chưa đổi SES) | Trực sửa lỗi theo ảnh chụp | STAGING chạy 8.1.5 bằng GmailApp |
@@ -96,7 +97,7 @@ Commit lên nhánh `gemini/spec-v9`, mở PR. Claude soát ở C5.
 | Mã | Việc | Trạng thái |
 |---|---|---|
 | C1 | `.gitignore`, `.clasp.json.example`, `.github/workflows/test.yml`, `AGENTS.md` | ✅ 05/11 |
-| C2 | 5R: SES trong `MailTransport.gs` (SigV4, gửi, tự gửi lại, hạn mức `MAIL_DAILY_CAP`), `MAIL_FROM_ADDRESS`, menu 2, quyền `script.external_request`, test I136 đến I138, I133 mở rộng, thử phá, `VERSION 8.1.5`, `dist/`, hướng dẫn | ✅ 10/11 |
+| C2 | 5S: SES trong `MailTransport.gs` (SigV4, gửi, tự gửi lại, hạn mức `MAIL_DAILY_CAP`), `MAIL_FROM_ADDRESS`, menu 2, quyền `script.external_request`, test I136 đến I138, I133 mở rộng, thử phá, `VERSION 8.1.5`, `dist/`, hướng dẫn | ✅ 10/11 |
 | C3 | `test/unit.js` viết lại 34 test, thử phá 25 đột biến | ✅ 10/11 |
 | C4 | Trực STAGING khi anh gửi ảnh MAIL_LOG, ACTIVITY_LOG | Chờ A10 |
 | C5 | Soát PR `docs/SPEC_V9.md` của Gemini, đối chiếu hàm thuần | Chờ A11 |
@@ -108,4 +109,4 @@ Commit lên nhánh `gemini/spec-v9`, mở PR. Claude soát ở C5.
 * [ ] 8.1.5 trên STAGING gửi bằng SES 3 ngày liền, 0 MAIL_FAILED, 5 hộp thư nhận ở hộp chính.
 * [ ] `MAIL_DAILY_CAP` đạt 1400, không phụ thuộc tuổi tài khoản Workspace.
 * [ ] Codex review bật, Gemini CLI chạy được, `docs/SPEC_V9.md` có PR.
-* [ ] Anh duyệt BL110 (SES), BL114 (P0 tháng 11), BL115 (`test/unit.js` viết lại).
+* [ ] Anh duyệt BL80 (SES), BL84 (P0 tháng 11), BL85 (`test/unit.js` viết lại).

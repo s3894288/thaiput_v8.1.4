@@ -1,8 +1,9 @@
 # Bàn giao: gửi email qua dịch vụ bên thứ ba (Amazon SES, Resend) cho v8
 
-> **Ghi chú gộp 28/11/2026 (đọc trước):** file này đến từ nhánh `claude/hopeful-galileo-xa1dv9` (PR 2, đã đóng 27/11, nhánh đã xoá 28/11). Anh Chris chốt 28/11: **main giữ code 8.1.4**, chỉ gộp tài liệu. Vì vậy trên main: code SES (bản 8.1.5) CHƯA có, nằm ở `handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch`; `test/unit.js` là bản gốc (patch `02_test_unit_js.patch` không cần); `.github/workflows/test.yml`, `.gitignore`, `.clasp.json.example` đã có (patch `03_repo_ci.patch` không cần). Số BACKLOG BL70 đến BL85 của nhánh cũ đã đổi thành BL100 đến BL115. Chữ "8.1.5" và "5R" dưới đây là bản và đợt của nhánh cũ, khác 5R của nhánh 8.1.9 (PR 1).
+> **Ghi chú gộp 28/11/2026 (đọc trước):** file này đến từ nhánh `claude/hopeful-galileo-xa1dv9` (PR 2). Anh Chris chốt 28/11: **main giữ code 8.1.4**, chỉ gộp tài liệu; nhánh PR 2 xoá sau khi gộp. Trên main: code SES (bản 8.1.5, chunk 5S) CHƯA có, nằm ở `handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch`; `test/unit.js` là bản gốc; `.github/workflows/test.yml`, `.gitignore`, `.clasp.json.example` đã có. Số BACKLOG BL70 đến BL85 giữ nguyên số của nhánh PR 2 (nhánh 8.1.9 đã đổi số của nó sang BL150 đến BL175 ngày 28/11, không trùng).
+*Xuất 14/11/2026 từ nhánh `claude/hopeful-galileo-xa1dv9` (PR #2, đang tạm dừng theo lệnh anh Chris). Mục đích: mang toàn bộ phần email sang nhánh khác để hoàn thiện tiếp v8 đang vận hành, trong vòng sửa sau pilot. Thư mục này tự đủ: không cần đọc nhánh cũ.*
 
-*Xuất 14/11/2026 từ nhánh `claude/hopeful-galileo-xa1dv9` (PR #2, đang tạm dừng theo lệnh anh Chris). Mục đích: mang toàn bộ phần email sang nhánh khác để hoàn thiện tiếp v8 đang vận hành, trong vòng 5S. Thư mục này tự đủ: không cần đọc nhánh cũ.*
+*Ghi chú 28/11: chunk này đã đổi tên từ 5R thành 5S; các file patch giữ tên cũ (`01_code_5R_ses.patch`) và giữ nguyên comment cũ ghi 5R vì đã xuất trước khi đổi tên.*
 
 ## 1. Tóm tắt một đoạn
 
@@ -14,24 +15,19 @@ v8 gửi email qua Google (GmailApp), bị hạn mức của Google: khoảng 10
 |---|---|---|
 | `README.md` | File này: quyết định, thiết kế, cách áp, việc còn lại | Đọc trước |
 | `01_code_5R_ses.patch` | Code SES và test (7 file: `src/MailTransport.gs`, `src/Config.gs`, `src/Setup.gs`, `src/appsscript.json`, `test/gas_mock.js`, `test/load.js`, `test/integration.js`) | Có |
-| `02_test_unit_js.patch` | `test/unit.js` viết lại (34 test). Repo hiện thiếu file này nên `npm test` đỏ ngay dòng nạp | Có, trừ khi nhánh đích đã có `test/unit.js` |
-| `03_repo_ci.patch` | `.github/workflows/test.yml` (CI chạy `npm test` và kiểm `dist/` khớp `src/`), `.gitignore`, `.clasp.json.example` | Nên có |
-| `04_HUONG_DAN_CAI_SES_TUNG_BUOC.md` | Hướng dẫn admin cài AWS và SES từng bước (A2 đến A12), lịch thử, điều kiện xong | Cho admin |
+| `02_test_unit_js.patch` | `test/unit.js` viết lại 10/11 (34 test). Main đã có bản gốc từ 27/11: KHÔNG áp, chỉ dùng để so với bản gốc (BACKLOG BL85) | Không |
+| `plan/P0_BUOC_TUNG_BUOC.md` (ngoài thư mục này) | Hướng dẫn admin cài AWS và SES từng bước (A2 đến A12), lịch thử, điều kiện xong. Bản chép `04_HUONG_DAN_CAI_SES_TUNG_BUOC.md` và `03_repo_ci.patch` (main đã có các file đó) đã bỏ 28/11 vì trùng | Cho admin |
 
 ## 3. Cách áp sang nhánh khác
 
-Đã thử ngày 14/11: áp cả 3 patch lên `main` sạch (`648057d`) thì `npm test` xanh hết (34/34, 46/46, 137/137, 48/48, 2/2).
+Đã thử ngày 14/11: áp cả 3 patch lên `main` sạch (`648057d`) thì `npm test` xanh hết (34/34, 46/46, 137/137, 48/48, 2/2). Từ 28/11 thư mục này đã nằm trên main; chỉ cần áp `01_code_5R_ses.patch` (Alex kiểm 28/11: `git apply --check` chạy được trên main).
 
 ```bash
 git checkout -b <nhánh-mới> origin/main
 ```
 
 ```bash
-git checkout claude/hopeful-galileo-xa1dv9 -- handoff/EMAIL_SES_RESEND
-```
-
-```bash
-git apply handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch handoff/EMAIL_SES_RESEND/02_test_unit_js.patch handoff/EMAIL_SES_RESEND/03_repo_ci.patch
+git apply handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch
 ```
 
 ```bash
@@ -44,10 +40,10 @@ Lưu ý khi áp:
 3. **`dist/` không nằm trong patch** (luật 28): chạy `npm run build` sau khi áp, commit cả `dist/`.
 4. **Mã test:** patch dùng I136, I137, I138 cho test SES. Nhánh đích đã dùng các mã này thì đổi sang mã trống kế tiếp.
 
-## 4. Thiết kế đã làm (bản 8.1.5, chunk 5R)
+## 4. Thiết kế đã làm (bản 8.1.5, chunk 5S)
 
 ### 4.1 Chỗ cắm
-Mọi email đi `sendTpl_` → `sendMail_` (Notify.gs) → `mailDeliver_` (MailTransport.gs). Chỉ `MailTransport.gs` được gọi dịch vụ gửi thư, đọc hạn mức và (từ 5R) gọi `UrlFetchApp`; test I133 quét `src/` và báo đỏ nếu file khác gọi (luật 19).
+Mọi email đi `sendTpl_` → `sendMail_` (Notify.gs) → `mailDeliver_` (MailTransport.gs). Chỉ `MailTransport.gs` được gọi dịch vụ gửi thư, đọc hạn mức và (từ 5S) gọi `UrlFetchApp`; test I133 quét `src/` và báo đỏ nếu file khác gọi (luật 19).
 
 ### 4.2 Gửi qua SES
 * API SES v2: `POST https://email.<vùng>.amazonaws.com/v2/email/outbound-emails`, thân JSON (`FromEmailAddress` có tên hiển thị, `Destination` To, Cc, Bcc, `ReplyToAddresses` = ADMIN_EMAIL, `Content.Simple` có Subject, Text, Html, đều UTF-8).
@@ -96,7 +92,7 @@ Thử phá: 3 đột biến SES (bỏ sắp xếp header ký, coi mã 400 là th
 | Báo thư tới, trả về | SNS gửi email về admin (v8); webhook ở v9 | Trang quản lý có sẵn; webhook ở v9 |
 | Dùng tiếp ở v9 | Có (Cloudflare Worker gọi SES) | Có |
 
-Kết luận (BL110, chờ anh duyệt): SES rẻ hơn khoảng 4 lần và dùng thẳng tới v9, không phải chuyển hai lần. Chọn Resend khi AWS từ chối cho ra khỏi sandbox hoặc anh muốn trang quản lý thư dễ xem hơn.
+Kết luận (BL80, chờ anh duyệt): SES rẻ hơn khoảng 4 lần và dùng thẳng tới v9, không phải chuyển hai lần. Chọn Resend khi AWS từ chối cho ra khỏi sandbox hoặc anh muốn trang quản lý thư dễ xem hơn.
 
 ### 5.1 Nếu cần làm Resend (khoảng 1 cửa sổ Claude)
 Cắm cùng chỗ, không đụng file khác:
@@ -107,7 +103,7 @@ Cắm cùng chỗ, không đụng file khác:
 5. Test như I137, I138 với máy chủ giả trả `{ "id": "..." }`.
 6. Admin: resend.com bằng admin@, Domains thêm `mail.<tên miền>`, chép 3 bản ghi DNS (MX, SPF, DKIM), DMARC `p=none`, tạo khoá "Sending access" chỉ cho tên miền đó, dán vào Script Properties.
 
-## 6. Việc của admin để chạy thật (chi tiết: `04_HUONG_DAN_CAI_SES_TUNG_BUOC.md`)
+## 6. Việc của admin để chạy thật (chi tiết: `plan/P0_BUOC_TUNG_BUOC.md` mục 2)
 
 | Bước | Việc | Thời gian |
 |---|---|---|
@@ -126,7 +122,7 @@ Quay về bất cứ lúc nào: đổi `MAIL_TRANSPORT = GMAILAPP`, không cần
 
 1. **Chưa thử trên AWS thật** (rủi ro chính). Lỗi thì thư tự đi GmailApp, không mất thư.
 2. v8 không đọc thư bị trả về hay bị báo spam: `doPost` chỉ dành cho cổng thử tải (luật 48). SES báo qua SNS về email admin; admin sửa email học viên bằng tay. v9 nhận webhook.
-3. Chưa làm (BACKLOG): BL69 bảng hạn mức 5 dòng ở menu 2, kiểm 5 loại hộp thư; BL64 Gmail API; Resend (mục 5.1); `REMINDER_MODE` giảm khoảng 40% thư (BL110, để v9).
+3. Chưa làm (BACKLOG): BL69 bảng hạn mức 5 dòng ở menu 2, kiểm 5 loại hộp thư; BL64 Gmail API; Resend (mục 5.1); `REMINDER_MODE` giảm khoảng 40% thư (BL80, để v9).
 4. Hướng dẫn vận hành B8 và hướng dẫn phát hành đã có đoạn cho 8.1.5 trên nhánh cũ; khi áp sang nhánh mới, chép 3 dòng bảng B8 sau (Phần B thành 100 ô):
 
 | Ô | Mặc định | Ý nghĩa |
@@ -139,14 +135,14 @@ Quay về bất cứ lúc nào: đổi `MAIL_TRANSPORT = GMAILAPP`, không cần
 
 | Mã | Câu hỏi | Đề xuất |
 |---|---|---|
-| BL31 | Gửi email qua dịch vụ ngoài | Đã làm SES ở 5R |
+| BL31 | Gửi email qua dịch vụ ngoài | Code SES đã viết (bản vá `01_code_5R_ses.patch`), chưa áp vào main |
 | BL69 | Bảng hạn mức 5 dòng ở menu 2, kiểm 5 loại hộp thư | Làm cùng lần thử A9 |
-| BL100 | Dịch vụ: Resend, Postmark hay SES | Đổi thành SES (BL110) |
-| BL101 | Làm email bên thứ ba khi nào | Trước khi PRODUCTION tách riêng, để go live đã có hạn mức rộng |
-| BL110 | SES ngay, không đi vòng qua Resend | SES |
-| BL115 | `test/unit.js` viết lại hay lấy bản gốc từ `TEST_BUNDLE.txt` | Bản gốc nếu còn, không thì giữ bản viết lại |
+| BL70 | Dịch vụ: Resend, Postmark hay SES | Đổi thành SES (BL80) |
+| BL71 | Làm email bên thứ ba khi nào | Trước khi PRODUCTION tách riêng, để go live đã có hạn mức rộng |
+| BL80 | SES ngay, không đi vòng qua Resend | SES |
+| BL85 | `test/unit.js` viết lại hay lấy bản gốc từ `TEST_BUNDLE.txt` | Bản gốc nếu còn, không thì giữ bản viết lại |
 
-## 9. Lộ trình liên quan (để đặt vào vòng 5S)
+## 9. Lộ trình liên quan (để đặt vào vòng sửa sau pilot)
 
 1. Áp patch, test xanh, `npm run build`, đánh số phiên bản theo nhánh đích.
 2. Dán lên STAGING với `MAIL_TRANSPORT = GMAILAPP` (không đổi hành vi), cấp quyền mới.

@@ -1,5 +1,6 @@
 # v9 bản 2: tối ưu hiệu năng trên giá tới tận cùng, kế hoạch tổng và điều phối Claude, Codex, Gemini
 
+> **Ghi chú gộp 28/11/2026:** kế hoạch v9 từ nhánh PR 2, **chưa duyệt** (BACKLOG BL70 đến BL85). Main vẫn chạy 8.1.4 bằng GmailApp; code SES chưa áp (`handoff/EMAIL_SES_RESEND/`).
 *Lập 05/11/2026, trả lời câu hỏi "đã tối ưu performance per price theo chuẩn pro chưa". Trả lời thẳng: **bản 1 (`KE_HOACH_V9_CHI_TIET.md`) chưa.** Nó an toàn cho người không viết code nhưng trả đắt ở 3 chỗ: hosting (gấp 4), email (gấp 4), công cụ AI (thừa 1 gói). Bản này sửa 3 chỗ đó, giữ nguyên phần còn lại của bản 1 (điểm nghẽn, bảng dữ liệu, ánh xạ luật, sprint), và thêm phần điều phối ba công cụ. Giá kiểm 05/11/2026 bằng tìm kiếm web, nguồn ở mục 9; vẫn phải mở trang giá chính thức trước khi đăng ký.*
 
 ## 1. Tối ưu chi phí: bảng so sánh thẳng
@@ -16,7 +17,7 @@
 | Công cụ AI lúc xây | Claude Pro 20 + ChatGPT Plus 20 + Google AI Pro 20 = 60 | Claude Pro 20 + ChatGPT Plus 20 + **Gemini CLI miễn phí** (1.000 lượt mỗi ngày với tài khoản Google cá nhân, đủ cho vai đọc dài và viết chữ) = **40** | 20 | Gemini app trong gói AI Pro không cần cho việc này; nếu anh dùng AI Pro cho việc khác thì giữ |
 | Nâng Claude Max | tuỳ chọn cả kỳ (+80) | Chỉ nâng Max 5x trong 2 tháng nặng nhất (S4 đến S10), +160 USD một lần | | Max không "rẻ hơn mỗi lượt", chỉ rút ngắn lịch; là quyết định về thời gian, không phải giá |
 
-### 1.1 Ba mức để anh chọn (BL109)
+### 1.1 Ba mức để anh chọn (BL79)
 
 | Mức | Hạ tầng mỗi tháng | Gồm | Hợp với |
 |---|---|---|---|
@@ -56,9 +57,9 @@ Sentry, Better Stack: miễn phí
 
 **Hiệu năng kỹ thuật (mục tiêu đo ở S14):** p95 xem lưới slot dưới 500 ms (KV cache 60 giây theo tutor và tuần, xoá khi có booking), p95 đặt dưới 1,5 giây (1 giao dịch, 2 lần đi tới Postgres), 50 người đặt cùng lúc không lỗi bận (khoá dòng thay khoá toàn cục), cron lệch dưới 1 phút. Chỉ mục: `bookings (tutor_id, date, slot)`, `bookings (student_id, date)`, `student_packages (student_id, status)`, `outbox (run_after) WHERE done_at IS NULL`.
 
-## 3. Email: làm SES ngay ở 5R, không đi vòng qua Resend
+## 3. Email: làm SES ngay ở 5S, không đi vòng qua Resend
 
-Bản 1 đề xuất Resend ở 5R rồi có thể đổi SES ở v9: trả 20 USD mỗi tháng và chuyển hai lần. Bản 2: **SES một lần, dùng từ 5R tới hết v9**.
+Bản 1 đề xuất Resend ở 5S rồi có thể đổi SES ở v9: trả 20 USD mỗi tháng và chuyển hai lần. Bản 2: **SES một lần, dùng từ 5S tới hết v9**.
 
 | Bước | Ai | Thời gian |
 |---|---|---|
@@ -72,20 +73,20 @@ Bản 1 đề xuất Resend ở 5R rồi có thể đổi SES ở v9: trả 20 U
 
 Dự phòng nếu AWS từ chối ra khỏi sandbox (hiếm với mục đích rõ): Resend Pro 20 USD theo bản 1, cùng chỗ cắm, đổi 1 ô CONFIG.
 
-**Giảm số thư gửi (đòn bẩy sản phẩm, BL110):** hiện mỗi buổi có thư nhắc riêng cộng thư buổi sáng; thêm ô CONFIG `REMINDER_MODE = PER_LESSON | MORNING_ONLY` cho học viên có nhiều buổi mỗi tuần, giảm khoảng 40% thư. Không bắt buộc, SES rẻ nên có thể để nguyên.
+**Giảm số thư gửi (đòn bẩy sản phẩm, BL80):** hiện mỗi buổi có thư nhắc riêng cộng thư buổi sáng; thêm ô CONFIG `REMINDER_MODE = PER_LESSON | MORNING_ONLY` cho học viên có nhiều buổi mỗi tuần, giảm khoảng 40% thư. Không bắt buộc, SES rẻ nên có thể để nguyên.
 
 ## 4. Kế hoạch tổng (gắn với lộ trình v8)
 
 | Giai đoạn | Thời gian (ước, Claude Pro) | Việc | Điều kiện sang giai đoạn sau |
 |---|---|---|---|
-| **P0 · Trong v8** | 11 đến 12/2026, xen kẽ chunk 6, 7 | Lấy lại `test/unit.js`, thêm `.gitignore`, GitHub Actions cho v8; **5R email SES**; `AGENTS.md` dùng chung 3 công cụ (mục 5); đăng ký Cloudflare, Supabase, AWS, Sentry (chưa trả tiền); Gemini viết "bản luật v9" từ file 01, 03 và hàm thuần | v8 PRODUCTION chạy ổn 2 tuần (chunk 8); bản luật v9 anh duyệt |
+| **P0 · Trong v8** | 11 đến 12/2026, xen kẽ chunk 6, 7 | Lấy lại `test/unit.js`, thêm `.gitignore`, GitHub Actions cho v8; **5S email SES**; `AGENTS.md` dùng chung 3 công cụ (mục 5); đăng ký Cloudflare, Supabase, AWS, Sentry (chưa trả tiền); Gemini viết "bản luật v9" từ file 01, 03 và hàm thuần | v8 PRODUCTION chạy ổn 2 tuần (chunk 8); bản luật v9 anh duyệt |
 | **P1 · Nền** | 01/2027, 4 tuần (S0 đến S3) | Thử nghiệm S0 chốt hosting; repo v9; migration; `import_sheets`; core TypeScript + 46 kịch bản | 46 kịch bản xanh; nhập đủ dữ liệu v8 |
 | **P2 · Sản phẩm** | 02 đến 03/2027, 8 tuần (S4 đến S9) | Đăng nhập; cổng học viên; cổng tutor; trang admin | Mọi việc của hướng dẫn vận hành làm được trên web |
 | **P3 · Nền tảng** | 04/2027, 3 tuần (S10, S11) | Worker jobs: outbox, SES, Calendar, cron; giám sát, sao lưu, health | Email Delivered qua SNS; Meet tạo đúng; báo động trong 5 phút |
 | **P4 · Chạy bóng và cắt chuyển** | 05/2027, 5 tuần (S12 đến S15) | 14 đêm so sánh; k6; soát bảo mật người thật; cắt chuyển cuối tuần | 7 đêm không chênh; không lỗi CAO |
 | **P5 · Chăm sóc** | 06/2027 | Đóng v8 sau 30 ngày; sổ tay sự cố; bàn giao đồng sáng lập thứ hai | 2 tuần không lỗi CAO |
 
-Tổng khoảng 22 tuần từ 01/2027 với Claude Pro; nâng Max trong P2 và P3 thì khoảng 16 tuần, cắt chuyển cuối 04/2027. Điều kiện bắt đầu P1 giữ như bản 01/11: v8 ổn định hoặc chạm ngưỡng; P0 làm được ngay vì không đụng v8 đang chạy (trừ 5R, là một sub chunk bình thường của v8).
+Tổng khoảng 22 tuần từ 01/2027 với Claude Pro; nâng Max trong P2 và P3 thì khoảng 16 tuần, cắt chuyển cuối 04/2027. Điều kiện bắt đầu P1 giữ như bản 01/11: v8 ổn định hoặc chạm ngưỡng; P0 làm được ngay vì không đụng v8 đang chạy (trừ 5S, là một sub chunk bình thường của v8).
 
 ## 5. Điều phối ba công cụ: một repo, một luật, ba làn
 
@@ -194,21 +195,21 @@ key content thiếu tiếng Anh, mẫu email thiếu biến. Ghi vào docs/REVIE
 ## 6. Thay đổi so với bản 1, tóm tắt để cập nhật
 
 * Hosting: Cloudflare Workers (web qua vinext hoặc OpenNext, jobs bằng Hono riêng) thay Vercel; Vercel là dự phòng nếu thử nghiệm S0 đỏ.
-* Email: SES từ 5R, Resend là dự phòng; không chuyển hai lần.
+* Email: SES từ 5S, Resend là dự phòng; không chuyển hai lần.
 * Công cụ: bỏ Google AI Pro, dùng Gemini CLI miễn phí; Max chỉ 2 tháng nặng.
 * Thêm: Worker jobs tách riêng, Hyperdrive, KV cache slot, Turnstile, mục tiêu hiệu năng đo được, kế hoạch tổng P0 đến P5, điều phối 3 làn, MCP và quyền, nhịp tuần, 4 mẫu file.
 * Chi phí hạ tầng 65 → 35 USD mỗi tháng; công cụ 60 → 40 USD mỗi tháng.
 
-## 7. Quyết định cần anh chốt (BACKLOG BL109 đến BL114)
+## 7. Quyết định cần anh chốt (BACKLOG BL79 đến BL84)
 
 | Mã | Câu hỏi | Đề xuất |
 |---|---|---|
-| BL109 | Mức hạ tầng: Pro gọn 35 USD, An toàn 65 USD, Tột cùng 10 USD | Pro gọn |
-| BL110 | Email: SES ngay từ 5R (thay BL100 Resend) và thêm `REMINDER_MODE` giảm thư | SES; `REMINDER_MODE` làm ở v9 |
-| BL111 | Bỏ Google AI Pro, dùng Gemini CLI miễn phí | Bỏ, trừ khi anh dùng AI Pro việc khác |
-| BL112 | Nâng Claude Max 5x chỉ trong P2, P3 (2 tháng) | Có |
-| BL113 | Tách Worker jobs bằng Hono riêng khỏi web | Có |
-| BL114 | Làm P0 (test/unit.js, .gitignore, Actions, AGENTS.md, 5R) ngay trong tháng 11 xen kẽ chunk 6, 7 | Có |
+| BL79 | Mức hạ tầng: Pro gọn 35 USD, An toàn 65 USD, Tột cùng 10 USD | Pro gọn |
+| BL80 | Email: SES ngay từ 5S (thay BL70 Resend) và thêm `REMINDER_MODE` giảm thư | SES; `REMINDER_MODE` làm ở v9 |
+| BL81 | Bỏ Google AI Pro, dùng Gemini CLI miễn phí | Bỏ, trừ khi anh dùng AI Pro việc khác |
+| BL82 | Nâng Claude Max 5x chỉ trong P2, P3 (2 tháng) | Có |
+| BL83 | Tách Worker jobs bằng Hono riêng khỏi web | Có |
+| BL84 | Làm P0 (test/unit.js, .gitignore, Actions, AGENTS.md, 5S) ngay trong tháng 11 xen kẽ chunk 6, 7 | Có |
 
 ## 8. Việc làm ngay (không chờ chốt, không tốn tiền)
 
