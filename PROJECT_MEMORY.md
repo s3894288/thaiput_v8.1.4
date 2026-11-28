@@ -1,8 +1,10 @@
 # PROJECT_MEMORY · Bàn giao dự án thaiput v8 (đọc đầu tiên ở mọi chat mới)
 
-*Bản 27/11/2026 (lần 2, tối). Dành cho Claude ở chat mới trong project "Thai Class". Lưu tại `v8/PROJECT_MEMORY.md`.*
+*Bản 28/11/2026 (lần 3). Dành cho Claude ở chat mới trong project "Thai Class". Lưu tại `v8/PROJECT_MEMORY.md`.*
 
 ## Thay đổi so với bản trước
+
+**Lần 3 (28/11):** gộp tài liệu nhánh PR 2 vào main (kế hoạch v9, `AGENTS.md`, `handoff/EMAIL_SES_RESEND/`), giữ code 8.1.4; 16 câu BACKLOG của PR 2 thành BL100 đến BL115; tạo nhánh `Merge-814-at-28Nov`; xoá nhánh `dong-bo-27-11` và `claude/hopeful-galileo-xa1dv9`. Sửa mục 3, 4, 5.
 
 **Lần 2 (tối 27/11):** repo main đã đồng bộ với project (PR 3, BL97 xong); phát hiện nhánh 8.1.9 chưa gộp (PR 1, BL99: 5O, 5N, 5R đã làm ở đó); PR 2 (SES) đã đóng; chuyển Private bị chặn (BL98, anh tự làm); đánh số lại BL70, BL71, BL72 của main thành BL96, BL97, BL98. Sửa mục 3, 4, 5, 6.
 
@@ -33,20 +35,21 @@ Bản đồ đầy đủ các file project nằm ở `v8/HUONG_DAN_DOC_PROJECT.m
 5. Chỉ khi sửa code: `v8/CLAUDE.md` (các luật đánh số và mục "Quy ước làm việc") và `v8/repo/BOOTSTRAP.md`.
 6. Chỉ khi cần tra: `v8/docs/01_QUYET_DINH_50_CAU.md` (quyết định nghiệp vụ), `v8/docs/03_KICH_BAN_TEST_40.md` (không tự sửa kết quả mong đợi để test qua; chỉ đổi khi anh duyệt, luật 15 trong `CLAUDE.md`), `v8/HUONG_DAN_VAN_HANH.md`. Không đọc `v8/dist/` và hai bundle trừ khi cần tra (rất lớn).
 
-## 3. Trạng thái tại 27/11/2026
+## 3. Trạng thái tại 28/11/2026
 
 *Mục này và mục 5 phải được cập nhật ở cuối mỗi việc (xem mục 7).*
 
-* **Bản code hiện tại: 8.1.4** (`src/Config.gs` VERSION '8.1.4'). Sub chunk 5Q phần A (gửi email cố định bằng GmailApp qua `src/MailTransport.gs`, bỏ MailFix) xong 02/11/2026. Ngày 12/11 và 27/11 chỉ đồng bộ file và tài liệu, không đổi code.
+* **Bản code hiện tại: 8.1.4** (`src/Config.gs` VERSION '8.1.4'). Sub chunk 5Q phần A (gửi email cố định bằng GmailApp qua `src/MailTransport.gs`, bỏ MailFix) xong 02/11/2026. Ngày 12/11, 27/11 và 28/11 chỉ đồng bộ file và tài liệu, không đổi code.
 * **Kết quả test 8.1.4 (chạy lại 12/11 và 27/11/2026):** hàm thuần 34/34, kịch bản 46/46, tích hợp 134/134, giao diện 48/48, thử tải 2/2. `dist/` dựng lại trùng `src/`.
 * **Code đã giao:** `dist/Code.gs`, `dist/Index.html`, `dist/appsscript.json`, `dist_google_login/` (dự án phụ đăng nhập Google). Hai bundle `v8/repo/SRC_BUNDLE.txt` (56 file) và `v8/repo/TEST_BUNDLE.txt` (13 file) là bản dự phòng, đóng lại 12/11.
-* **Repo GitHub `s3894288/thaiput_v8.1.4` (kiểm tối 27/11):**
-  * **main = 8.1.4**, đã đồng bộ với project qua PR 3 (gộp 27/11): đủ `.github/`, `.gitignore`, `.clasp.json.example`, `THIET_KE_GIAO_DIEN.md`, `test/unit.js`, mọi file md mới nhất. Anh chốt giữ main 8.1.4, không đụng các nhánh khác.
+* **Repo GitHub `s3894288/thaiput_v8.1.4` (kiểm 28/11), đúng 3 nhánh:**
+  * **`main` = 8.1.4**, nguồn chuẩn: đồng bộ với project qua PR 3 (27/11), gộp tài liệu nhánh PR 2 qua PR 4 (28/11). Có kế hoạch v9 (`plan/KE_HOACH_V9_CHI_TIET.md`, `plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md`, `plan/P0_BUOC_TUNG_BUOC.md`), `AGENTS.md` (luật làn Claude, Codex, Gemini), `handoff/EMAIL_SES_RESEND/` (bản vá code SES 8.1.5 CHƯA áp, hướng dẫn cài SES).
+  * **`Merge-814-at-28Nov`:** bản chụp main ngay sau lần gộp 28/11. Không làm việc trên nhánh này.
   * **Nhánh `claude/wizardly-gates-8xzfbn` (PR 1, nháp, CHƯA gộp) = 8.1.9:** đã làm 5O (8.1.5, 8.1.6: giao diện đen trắng, khung email mới), 5N (8.1.7: tô màu Sheets, "Đã xử lý (giữ nguyên)", báo buổi kẹt Chờ đổi tutor), bản vá 8.1.8 (viền đỏ đúng ô nhập sai, bảng màu vào hướng dẫn), 5R (gộp dòng trùng EMAIL_TEMPLATES và CONTENT, ô QR chuyển khoản, tăng tốc tải, tóm tắt thay đổi sau nâng cấp). Soát chéo PASS. Alex chạy test nhánh này 27/11: 34/34, 46/46, 228/228, 71/71, 2/2. Chưa kiểm trên Google thật. Nhánh có BACKLOG riêng (lần 15, 55 câu chờ) và `HUONG_DAN_TIEP_NHAN_8.1.9.md`; số BL70 đến BL95 ở nhánh đó là câu khác với main. Xem BL99.
-  * **Nhánh `claude/hopeful-galileo-xa1dv9` (PR 2 đã đóng 27/11, nhánh giữ):** bản 8.1.5 gửi email qua Amazon SES và kế hoạch v9 (Cloudflare, Supabase, SES), tạm dừng từ 14/11, xung đột 12 file với PR 1.
-  * Repo đang **Public**: chuyển Private bị proxy chặn, anh tự làm (BL98).
+  * **Nhánh `claude/hopeful-galileo-xa1dv9` (PR 2) đã xoá 28/11** sau khi lấy hết tài liệu; code SES còn trong `handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch` và trong lịch sử PR 2 (đã đóng) trên GitHub. Chữ "5R" của nhánh này (email SES) khác 5R của nhánh 8.1.9.
+  * Repo vẫn **Public** (kiểm 28/11): chuyển Private bị proxy chặn, anh tự làm (BL98).
 * **STAGING và PRODUCTION:** chưa tách tới hết chunk 5. Mọi bản chỉ dán vào STAGING. Go live ở chunk 6 (`plan/KE_HOACH_5J_5P.md` mục 5).
-* **BACKLOG còn 35 câu chờ anh** (mục A 31, mục B 4), theo số liệu 27/11. Mới nhất: BL99 (nhánh 8.1.9 chưa gộp), BL98 (repo Public), BL96 (admin chưa mở được giờ rảnh hộ tutor). BL97 đã xong. Từ 27/11 số câu mới của main bắt đầu từ BL100.
+* **BACKLOG còn 51 câu chờ anh** (mục A 47, mục B 4), theo số liệu 28/11. Mới nhất: BL100 đến BL115 (kế hoạch v9 và email SES, từ nhánh PR 2), BL99 (nhánh 8.1.9 chưa gộp), BL98 (repo Public), BL96 (admin chưa mở được giờ rảnh hộ tutor). Câu mới của main bắt đầu từ **BL116**.
 * **Việc của anh trên Google:** các file không ghi anh đã dán 8.1.4 lên STAGING chưa. Hỏi anh trước khi giả định.
 
 ## 4. Dòng thời gian quyết định và việc đã xong
@@ -59,6 +62,8 @@ Bản đồ đầy đủ các file project nằm ở `v8/HUONG_DAN_DOC_PROJECT.m
 * **27/11:** anh yêu cầu sửa memory cho khớp, rà đồng bộ, tóm tắt cả chuỗi hội thoại thành tài liệu bàn giao, gộp vào KHOI_DONG_CHAT_MOI rồi đổi tên thành PROJECT_MEMORY, tạo md hướng dẫn đọc file project, đối chiếu repo GitHub, tối ưu dung lượng. Anh duyệt xoá 7 file `v8/archive/` khỏi project (bản gốc còn trên GitHub, đã so trùng; không nằm trong bundle). Việc sửa GitHub ghi vào BACKLOG (BL97, BL98), chưa làm. Memory (`overview.md`, `ways-of-working.md` của project) đã sửa cho khớp 8.1.4. CLAUDE.md sửa quy ước 6 (rà BACKLOG sau 5N, 5O) và 7 (bundle giữ làm dự phòng). Không đổi code; test chạy lại xanh hết.
 * **27/11 tối:** anh lệnh làm các việc bị chặn. Đồng bộ main qua PR 3 (đã gộp). Phát hiện 2 PR cũ từ phiên Claude Code mà tài liệu project chưa biết: PR 1 (8.1.9) và PR 2 (8.1.5 SES). Anh chốt: giữ main 8.1.4, không đụng nhánh khác, đóng PR 2 giữ nhánh. Chuyển Private bị chặn. Đánh số lại BL96, BL97, BL98; thêm BL99.
 
+* **28/11:** anh lệnh gộp nhánh PR 2 vào main. Alex phát hiện PR 2 có đổi code (8.1.5 SES, quyền `script.external_request`, `test/unit.js` viết lại); anh chốt chỉ lấy tài liệu, giữ code 8.1.4. Gộp qua PR 4 (GitHub Actions xanh), đánh số lại BL100 đến BL115, tạo `Merge-814-at-28Nov`, xoá `dong-bo-27-11` và `claude/hopeful-galileo-xa1dv9`. Nhánh 8.1.9 (PR 1) không đụng.
+
 ## 5. Việc còn tồn, xếp theo thứ tự làm
 
 Chỉ làm khi anh ra lệnh. Mục không có lệnh thì chỉ hỏi hoặc nhắc.
@@ -69,9 +74,9 @@ Chỉ làm khi anh ra lệnh. Mục không có lệnh thì chỉ hỏi hoặc nh
 4. **BL96 và phần còn lại của 5Q** (`BACKLOG.md` mục A). BL96 chờ anh duyệt (không code khi chưa duyệt, vì đổi quyền mở giờ). BL69 (bảng hạn mức 5 dòng, kiểm thư tới 5 loại hộp thư; đề xuất làm cùng 5N), BL51 (phát hiện thư bị trả về), BL64 (chế độ Gmail API). BL65 đến BL68 là quyết định đã làm trong 8.1.4, chờ anh duyệt.
 5. **Hướng dẫn bản thử song song để cập nhật code** (anh yêu cầu 02/11, chưa làm, chưa có file). Nền để đọc: `HUONG_DAN_PHAT_HANH.md` mục 3.
 6. **Hướng dẫn go live chunk 6** (chưa viết). Đọc `plan/KE_HOACH_5J_5P.md` mục 5, `plan/LO_TRINH_V8_TOI_CUOI.md`, `BACKLOG.md` BL52.
-7. **GitHub:** main đã đồng bộ (BL97 xong). Còn: anh chuyển repo sang Private (BL98: Settings, Danger Zone, Change visibility, Make private), và quyết nhánh 8.1.9 (BL99).
+7. **GitHub:** main đã đồng bộ (BL97 xong), tài liệu PR 2 đã gộp (28/11). Còn: anh chuyển repo sang Private (BL98: Settings, Danger Zone, Change visibility, Make private), quyết nhánh 8.1.9 (BL99), quyết email SES (BL110: áp bản vá trong `handoff/EMAIL_SES_RESEND/` theo README thư mục đó) và kế hoạch v9 (BL100 đến BL115).
 8. **Đề xuất chờ anh duyệt từ 13/11:** khi sửa code trong chat bằng bundle (không qua GitHub) thì cuối việc phải báo anh "GitHub chưa có bản này" và gửi file đổi. Xem mục 6 của file này.
-9. **Số phiên bản kế tiếp:** bảng ở `plan/KE_HOACH_5J_5P.md` mục 1 là số cũ. Đề xuất 8.1.5 cho 5N, báo anh khi làm.
+9. **Số phiên bản kế tiếp trên main:** KHÔNG dùng 8.1.5 đến 8.1.9: nhánh 8.1.9 đã dùng 8.1.5 đến 8.1.9, nhánh SES đã dùng 8.1.5 cho việc khác. Bảng ở `plan/KE_HOACH_5J_5P.md` mục 1 là số cũ. Nếu gộp PR 1 thì main thành 8.1.9 và làm tiếp từ 8.1.10; nếu làm lại trên main thì đề xuất 8.2.0. Báo anh khi làm.
 
 ## 6. Khi cần sửa code
 

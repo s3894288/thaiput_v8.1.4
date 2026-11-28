@@ -1,8 +1,10 @@
 # thaiput v8
 
-Hệ thống đặt lịch luyện nói tiếng Thái 1:1, bản **8.1.4** (02/11/2026). Google Sheets làm database, Google Apps Script làm máy chủ (web app), một trang web cho học viên, tutor và admin (nhúng được vào Google Sites).
+Hệ thống đặt lịch luyện nói tiếng Thái 1:1, bản **8.1.4** (02/11/2026; tài liệu cập nhật 28/11/2026). Google Sheets làm database, Google Apps Script làm máy chủ (web app), một trang web cho học viên, tutor và admin (nhúng được vào Google Sites).
 
-Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy bằng Node (giả lập Google), bản dán tay, tài liệu, kế hoạch, lịch sử. Từ 05/11/2026 repo GitHub thay cho 2 file bundle trong claude.ai project.
+Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy bằng Node (giả lập Google), bản dán tay, tài liệu, kế hoạch, lịch sử. Từ 05/11/2026 repo GitHub là nguồn chính; 2 file bundle trong claude.ai project (`v8/repo/`) giữ làm bản dự phòng. Bàn giao giữa các chat: `PROJECT_MEMORY.md` (đọc đầu tiên), bản đồ file: `HUONG_DAN_DOC_PROJECT.md`.
+
+Nhánh: `main` (8.1.4, nguồn chuẩn), `Merge-814-at-28Nov` (bản chụp main lúc gộp 28/11), `claude/wizardly-gates-8xzfbn` (PR 1, bản 8.1.9 chưa gộp, xem BACKLOG BL99).
 
 ## Cấu trúc
 
@@ -14,11 +16,14 @@ Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy b
 | `companion/`, `dist_google_login/` | Dự án phụ đăng nhập Google cho admin (nguồn và bản dán tay) |
 | `loadtest/` | Công cụ thử tải STAGING (`run.js`, `browser.js`) |
 | `CLAUDE.md` | Luật kỹ thuật và quy trình cho Claude Code (đọc trước khi sửa code) |
+| `AGENTS.md` | Luật làn khi nhiều công cụ AI (Claude Code, Codex, Gemini CLI) cùng làm trên repo |
+| `PROJECT_MEMORY.md`, `HUONG_DAN_DOC_PROJECT.md` | Bàn giao trạng thái giữa các chat; bản đồ file và cách đọc |
 | `PROGRESS.md`, `BACKLOG.md` | Tiến độ từng chunk; câu hỏi chờ chốt |
 | `HUONG_DAN_*.md` | 4 hướng dẫn cho admin: vận hành, phát hành và nâng cấp, thử tải, triển khai Workspace; thêm `HUONG_DAN_GITHUB_CLAUDE_CODE.md` (làm việc với repo này) |
 | `policy/` | Chính sách học viên, tutor (bản nháp) |
 | `docs/` | Đặc tả đã chốt: 50 quyết định, plan code, 40 kịch bản test, checklist, tên miền và Workspace |
-| `plan/` | Kế hoạch 5J đến 5Q, lộ trình, kế hoạch sau go live, luật bù buổi, trả lời 29/10 và 01/11 |
+| `plan/` | Kế hoạch 5J đến 5Q, lộ trình, kế hoạch sau go live, luật bù buổi, trả lời 29/10 và 01/11; kế hoạch v9 (`KE_HOACH_V9_CHI_TIET.md`, `KE_HOACH_V9_TOI_UU_DIEU_PHOI.md`: Next.js, Supabase, Cloudflare, SES, điều phối Claude, Codex, Gemini) và `P0_BUOC_TUNG_BUOC.md` |
+| `handoff/EMAIL_SES_RESEND/` | Bàn giao gửi email qua Amazon SES (bản vá code 8.1.5 chưa áp vào main, hướng dẫn cài SES). Áp theo `README.md` trong thư mục khi anh quyết BL110 |
 | `archive/` | Lịch sử đã gộp (giải thích chunk, báo cáo, soát, tư vấn, spec v7, hồ sơ v6, bảng tra `MANIFEST.md`) |
 | `THIET_KE_GIAO_DIEN.md`, `CLEANUP_REPORT.md` | Thiết kế giao diện 19/10; báo cáo dọn dẹp 30/10 |
 

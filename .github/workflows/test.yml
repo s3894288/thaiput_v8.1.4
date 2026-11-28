@@ -1,6 +1,8 @@
+# Thaiput v8 · chạy toàn bộ test và kiểm bản dán tay dist/ khớp src/ (CLAUDE.md luật 28, quy ước 6).
 name: test
 on:
   push:
+    branches: [main]
   pull_request:
 jobs:
   test:
@@ -10,9 +12,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
       - run: npm ci
-      - run: npm test
-      - name: dist phải khớp src (chạy npm run build rồi commit dist)
+      - name: Toàn bộ test (TZ Asia/Ho_Chi_Minh)
+        run: npm test
+      - name: Dựng lại dist/ và kiểm khớp src/
         run: |
-          node test/build_dist.js
+          npm run build
           git diff --exit-code -- dist dist_google_login
