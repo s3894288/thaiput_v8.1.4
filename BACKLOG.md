@@ -1,6 +1,14 @@
 # BACKLOG thaiput v8
 
-*Cập nhật 27/11/2026 (lần 11). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+*Cập nhật 28/11/2026 (lần 12). **5N, 5O dời sang tuần sau (anh chốt 02/11). Anh rà toàn bộ file này ở lượt cuối của chunk 5, sau 5N, 5O; coder nhắc lúc đó.** Trả lời theo mã, ví dụ "BL40 theo đề xuất". Dòng đã chốt chuyển xuống mục "Đã chốt" kèm ngày.*
+
+## Thay đổi so với bản 27/11 (lần 11)
+
+* Gộp tài liệu của nhánh `claude/hopeful-galileo-xa1dv9` (PR 2, kế hoạch v9, email SES) vào main ngày 28/11, giữ code 8.1.4. Thêm 16 câu của nhánh đó với **số gốc BL70 đến BL85**.
+* Bảng số BACKLOG giữa các nhánh (từ 28/11): main dùng BL01 đến BL69, BL70 đến BL85 (từ PR 2), BL96 đến BL99; nhánh 8.1.9 (PR 1) đã đổi số của nó sang BL150 đến BL175 ngày 28/11. BL86 đến BL95 bỏ trống. **Câu mới của main bắt đầu từ BL100.**
+* Chunk SES của PR 2 nay tên **5S** (đổi ngày 28/11 trên nhánh đó để không trùng 5R của nhánh 8.1.9). Chữ 5R hay 5S trong BL70, BL71, BL80, BL84 là đợt email SES này.
+* BL80, BL84, BL85 thêm ghi chú trạng thái trên main. BL99 sửa số của nhánh 8.1.9.
+* Tổng còn chờ: 51 câu (mục A 47, mục B 4).
 
 ## Thay đổi so với bản 27/11 (lần 10)
 
@@ -8,7 +16,7 @@
 * BL97 xong 27/11 (repo main đồng bộ với project qua PR 3), chuyển xuống "Đã chốt".
 * BL98: Alex thử chuyển Private bị chặn, anh tự làm.
 * Thêm **BL99**: nhánh 8.1.9 (PR 1) đã làm 5O, 5N, 5R nhưng chưa gộp main.
-* PR 2 (bản 8.1.5 gửi email qua Amazon SES, kế hoạch v9) đã đóng 27/11 theo lệnh anh, nhánh `claude/hopeful-galileo-xa1dv9` giữ nguyên.
+* PR 2 (bản 8.1.5 gửi email qua Amazon SES, kế hoạch v9) đã đóng 27/11 theo lệnh anh, nhánh `claude/hopeful-galileo-xa1dv9` giữ nguyên (tới 28/11, xem lần 12).
 * Tổng còn chờ: 35 câu (mục A 31, mục B 4).
 
 ## Thay đổi so với bản 12/11 (lần 9)
@@ -68,7 +76,23 @@
 | BL69 | Phần còn lại của 5Q: bảng hạn mức 5 dòng ở menu 2 và ô `MAIL_DAILY_CAP`; kiểm thư tới 5 loại hộp thư (Gmail, Outlook, Yahoo, tên miền trường, Workspace khác) trên STAGING | Làm cùng 5N | Tuần sau |
 | BL96 | Admin không mở được giờ rảnh hộ tutor. "Đặt thay" chỉ chọn giờ tutor đã mở (`OPEN` ở AVAILABILITY; test I48 xác nhận lý do `NO_TUTOR`); hiện chỉ tutor tự mở giờ của mình (`apiTutorSetAvailability`). Học viên nhắn riêng xin giờ tutor chưa mở thì admin phải nhờ tutor mở trước (Phần L4 đã ghi cách làm), hoặc gõ tay một dòng AVAILABILITY (chưa thử trên Google thật). (a) giữ cách hiện tại; (b) trang Đặt thay thêm bước "Mở giờ cho tutor": chọn tutor và giờ, ghi dòng `OPEN` kèm nhật ký `AVAIL_OPEN` do admin làm, tutor nhận email, rồi đặt luôn; vẫn chặn giờ đã bắt đầu, ngoài `BOOKING_HORIZON_DAYS`, giờ BLOCKED, tutor bị khoá | (b), chưa làm; anh duyệt vì đổi quyền mở giờ (hiện chỉ tutor) | Tuần sau (rà) |
 | BL98 | Repo GitHub `s3894288/thaiput_v8.1.4` đang Public (đọc được không cần đăng nhập), trong khi `HUONG_DAN_GITHUB_CLAUDE_CODE.md` mục 1 ghi bắt buộc Private vì có tài liệu nội bộ. Alex thử chuyển ngày 27/11 bằng quyền admin của repo nhưng bị chặn (proxy của phiên Claude cấm sửa cài đặt repo, lỗi 403). Anh tự làm: github.com, repo, Settings, kéo xuống Danger Zone, Change visibility, Make private | Làm ngay | Ngay |
-| BL99 | Repo có nhánh `claude/wizardly-gates-8xzfbn` (PR 1, nháp, phiên Claude Code 05/11 đến 27/11) chứa bản **8.1.9**: 5O (8.1.5, 8.1.6), 5N (8.1.7), bản vá 8.1.8, 5R (gộp dòng trùng EMAIL_TEMPLATES và CONTENT, QR chuyển khoản, tăng tốc tải, tóm tắt sau nâng cấp), đã soát chéo PASS. Alex chạy test nhánh này ngày 27/11: 34/34, 46/46, 228/228, 71/71, 2/2; chưa kiểm trên Google thật. Nhánh có BACKLOG riêng (lần 15, 55 câu chờ, BL70 đến BL95 là câu khác với main). Anh chốt 27/11: giữ main 8.1.4, không đụng nhánh này. (a) gộp PR 1 vào main sau khi diễn tập 8.1.9 trên bản sao STAGING, rồi gộp hai BACKLOG; (b) bỏ nhánh, làm lại 5N, 5O trên main | (a); quyết trước khi làm 5N, 5O để không làm lại việc đã xong | Trước 5N |
+| BL99 | Repo có nhánh `claude/wizardly-gates-8xzfbn` (PR 1, nháp, phiên Claude Code 05/11 đến 27/11) chứa bản **8.1.9**: 5O (8.1.5, 8.1.6), 5N (8.1.7), bản vá 8.1.8, 5R (gộp dòng trùng EMAIL_TEMPLATES và CONTENT, QR chuyển khoản, tăng tốc tải, tóm tắt sau nâng cấp), đã soát chéo PASS. Alex chạy test nhánh này ngày 27/11: 34/34, 46/46, 228/228, 71/71, 2/2; chưa kiểm trên Google thật. Nhánh có BACKLOG riêng (lần 15, 55 câu chờ; từ 28/11 nhánh đó dùng số BL150 đến BL175, không trùng main). Anh chốt 27/11: giữ main 8.1.4, không đụng nhánh này. (a) gộp PR 1 vào main sau khi diễn tập 8.1.9 trên bản sao STAGING, rồi gộp hai BACKLOG; (b) bỏ nhánh, làm lại 5N, 5O trên main | (a); quyết trước khi làm 5N, 5O để không làm lại việc đã xong | Trước 5N |
+| BL70 | Dịch vụ email bên thứ ba cho bước 0 (5S, trước v9) để có hơn 1.500 thư mỗi ngày không chờ Workspace qua 60 ngày: (a) Resend Pro 20 USD, 50.000 thư mỗi tháng, không trần ngày; (b) Postmark; (c) Amazon SES | (a) | 5S |
+| BL71 | Làm 5S khi nào: (a) ngay sau 5N, 5O, trước chunk 6 để go live đã có hạn mức rộng; (b) sau chunk 7 | (a) | 5S |
+| BL72 | Đăng nhập v9: (a) Supabase Auth (link email hạn chung, ví dụ 15 phút; Google cho admin), bỏ hạn link theo vai trò của luật 36; (b) giữ bảng link tự viết như v8 | (a) | v9 S4 |
+| BL73 | Repo v9: (a) repo GitHub riêng `thaiput_v9`, repo v8 giữ làm đặc tả và sửa lỗi tới khi đóng; (b) thư mục trong repo v8 | (a) | v9 S0 |
+| BL74 | Ảnh chuyển khoản ở v9: (a) Supabase Storage bucket riêng tư; (b) giữ Google Drive | (a) | v9 S1 |
+| BL75 | Số đo tốc độ ở v9: (a) bỏ bảng METRICS, dùng Sentry và Vercel; (b) giữ bảng để báo cáo riêng | (a) | v9 S11 |
+| BL76 | Sao lưu v9: (a) sao lưu ngày của Supabase Pro + `pg_dump` đêm lên Drive; (b) thêm PITR (thêm phí) | (a) giai đoạn đầu | v9 S11 |
+| BL77 | Nâng Claude lên Max trong các tháng xây v9 (16 tuần thay vì 20 đến 24) | Có, nếu muốn 16 tuần | v9 S0 |
+| BL78 | Dòng "không thêm máy chủ ngoài" trong `CLAUDE.md`: (a) chỉ sửa trong `CLAUDE.md` của repo v9 khi vào S0, repo v8 giữ nguyên; (b) sửa ngay | (a) | v9 S0 |
+| BL79 | Mức hạ tầng v9: (a) Pro gọn 35 USD mỗi tháng (Cloudflare Workers 5 + Supabase Pro 25 + SES 5); (b) An toàn 65 USD (Vercel Pro mỗi ghế + Supabase Pro + Resend Pro); (c) Tột cùng 10 USD (Workers + D1 + SES, tự viết đăng nhập) | (a), thử nghiệm S0 đỏ thì web về Vercel | v9 S0 |
+| BL80 | Email: (a) Amazon SES ngay từ 5S (0,10 USD mỗi 1.000 thư, một lần cài, dùng tới hết v9; thay đề xuất Resend ở BL70); (b) Resend Pro 20 USD ở 5S rồi đổi SES ở v9. Kèm: thêm `REMINDER_MODE` giảm khoảng 40% thư ở v9. Ghi chú 28/11: code SES CHƯA vào main (anh chốt 28/11 giữ code 8.1.4); bản vá ở `handoff/EMAIL_SES_RESEND/01_code_5R_ses.patch`. | (a); `REMINDER_MODE` làm ở v9 | 5S |
+| BL81 | Công cụ AI: (a) bỏ Google AI Pro, dùng Gemini CLI miễn phí 1.000 lượt mỗi ngày cho vai đọc dài và viết chữ; (b) giữ AI Pro | (a) trừ khi anh dùng AI Pro cho việc khác | v9 S0 |
+| BL82 | Nâng Claude Max 5x chỉ trong 2 tháng nặng nhất của v9 (P2, P3), khoảng +160 USD một lần | Có | v9 P2 |
+| BL83 | Tách Worker "jobs" (Hono, TypeScript thuần: cron, outbox, webhook SES) khỏi Worker "web" (Next.js qua vinext hoặc OpenNext) | Có | v9 S0 |
+| BL84 | Làm P0 ngay trong tháng 11 xen kẽ chunk 6, 7: lấy lại `test/unit.js`, `.gitignore`, GitHub Actions, `AGENTS.md` dùng chung, 5S email. Ghi chú 28/11: phần repo của P0 đã có trên main (`.gitignore`, GitHub Actions, `AGENTS.md`, `.clasp.json.example`, `test/unit.js` bản gốc); phần email SES chưa (BL80). | Có | P0 |
+| BL85 | `test/unit.js` viết lại 10/11 vì bản gốc không lên repo. (a) giữ bản viết lại; (b) anh gửi `TEST_BUNDLE.txt`, coder gộp test bản gốc có mà bản mới thiếu. Ghi chú 28/11: main dùng bản GỐC `test/unit.js` (khôi phục từ project 27/11); bản viết lại chỉ còn ở `handoff/EMAIL_SES_RESEND/02_test_unit_js.patch`. Việc còn lại: so hai bản, thêm vào bản gốc test nào bản viết lại có mà bản gốc thiếu. | (b) nếu còn file, không thì (a) | Không chặn |
 | BL60 | Số điện thoại nước ngoài gõ không có + và mã nước (ví dụ số Thái `081 234 5678`) bị hiểu là số Việt Nam và lưu `+84812345678`, có link Zalo sai người. (a) giữ, gợi ý trên form đã ghi "số nước ngoài ghi + và mã nước"; (b) chỉ chuẩn hoá khi bắt đầu bằng 0 hoặc +84 hoặc 84 và đủ 10 hay 11 số | (a) | 5Q (rà) |
 | BL61 | Gói giá 0 chỉ đăng ký qua Zalo: nếu TRIAL để giá 0 thì Trial thành chỉ qua Zalo. Bản cài mới có giá mặc định 0, menu 2 báo LƯU Ý (không phải LỖI). (a) giữ LƯU Ý; (b) báo LỖI khi mọi gói đang bán đều giá 0 | (a) | 5Q (rà) |
 | BL62 | Khoá tutor huỷ giờ rảnh tương lai; mở khoá không tự mở lại giờ rảnh (tutor mở lại trên trang). (a) giữ; (b) mở khoá tự mở lại các giờ đã huỷ khi khoá mà còn ở tương lai | (a) | 5Q (rà) |

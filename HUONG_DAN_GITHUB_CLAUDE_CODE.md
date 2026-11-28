@@ -1,10 +1,11 @@
 # Hướng dẫn dùng repo GitHub với Claude Code (bản 8.1.4)
 
-*Cập nhật 05/11/2026. Dành cho admin không viết code. Chiến lược: sau go live, sửa hệ thống bằng Claude Code (gói Pro) trên repo này; code JavaScript trong `src/` được kiểm bằng bộ test Node rồi đưa lên Apps Script.*
+*Cập nhật 05/11/2026, bổ sung 28/11/2026. Dành cho admin không viết code. Chiến lược: sau go live, sửa hệ thống bằng Claude Code (gói Pro) trên repo này; code JavaScript trong `src/` được kiểm bằng bộ test Node rồi đưa lên Apps Script.*
 
 ## Thay đổi so với bản trước
 
-Bản đầu tiên. Thay cho cách cũ: 2 file bundle trong claude.ai project (`v8/repo/`) và `repo/BOOTSTRAP.md`.
+* **28/11/2026:** repo đã có từ 05/11: `s3894288/thaiput_v8.1.4`; mục 1 chỉ dùng khi dựng lại repo từ đầu. Repo còn để **Public**: chuyển Private ngay (Settings, Danger Zone, Change visibility, Make private; BACKLOG BL98). Nhánh: `main` (8.1.4, nguồn chuẩn), `Merge-814-at-28Nov` (bản chụp 28/11), `claude/wizardly-gates-8xzfbn` (PR 1, bản 8.1.9 chưa gộp, BL99). Làm việc trên main; làm tiếp bản 8.1.9 thì làm trên nhánh của PR 1 và đọc BACKLOG, PROGRESS của chính nhánh đó. Dùng thêm Codex hoặc Gemini CLI: đọc `AGENTS.md`. 2 bundle trong claude.ai project (`v8/repo/`) giữ làm bản dự phòng.
+* Bản đầu tiên (05/11): thay cho cách cũ chỉ dùng 2 file bundle trong claude.ai project.
 
 ## 1. Đưa repo lên GitHub (1 lần, khoảng 15 phút)
 

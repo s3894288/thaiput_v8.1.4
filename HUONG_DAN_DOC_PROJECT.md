@@ -4,7 +4,7 @@
 
 ## Thay đổi so với bản trước
 
-Bản đầu tiên (27/11). Sửa tối 27/11: dòng "Làm bằng Claude Code trên GitHub" ghi trạng thái repo sau khi đồng bộ.
+Bản 28/11: thêm 4 file từ nhánh PR 2 (`v8/AGENTS.md`, 3 file kế hoạch v9 trong `v8/plan/`), dòng tra "Kế hoạch v9 và email SES"; tổng 40 file; tính lại cỡ file. Bản đầu tiên (27/11). Sửa tối 27/11: dòng "Làm bằng Claude Code trên GitHub" ghi trạng thái repo sau khi đồng bộ.
 
 ## 1. Thứ tự đọc nhanh
 
@@ -25,6 +25,7 @@ Chat mới không thấy chat cũ. Mọi thứ cần biết nằm trong file c�
 | Rà BACKLOG | `v8/BACKLOG.md`; `v8/plan/KE_HOACH_5J_5P.md` | BACKLOG: mục A (chờ trả lời), B (câu cũ chưa thấy trả lời), C (để sau), D (còn phải kiểm trên Google thật), "Đã chốt". Rà ở lượt cuối của chunk 5, sau 5N và 5O; coder nhắc lúc đó |
 | Go live chunk 6 | `v8/plan/KE_HOACH_5J_5P.md`; `v8/HUONG_DAN_PHAT_HANH.md`; `v8/HUONG_DAN_TRIEN_KHAI_WORKSPACE.md`; `v8/docs/04_CHECKLIST.md`; `v8/HUONG_DAN_VAN_HANH.md` | Plan: mục 5. Phát hành: mục 6. Triển khai: mục 7. Checklist: phần B, C, D. Vận hành: Phần C, nhóm "Chuyển hệ thống". Hai mục 6 và 7 chỉ là ghi chú tạm, hướng dẫn go live mới viết khi vào chunk 6 |
 | Thử tải | `v8/HUONG_DAN_THU_TAI.md`; `v8/loadtest/run.js`, `v8/loadtest/browser.js` | Mục 1 (đo gì), mục 2 (chuẩn bị), mục 3 (mỗi lượt thử), mục 4 (dọn), mục 5 (an toàn), mục 6 (khác biệt với người thật). Chỉ chạy trên STAGING |
+| Kế hoạch v9 và email SES | `v8/plan/KE_HOACH_V9_CHI_TIET.md`; `v8/plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md`; `v8/plan/P0_BUOC_TUNG_BUOC.md`; `v8/AGENTS.md`; `v8/BACKLOG.md` | Kế hoạch chi tiết: điểm nghẽn, kiến trúc, sprint. Bản 2: giá, điều phối Claude, Codex, Gemini. P0: cài SES từng bước. BACKLOG: BL70 đến BL85. Code SES chưa vào main: bản vá ở `handoff/EMAIL_SES_RESEND/` trên GitHub (không có trong project) |
 | Làm bằng Claude Code trên GitHub | `v8/HUONG_DAN_GITHUB_CLAUDE_CODE.md`; `v8/CLAUDE.md`; `v8/README.md` | Hướng dẫn: mục 1 đến 4. CLAUDE.md: mục "Làm việc bằng Claude Code". README: Cấu trúc, Lệnh. Repo `s3894288/thaiput_v8.1.4`: main là 8.1.4 (đã đồng bộ với project 27/11); nhánh `claude/wizardly-gates-8xzfbn` (PR 1, chưa gộp) là 8.1.9, có BACKLOG và PROGRESS riêng. Xem `v8/PROJECT_MEMORY.md` mục 3 |
 | Dựng lại repo trong chat | `v8/repo/BOOTSTRAP.md`; `v8/repo/SRC_BUNDLE.txt`; `v8/repo/TEST_BUNDLE.txt` | BOOTSTRAP: mục 1 (giải bundle, cài, chạy test) và mục 4 (cuối việc: đóng lại bundle). Chỉ đưa bundle cho công cụ giải, không đọc vào chat |
 | Tra quyết định nghiệp vụ | `v8/docs/01_QUYET_DINH_50_CAU.md`; `v8/plan/TU_VAN_BU_BUOI.md`; `v8/policy/` | 01: 7 nhóm quyết định (mục 1 đến 7) và các mục "Thay đổi ngày ..." cuối file. TU_VAN_BU_BUOI: luật bù buổi, bù ngày. Policy: luật nhìn từ học viên và tutor. Lý do một thiết kế: `v8/plan/TRA_LOI_01_11.md` |
@@ -32,18 +33,19 @@ Chat mới không thấy chat cũ. Mọi thứ cần biết nằm trong file c�
 
 ## 3. Danh mục file
 
-Tổng cộng **36 file** trong project. Cỡ tính bằng KB (1 KB = 1.024 byte), làm tròn tới số nguyên; "< 1" là dưới nửa KB. Tên file viết đầy đủ đường dẫn trong project.
+Tổng cộng **40 file** trong project. Cỡ tính bằng KB (1 KB = 1.024 byte), làm tròn tới số nguyên; "< 1" là dưới nửa KB. Tên file viết đầy đủ đường dẫn trong project.
 
 ### Gốc `v8/`
 
 | Đường dẫn | Nội dung | Cỡ (KB) | Khi nào đọc | Lưu ý |
 |---|---|---:|---|---|
-| `v8/PROJECT_MEMORY.md` | Bàn giao giữa các chat: trạng thái hiện tại, việc kế tiếp, luật làm việc (mới 27/11, thay KHOI_DONG_CHAT_MOI.md) | 18 | Đầu mọi chat mới, luôn đọc trước | Cập nhật ở cuối mỗi việc |
-| `v8/HUONG_DAN_DOC_PROJECT.md` | File này: bản đồ các file trong project và cách đọc | 14 | Khi cần biết file nào chứa gì | Cập nhật khi thêm, xoá, đổi tên file |
-| `v8/PROGRESS.md` | Tiến độ từng chunk: làm gì, kết quả test, việc của admin, giới hạn còn lại | 72 | Đầu mọi việc code (chỉ phần đầu); tra lịch sử bằng tìm kiếm | Lớn; không đọc từ đầu tới cuối |
-| `v8/BACKLOG.md` | Câu hỏi chờ chốt, việc để sau, việc còn phải kiểm trên Google thật, mục đã chốt | 18 | Đầu mọi việc code; khi rà BACKLOG | Mục chưa duyệt chỉ ghi ở đây |
+| `v8/PROJECT_MEMORY.md` | Bàn giao giữa các chat: trạng thái hiện tại, việc kế tiếp, luật làm việc (mới 27/11, thay KHOI_DONG_CHAT_MOI.md) | 21 | Đầu mọi chat mới, luôn đọc trước | Cập nhật ở cuối mỗi việc |
+| `v8/HUONG_DAN_DOC_PROJECT.md` | File này: bản đồ các file trong project và cách đọc | 16 | Khi cần biết file nào chứa gì | Cập nhật khi thêm, xoá, đổi tên file |
+| `v8/PROGRESS.md` | Tiến độ từng chunk: làm gì, kết quả test, việc của admin, giới hạn còn lại | 75 | Đầu mọi việc code (chỉ phần đầu); tra lịch sử bằng tìm kiếm | Lớn; không đọc từ đầu tới cuối |
+| `v8/BACKLOG.md` | Câu hỏi chờ chốt, việc để sau, việc còn phải kiểm trên Google thật, mục đã chốt | 25 | Đầu mọi việc code; khi rà BACKLOG | Mục chưa duyệt chỉ ghi ở đây |
+| `v8/AGENTS.md` | Luật làn khi Claude Code, Codex, Gemini CLI cùng làm trên repo (từ nhánh PR 2) | 2 | Khi dùng nhiều công cụ AI trên GitHub | Đọc sau CLAUDE.md |
 | `v8/CLAUDE.md` | Luật kỹ thuật đánh số, quy ước làm việc, cách làm bằng Claude Code | 29 | Trước khi sửa code | Bản trên GitHub cũng là file này |
-| `v8/README.md` | Giới thiệu repo: cấu trúc thư mục, lệnh Node, cách đưa code lên Apps Script | 4 | Lần đầu làm quen với repo |  |
+| `v8/README.md` | Giới thiệu repo: cấu trúc thư mục, lệnh Node, cách đưa code lên Apps Script | 5 | Lần đầu làm quen với repo |  |
 | `v8/HUONG_DAN_VAN_HANH.md` | Hướng dẫn admin vận hành: CONFIG, menu, email, việc hằng ngày, tình huống, đăng nhập Google (Phần A đến M) | 102 | Khi cần chỉ admin cách làm hoặc xử lý tình huống | Rất lớn, chỉ tra theo Phần |
 | `v8/HUONG_DAN_PHAT_HANH.md` | Phát hành, cập nhật, quay lui; nâng STAGING lên 8.1.4 (mục 3) | 18 | Khi dán code lên STAGING hoặc quay lui | Mục 6 go live chưa viết lại |
 | `v8/HUONG_DAN_THU_TAI.md` | Thử tải trên STAGING: chuẩn bị, mỗi lượt thử, dọn, an toàn | 8 | Khi thử tải | Chỉ chạy trên STAGING |
@@ -88,6 +90,9 @@ Tổng cộng **36 file** trong project. Cỡ tính bằng KB (1 KB = 1.024 byte
 
 | Đường dẫn | Nội dung | Cỡ (KB) | Khi nào đọc | Lưu ý |
 |---|---|---:|---|---|
+| `v8/plan/KE_HOACH_V9_CHI_TIET.md` | Kế hoạch v9 chi tiết: 14 điểm nghẽn, Next.js, Supabase, sprint S0 đến S16 (05/11, nhánh PR 2) | 41 | Khi bàn v9 | Chưa duyệt (BL70 đến BL78) |
+| `v8/plan/KE_HOACH_V9_TOI_UU_DIEU_PHOI.md` | Kế hoạch v9 bản 2: tối ưu giá (Cloudflare, SES, Gemini CLI), điều phối 3 làn AI | 24 | Khi bàn v9, chi phí | Chưa duyệt (BL79 đến BL84) |
+| `v8/plan/P0_BUOC_TUNG_BUOC.md` | P0 từng bước: việc của anh, của Claude, lịch ngày, cài SES | 11 | Khi làm email SES | Đọc ghi chú gộp 28/11 ở đầu file: code SES chưa vào main |
 | `v8/plan/KE_HOACH_5J_5P.md` | Kế hoạch sub chunk 5J đến 5Q: luật mọi chunk (mục 0), chi tiết (mục 2), lỗ hổng (mục 4), go live chunk 6 (mục 5) | 34 | Trước mỗi sub chunk code; khi vào chunk 6 | Bảng số phiên bản trong plan là số cũ |
 | `v8/plan/KE_HOACH_SAU_GO_LIVE.md` | Kế hoạch sau go live: từ v8 lên v9 (web app riêng, database thật) | 10 | Khi bàn việc sau go live | Đã duyệt 01/11, chờ hiệu lệnh |
 | `v8/plan/LO_TRINH_V8_TOI_CUOI.md` | Lộ trình v8 từ hôm nay tới bước cuối | 7 | Khi cần nhìn toàn cảnh tiến trình | Ngày tháng là ước lượng |
