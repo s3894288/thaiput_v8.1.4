@@ -4244,7 +4244,7 @@ const HL5N = { RED: '#ea9999', ORANGE: '#f6b26b', PINK: '#f9d2e4', YELLOW: '#fff
 const bkSet = (c, id, patch) => c.api.withLock_(() => { const t = c.api.table_('BOOKINGS'); t.update(t.byId(id), patch); });
 const bkColor = (c, id) => { const b = c.row('BOOKINGS', id); return cfColor(c, 'BOOKINGS', b._row, c.api.getNow_()); };
 
-t('I136', '5N BOOKINGS: đúng 6 màu theo thứ tự ưu tiên; "Đã xử lý (giữ nguyên)" ghi admin_done_at, hết vàng Vắng học viên và đỏ Không hoàn thành, hiện lại khi kết quả đổi sau đó; không cho chọn ở buổi chưa có kết quả, chờ đổi tutor, kỹ thuật chưa chọn lỗi; lựa chọn khác chạy được cũng ghi admin_done_at', () => {
+t('I230', '5N BOOKINGS: đúng 6 màu theo thứ tự ưu tiên; "Đã xử lý (giữ nguyên)" ghi admin_done_at, hết vàng Vắng học viên và đỏ Không hoàn thành, hiện lại khi kết quả đổi sau đó; không cho chọn ở buổi chưa có kết quả, chờ đổi tutor, kỹ thuật chưa chọn lỗi; lựa chọn khác chạy được cũng ghi admin_done_at', () => {
   const c = mk('2026-10-12 10:00'), { api } = c;
   api.applyHighlights_(api.dbSpreadsheet_());
   const days = ['13', '14', '15', '16', '17', '19', '20', '21'];
@@ -4320,7 +4320,7 @@ t('I136', '5N BOOKINGS: đúng 6 màu theo thứ tự ưu tiên; "Đã xử lý 
   assert.ok(api.BOOKING_ADMIN_ACTIONS.includes('Đã xử lý (giữ nguyên)'));
 });
 
-t('I137', '5N STUDENT_PACKAGES: đỏ khi còn thông báo COMP_ON_EXPIRED chưa đọc của gói (đọc rồi thì hết), xám hết hạn, vàng còn EXPIRY_NOTICE_DAYS ngày (tính theo hôm nay, đổi CONFIG thì đổi), tím admin cộng tay, xanh dương có ngày bù', () => {
+t('I231', '5N STUDENT_PACKAGES: đỏ khi còn thông báo COMP_ON_EXPIRED chưa đọc của gói (đọc rồi thì hết), xám hết hạn, vàng còn EXPIRY_NOTICE_DAYS ngày (tính theo hôm nay, đổi CONFIG thì đổi), tím admin cộng tay, xanh dương có ngày bù', () => {
   const c = mk('2026-10-12 10:00'), { api } = c;
   const sps = c.rows('STUDENT_PACKAGES');
   assert.ok(sps.length >= 4, 'cần ít nhất 4 gói mẫu');
@@ -4356,7 +4356,7 @@ t('I137', '5N STUDENT_PACKAGES: đỏ khi còn thông báo COMP_ON_EXPIRED chưa
   assert.strictEqual(color(p3), HL5N.GREY, 'đọc rồi: hết đỏ');
 });
 
-t('I138', '5N hourlyJob báo buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: một lần mỗi lần kẹt (email Khẩn, nhật ký), chịu lệch nhịp trigger vài phút, nhiều buổi kẹt cùng lượt chỉ một email, buổi ra khỏi trạng thái thì xoá mốc và kẹt lại được báo lại; đổi giờ trong CONFIG, -1 tắt', () => {
+t('I232', '5N hourlyJob báo buổi kẹt Chờ đổi tutor quá REASSIGN_STUCK_HOURS giờ: một lần mỗi lần kẹt (email Khẩn, nhật ký), chịu lệch nhịp trigger vài phút, nhiều buổi kẹt cùng lượt chỉ một email, buổi ra khỏi trạng thái thì xoá mốc và kẹt lại được báo lại; đổi giờ trong CONFIG, -1 tắt', () => {
   const c = mk('2026-10-12 10:00'), { api, env } = c;
   c.onlyOpen('2026-10-20', '19:00', ['T001']); c.onlyOpen('2026-10-21', '19:00', ['T002']); c.onlyOpen('2026-10-22', '19:00', ['T003']);
   const [r] = c.book('S001', [['2026-10-20', '19:00']]), [r2] = c.book('S002', [['2026-10-21', '19:00']]), [r3] = c.book('S003', [['2026-10-22', '19:00']]);
