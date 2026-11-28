@@ -4,7 +4,7 @@ Hệ thống đặt lịch luyện nói tiếng Thái 1:1, bản **8.1.4** (02/1
 
 Repo này là bản đầy đủ của dự án: mã nguồn, bộ test chạy bằng Node (giả lập Google), bản dán tay, tài liệu, kế hoạch, lịch sử. Từ 05/11/2026 repo GitHub là nguồn chính; 2 file bundle trong claude.ai project (`v8/repo/`) giữ làm bản dự phòng. Bàn giao giữa các chat: `PROJECT_MEMORY.md` (đọc đầu tiên); bản đồ file: `HUONG_DAN_DOC_PROJECT.md`.
 
-Nhánh (từ 28/11): `main` (8.1.4, nguồn chuẩn), `Merge-814-at-28Nov` (bản chụp main ngay sau lần gộp 28/11), `claude/wizardly-gates-8xzfbn` (PR 1, bản 8.1.9 chưa gộp, BACKLOG BL99).
+Nhánh (từ 28/11): `main` (8.1.4, nguồn chuẩn), `Merge-814-at-28Nov` (bản chụp main ngay sau lần gộp 28/11), `claude/wizardly-gates-8xzfbn` (PR 1, bản 8.1.9 chưa gộp, BACKLOG BL99). Ba nhánh khác còn trên repo là nhánh thừa chờ xoá (BL100).
 
 ## Cấu trúc
 

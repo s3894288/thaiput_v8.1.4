@@ -5,10 +5,11 @@
 ## Thay đổi so với bản 27/11 (lần 11)
 
 * Gộp tài liệu của nhánh `claude/hopeful-galileo-xa1dv9` (PR 2, kế hoạch v9, email SES) vào main ngày 28/11, giữ code 8.1.4. Thêm 16 câu của nhánh đó với **số gốc BL70 đến BL85**.
-* Bảng số BACKLOG giữa các nhánh (từ 28/11): main dùng BL01 đến BL69, BL70 đến BL85 (từ PR 2), BL96 đến BL99; nhánh 8.1.9 (PR 1) đã đổi số của nó sang BL150 đến BL175 ngày 28/11. BL86 đến BL95 bỏ trống. **Câu mới của main bắt đầu từ BL100.**
+* Bảng số BACKLOG giữa các nhánh (từ 28/11): main dùng BL01 đến BL69, BL70 đến BL85 (từ PR 2), BL96 đến BL99; nhánh 8.1.9 (PR 1) đã đổi số của nó sang BL150 đến BL175 ngày 28/11. BL86 đến BL95 bỏ trống. **Câu mới của main bắt đầu từ BL101.**
 * Chunk SES của PR 2 nay tên **5S** (đổi ngày 28/11 trên nhánh đó để không trùng 5R của nhánh 8.1.9). Chữ 5R hay 5S trong BL70, BL71, BL80, BL84 là đợt email SES này.
 * BL80, BL84, BL85 thêm ghi chú trạng thái trên main. BL99 sửa số của nhánh 8.1.9.
-* Tổng còn chờ: 51 câu (mục A 47, mục B 4).
+* Thêm **BL100**: xoá 3 nhánh thừa bị proxy của phiên Claude chặn (lỗi 403), anh tự xoá. PR 2 đã đóng 28/11 sau khi gộp tài liệu.
+* Tổng còn chờ: 52 câu (mục A 48, mục B 4).
 
 ## Thay đổi so với bản 27/11 (lần 10)
 
@@ -93,6 +94,7 @@
 | BL83 | Tách Worker "jobs" (Hono, TypeScript thuần: cron, outbox, webhook SES) khỏi Worker "web" (Next.js qua vinext hoặc OpenNext) | Có | v9 S0 |
 | BL84 | Làm P0 ngay trong tháng 11 xen kẽ chunk 6, 7: lấy lại `test/unit.js`, `.gitignore`, GitHub Actions, `AGENTS.md` dùng chung, 5S email. Ghi chú 28/11: phần repo của P0 đã có trên main (`.gitignore`, GitHub Actions, `AGENTS.md`, `.clasp.json.example`, `test/unit.js` bản gốc); phần email SES chưa (BL80). | Có | P0 |
 | BL85 | `test/unit.js` viết lại 10/11 vì bản gốc không lên repo. (a) giữ bản viết lại; (b) anh gửi `TEST_BUNDLE.txt`, coder gộp test bản gốc có mà bản mới thiếu. Ghi chú 28/11: main dùng bản GỐC `test/unit.js` (khôi phục từ project 27/11); bản viết lại chỉ còn ở `handoff/EMAIL_SES_RESEND/02_test_unit_js.patch`. Việc còn lại: so hai bản, thêm vào bản gốc test nào bản viết lại có mà bản gốc thiếu. | (b) nếu còn file, không thì (a) | Không chặn |
+| BL100 | Repo còn 3 nhánh thừa phải xoá để đúng 3 nhánh anh chốt 28/11 (`main`, `Merge-814-at-28Nov`, `claude/wizardly-gates-8xzfbn`): `dong-bo-27-11` (PR 3, đã gộp), `gop-814-28-11` (PR 4, đã gộp), `claude/hopeful-galileo-xa1dv9` (PR 2, đã đóng; tài liệu đã gộp vào main, code SES còn ở `handoff/EMAIL_SES_RESEND/` và trong lịch sử PR 2). Alex thử xoá 28/11 bằng git và bằng API GitHub: proxy của phiên Claude chặn cả hai (lỗi 403). Anh tự xoá: github.com, repo, tab **Code**, bấm **Branches**, bấm biểu tượng thùng rác ở từng nhánh | Xoá ngay cả 3 | Ngay |
 | BL60 | Số điện thoại nước ngoài gõ không có + và mã nước (ví dụ số Thái `081 234 5678`) bị hiểu là số Việt Nam và lưu `+84812345678`, có link Zalo sai người. (a) giữ, gợi ý trên form đã ghi "số nước ngoài ghi + và mã nước"; (b) chỉ chuẩn hoá khi bắt đầu bằng 0 hoặc +84 hoặc 84 và đủ 10 hay 11 số | (a) | 5Q (rà) |
 | BL61 | Gói giá 0 chỉ đăng ký qua Zalo: nếu TRIAL để giá 0 thì Trial thành chỉ qua Zalo. Bản cài mới có giá mặc định 0, menu 2 báo LƯU Ý (không phải LỖI). (a) giữ LƯU Ý; (b) báo LỖI khi mọi gói đang bán đều giá 0 | (a) | 5Q (rà) |
 | BL62 | Khoá tutor huỷ giờ rảnh tương lai; mở khoá không tự mở lại giờ rảnh (tutor mở lại trên trang). (a) giữ; (b) mở khoá tự mở lại các giờ đã huỷ khi khoá mà còn ở tương lai | (a) | 5Q (rà) |

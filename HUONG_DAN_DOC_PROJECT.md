@@ -42,7 +42,7 @@ Tổng cộng **40 file** trong project. Cỡ tính bằng KB (1 KB = 1.024 byte
 | `v8/PROJECT_MEMORY.md` | Bàn giao giữa các chat: trạng thái hiện tại, việc kế tiếp, luật làm việc (mới 27/11, thay KHOI_DONG_CHAT_MOI.md) | 21 | Đầu mọi chat mới, luôn đọc trước | Cập nhật ở cuối mỗi việc |
 | `v8/HUONG_DAN_DOC_PROJECT.md` | File này: bản đồ các file trong project và cách đọc | 16 | Khi cần biết file nào chứa gì | Cập nhật khi thêm, xoá, đổi tên file |
 | `v8/PROGRESS.md` | Tiến độ từng chunk: làm gì, kết quả test, việc của admin, giới hạn còn lại | 75 | Đầu mọi việc code (chỉ phần đầu); tra lịch sử bằng tìm kiếm | Lớn; không đọc từ đầu tới cuối |
-| `v8/BACKLOG.md` | Câu hỏi chờ chốt, việc để sau, việc còn phải kiểm trên Google thật, mục đã chốt | 25 | Đầu mọi việc code; khi rà BACKLOG | Mục chưa duyệt chỉ ghi ở đây |
+| `v8/BACKLOG.md` | Câu hỏi chờ chốt, việc để sau, việc còn phải kiểm trên Google thật, mục đã chốt | 26 | Đầu mọi việc code; khi rà BACKLOG | Mục chưa duyệt chỉ ghi ở đây |
 | `v8/AGENTS.md` | Luật làn khi Claude Code, Codex, Gemini CLI cùng làm trên repo (từ nhánh PR 2) | 2 | Khi dùng nhiều công cụ AI trên GitHub | Đọc sau CLAUDE.md |
 | `v8/CLAUDE.md` | Luật kỹ thuật đánh số, quy ước làm việc, cách làm bằng Claude Code | 29 | Trước khi sửa code | Bản trên GitHub cũng là file này |
 | `v8/README.md` | Giới thiệu repo: cấu trúc thư mục, lệnh Node, cách đưa code lên Apps Script | 5 | Lần đầu làm quen với repo |  |
